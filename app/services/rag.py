@@ -52,7 +52,13 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import tool
 
 from app.security import sanitize_for_llm
-from app.services.llm_client import SYSTEM_GUARDRAIL, embeddings_retry, get_chat_model, get_embeddings_model
+from app.services.llm_client import (
+    SYSTEM_GUARDRAIL,
+    embeddings_retry,
+    get_embeddings_model,
+    get_raw_chat_model,
+    with_chat_retry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -351,14 +357,18 @@ async def answer_question(
         return 'Ask a question about the analyzed tickets - e.g. "how many P1 tickets are there?"'
 
     stats_text = _format_stats(stats)
-    chat_model = get_chat_model()
-    if chat_model is None:
+    raw_chat_model = get_raw_chat_model()
+    if raw_chat_model is None:
         return _no_llm_fallback(question, index, stats_text)
 
     try:
         tools = _make_tools(index)
         tool_map = {t.name: t for t in tools}
-        model_with_tools = chat_model.bind_tools(tools)
+        # bind_tools() must be called on the RAW model - with_chat_retry()
+        # returns a RunnableRetry, which doesn't expose bind_tools() (see
+        # get_raw_chat_model()'s docstring in llm_client.py). Bind first,
+        # then wrap the bound runnable in retry so 429s are still handled.
+        model_with_tools = with_chat_retry(raw_chat_model.bind_tools(tools))
 
         messages = [SystemMessage(content=AGENT_SYSTEM_PROMPT.format(stats=stats_text))]
         messages += _history_to_messages(history)
@@ -380,10 +390,10 @@ async def answer_question(
 
         # Exceeded MAX_TOOL_ROUNDS without a final answer - force one
         # without giving the model tools to call again.
-        final = await chat_model.ainvoke(
+        final = await with_chat_retry(raw_chat_model).ainvoke(
             messages + [HumanMessage(content="Answer the original question now, using only the information already gathered above.")]
         )
         return final.content.strip()
     except Exception as exc:
-        logger.warning("Chat answer generation failed, falling back to raw stats: %s", exc)
+        logger.exception("Chat answer generation failed, falling back to raw stats")
         return "I couldn't reach the assistant model just now. Here's what the data shows directly:\n\n" + stats_text
