@@ -65,12 +65,14 @@ SYSTEM_GUARDRAIL = (
 _RETRYABLE = (openai.RateLimitError,)
 
 
-def _with_retry(model):
-    """Applies LangChain's built-in retry to a chat model Runnable. Only
-    chat models support this - langchain_core.embeddings.Embeddings is NOT
-    a Runnable (no .invoke/.batch/.with_retry), so embedding calls are
-    retried separately with `embeddings_retry` below, applied at the call
-    site in categorizer.py instead of on the model object itself."""
+def with_chat_retry(model):
+    """Applies LangChain's built-in retry to a chat model Runnable. Public
+    (not the old `_with_retry`) because tool-calling callers need it too -
+    see get_raw_chat_model() below for why. Only chat models support this -
+    langchain_core.embeddings.Embeddings is NOT a Runnable (no .invoke/
+    .batch/.with_retry), so embedding calls are retried separately with
+    `embeddings_retry` below, applied at the call site instead of on the
+    model object itself."""
     return model.with_retry(
         retry_if_exception_type=_RETRYABLE,
         wait_exponential_jitter=True,
@@ -90,10 +92,18 @@ def embeddings_retry(fn):
 
 
 @lru_cache
-def get_chat_model():
-    """Returns a LangChain BaseChatModel with retry applied, or None if the
-    configured provider is unavailable/misconfigured (fail-safe: callers
-    treat None as 'no LLM available, use keyword rules only')."""
+def get_raw_chat_model():
+    """Returns the underlying LangChain BaseChatModel with NO retry wrapper.
+
+    Use this instead of get_chat_model() whenever you need a chat-model-
+    specific method - bind_tools() being the one that matters here (see
+    rag.py). with_retry() returns a RunnableRetry, which only implements
+    the generic Runnable interface (ainvoke/abatch/...) - it does NOT proxy
+    BaseChatModel-only methods like bind_tools() through to the wrapped
+    model, so `get_chat_model().bind_tools(...)` fails with
+    `'RunnableRetry' object has no attribute 'bind_tools'`. Bind tools to
+    THIS raw model first, then call with_chat_retry() on the bound result
+    if you still want 429 resilience on top (rag.py does exactly this)."""
     try:
         if settings.LLM_PROVIDER == "sap_genai_hub":
             for required in ("AICORE_AUTH_URL", "AICORE_CLIENT_ID", "AICORE_CLIENT_SECRET", "AICORE_BASE_URL"):
@@ -103,25 +113,36 @@ def get_chat_model():
             from gen_ai_hub.proxy.langchain import ChatOpenAI as SapChatOpenAI
 
             proxy_client = get_proxy_client("gen-ai-hub")
-            model = SapChatOpenAI(proxy_model_name=settings.CHAT_MODEL_NAME, proxy_client=proxy_client, temperature=0.0)
-            return _with_retry(model)
+            return SapChatOpenAI(proxy_model_name=settings.CHAT_MODEL_NAME, proxy_client=proxy_client, temperature=0.0)
 
         if settings.LLM_PROVIDER == "openai_compat":
             if not settings.LLM_BASE_URL or not settings.LLM_API_KEY:
                 raise RuntimeError("LLM_BASE_URL / LLM_API_KEY not configured for openai_compat provider.")
             from langchain_openai import ChatOpenAI
 
-            model = ChatOpenAI(
+            return ChatOpenAI(
                 model=settings.CHAT_MODEL_NAME,
                 base_url=settings.LLM_BASE_URL,
                 api_key=settings.LLM_API_KEY,
                 temperature=0.0,
             )
-            return _with_retry(model)
     except Exception as exc:
         logger.warning("No chat model available - falling back to keyword rules only: %s", exc)
 
     return None
+
+
+@lru_cache
+def get_chat_model():
+    """Returns a LangChain BaseChatModel WITH retry applied, or None if the
+    configured provider is unavailable/misconfigured (fail-safe: callers
+    treat None as 'no LLM available, use keyword rules only'). This is what
+    plain-completion callers want (categorizer.py, graph_pipeline.py - a
+    single .ainvoke() with no tool binding). For tool-calling, use
+    get_raw_chat_model() + .bind_tools() + with_chat_retry() instead - see
+    the docstring on get_raw_chat_model() for why."""
+    model = get_raw_chat_model()
+    return with_chat_retry(model) if model is not None else None
 
 
 @lru_cache
