@@ -233,6 +233,63 @@ footer {display: none !important;}
     20% {opacity: 1;}
     100% {opacity: 0;}
 }
+
+/* Ask the Agent - bounded chat panel. Everything (intro, transcript,
+   composer) lives inside one fixed-height card so the tab no longer
+   grows to the length of the conversation; only the transcript itself
+   scrolls internally. */
+#chat-panel {
+    display: flex !important; flex-direction: column !important;
+    height: 640px !important; max-height: 78vh !important;
+    padding: 0 !important; overflow: hidden !important;
+}
+.chat-intro {
+    margin: 0 !important; padding: 14px 20px 12px !important;
+    border-bottom: 1px solid var(--dash-border); flex-shrink: 0;
+}
+#chatbot {flex: 1 1 auto !important; min-height: 0 !important;}
+#chatbot .wrap {background: #f8fafc !important;}
+#chatbot .bubble-wrap, #chatbot .message-wrap {padding: 16px 20px !important; gap: 12px !important;}
+
+/* Message bubbles - best-effort selectors covering the class names used
+   across recent Gradio chatbot versions; harmless no-ops if a selector
+   doesn't match the installed version's DOM. */
+#chatbot .message, #chatbot [class*="user-row"] .bubble, #chatbot [class*="bot-row"] .bubble {
+    border-radius: 16px !important; font-size: 0.88rem !important; line-height: 1.45 !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important; border: none !important;
+}
+#chatbot .message.user, #chatbot [class*="user-row"] .bubble, #chatbot .role-user {
+    background: #2563eb !important; color: #ffffff !important;
+}
+#chatbot .message.bot, #chatbot [class*="bot-row"] .bubble, #chatbot .role-assistant {
+    background: #ffffff !important; color: var(--dash-text) !important;
+    border: 1px solid var(--dash-border) !important;
+}
+#chatbot .avatar-container {
+    border-radius: 10px !important; box-shadow: var(--dash-shadow);
+}
+
+/* Composer - pinned to the bottom of the panel, pill-shaped input to
+   read as a real chat composer rather than a generic form row. */
+#chat-input-row {
+    flex-shrink: 0 !important; margin: 0 !important; gap: 10px !important;
+    align-items: center !important; padding: 14px 20px !important;
+    border-top: 1px solid var(--dash-border) !important; background: #ffffff !important;
+}
+#chat-input-row textarea {
+    border-radius: 22px !important; padding: 10px 18px !important; font-size: 0.88rem !important;
+    border: 1px solid var(--dash-border) !important; background: #f8fafc !important;
+}
+#chat-input-row textarea:focus {border-color: #2563eb !important; background: #ffffff !important;}
+#chat-input-row button.primary {
+    border-radius: 22px !important; font-weight: 600 !important; height: 42px !important; padding: 0 22px !important;
+}
+#chat-clear-btn {
+    flex-shrink: 0 !important; margin: 10px 20px 14px !important; align-self: flex-start !important;
+    border-radius: 8px !important; font-size: 0.78rem !important; font-weight: 500 !important;
+    color: var(--dash-text-muted) !important; background: transparent !important;
+    border: 1px solid var(--dash-border) !important; box-shadow: none !important;
+}
 """
 
 AGENT_PROGRESS_HTML = """
@@ -902,23 +959,28 @@ def build_ui() -> gr.Blocks:
                                 next_btn = gr.Button("Next →", size="sm")
 
                     with gr.Tab("💬 Ask the Agent"):
-                        gr.Markdown(
-                            "Ask a question about the tickets you just analyzed - e.g. "
-                            "*\"what's driving high-priority incidents?\"*, "
-                            "*\"which assignment group has the worst worklog quality?\"*, or "
-                            "*\"summarize the recurring issues on our database servers.\"* "
-                            "Answers are grounded only in the analyzed batch (Dashboard tab) - "
-                            "run an analysis first if you haven't yet.",
-                            elem_classes=["severity-note"],
-                        )
-                        chatbot = gr.Chatbot(height=440, show_label=False, elem_id="chatbot")
-                        with gr.Row():
-                            chat_input = gr.Textbox(
-                                placeholder="Ask a question about the analyzed tickets...",
-                                show_label=False, scale=5, container=False,
+                        # Single bounded chat panel (intro + transcript +
+                        # composer) instead of loosely stacked components -
+                        # keeps the tab a fixed height with the transcript
+                        # scrolling internally like a normal chat app.
+                        with gr.Column(elem_id="chat-panel", elem_classes=["dash-card"]):
+                            gr.Markdown(
+                                "Ask a question about the tickets you just analyzed - e.g. "
+                                "*\"what's driving high-priority incidents?\"*, "
+                                "*\"which assignment group has the worst worklog quality?\"*, or "
+                                "*\"summarize the recurring issues on our database servers.\"* "
+                                "Answers are grounded only in the analyzed batch (Dashboard tab) - "
+                                "run an analysis first if you haven't yet.",
+                                elem_classes=["severity-note", "chat-intro"],
                             )
-                            chat_send = gr.Button("Send", variant="primary", scale=1)
-                        chat_clear_btn = gr.Button("Clear conversation", size="sm")
+                            chatbot = gr.Chatbot(height=440, show_label=False, elem_id="chatbot")
+                            with gr.Row(elem_id="chat-input-row"):
+                                chat_input = gr.Textbox(
+                                    placeholder="Ask a question about the analyzed tickets...",
+                                    show_label=False, scale=5, container=False,
+                                )
+                                chat_send = gr.Button("Send", variant="primary", scale=1)
+                            chat_clear_btn = gr.Button("Clear conversation", size="sm", elem_id="chat-clear-btn")
 
         full_results_state = gr.State(pd.DataFrame())
         filtered_results_state = gr.State(pd.DataFrame())
