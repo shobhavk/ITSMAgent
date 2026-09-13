@@ -343,19 +343,28 @@ button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; 
    block button below the heading. */
 #exec-summary-card {margin-top: 14px;}
 #exec-summary-header {
+    display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important;
     align-items: center !important; justify-content: space-between !important;
-    gap: 12px !important; margin-bottom: 4px !important; flex-wrap: nowrap !important;
+    gap: 12px !important; margin-bottom: 4px !important;
 }
-#exec-summary-title {margin: 0 !important; padding-bottom: 0 !important; border-bottom: none !important; flex: 1 1 auto;}
+#exec-summary-title {min-width: 0; margin: 0 !important; padding-bottom: 0 !important; border-bottom: none !important; flex: 1 1 auto;}
 #exec-summary-title h3 {margin: 0 !important;}
 #exec-summary-btn {
-    flex-shrink: 0 !important; width: auto !important; min-width: 0 !important;
+    flex-shrink: 0 !important; flex-grow: 0 !important; width: auto !important; min-width: 0 !important;
     background: transparent !important; color: #2563eb !important;
     border: 1px solid #bfdbfe !important; border-radius: 999px !important;
     font-size: 0.78rem !important; font-weight: 600 !important;
     padding: 6px 14px !important; height: auto !important; box-shadow: none !important;
+    white-space: nowrap !important;
 }
 #exec-summary-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
+/* Gradio's default Row rules can switch to a stacked column layout below
+   a width breakpoint (which also lets the button's own label wrap onto
+   two lines) - these overrides keep the header row and its button text
+   on one line regardless of the surrounding column width. */
+@media (max-width: 1024px) {
+    #exec-summary-header {flex-direction: row !important; flex-wrap: nowrap !important;}
+}
 #exec-summary-output {
     margin-top: 12px; font-size: 0.88rem; color: var(--dash-text); line-height: 1.55;
 }
