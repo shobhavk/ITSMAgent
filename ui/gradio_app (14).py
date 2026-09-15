@@ -335,30 +335,23 @@ button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; 
     color: #166534; font-size: 0.85rem;
 }
 
-/* Overview - Executive Summary card/button. Heading and button live in
-   a plain (non-Gradio-Row) flex div we fully control, so Gradio's own
-   responsive row rules can never stack it into a column or wrap the
-   button label onto two lines - both things that happened when this
-   used a gr.Row. */
-#exec-summary-card {margin-top: 14px;}
-#exec-summary-header {
-    display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important;
-    align-items: center !important; justify-content: space-between !important;
-    gap: 12px !important; margin: 0 0 10px 0 !important; padding: 0 0 10px 0 !important;
-    border-bottom: 1px solid var(--dash-border) !important;
-}
-@media (max-width: 1024px) {
-    #exec-summary-header {flex-direction: row !important; flex-wrap: nowrap !important;}
-}
-#exec-summary-title {flex: 1 1 auto !important; min-width: 0 !important;}
-#exec-summary-title p {margin: 0 !important; font-size: 0.95rem !important; font-weight: 700 !important; color: var(--dash-text) !important;}
+/* Overview - Executive Summary card/button. The button is pinned with
+   position:absolute onto the card's own padding box (via
+   #exec-summary-card {position:relative}) instead of living inside a
+   gr.Row next to the heading - Gradio applies its own negative side
+   margins to Row internals to get edge-to-edge children, which was
+   pulling the button outside the card's visible border. Taking it out
+   of the normal flow entirely avoids that regardless of Gradio version. */
+#exec-summary-card {margin-top: 14px; position: relative !important; overflow: visible;}
+#exec-summary-card .section-heading {padding-right: 150px !important;}
 #exec-summary-btn {
-    flex-shrink: 0; flex-grow: 0; display: inline-flex; align-items: center; gap: 6px;
-    background: transparent !important; color: #2563eb !important;
+    position: absolute !important; top: 18px !important; right: 20px !important;
+    z-index: 5 !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
+    background: #ffffff !important; color: #2563eb !important;
     border: 1px solid #bfdbfe !important; border-radius: 999px !important;
     font-size: 0.78rem !important; font-weight: 600 !important; line-height: 1 !important;
     padding: 7px 16px !important; height: auto !important; min-width: 0 !important;
-    width: auto !important; box-shadow: none !important; white-space: nowrap !important;
+    width: auto !important; box-shadow: 0 1px 2px rgba(15,23,42,0.06) !important; white-space: nowrap !important;
 }
 #exec-summary-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
 #exec-summary-output {
@@ -1399,16 +1392,18 @@ def build_ui() -> gr.Blocks:
                         # Executive Summary - computes KPIs/trends with
                         # pandas first, then sends only that small
                         # aggregated dict to the LLM for a short write-up.
-                        # Title + button are one plain HTML flex header
-                        # (elem_id="exec-summary-header") rather than a
-                        # gr.Row, so Gradio's own responsive row rules
-                        # can never stack it or wrap the button label.
+                        # The button is NOT inside a gr.Row with the
+                        # heading - Gradio gives Row children negative
+                        # side margins for edge-to-edge layout, which was
+                        # pushing the button past the card's own border.
+                        # Instead it's a normal sibling, pinned on top of
+                        # the card with CSS position:absolute, so it can
+                        # never escape the card's visible edges.
                         with gr.Column(elem_classes=["dash-card"], elem_id="exec-summary-card"):
-                            with gr.Row(elem_id="exec-summary-header", equal_height=True):
-                                gr.Markdown("🧾 Executive Summary", elem_id="exec-summary-title")
-                                exec_summary_btn = gr.Button(
-                                    "✨ Generate summary", size="sm", elem_id="exec-summary-btn",
-                                )
+                            gr.Markdown("### 🧾 Executive Summary", elem_classes=["section-heading"])
+                            exec_summary_btn = gr.Button(
+                                "✨ Generate summary", size="sm", elem_id="exec-summary-btn",
+                            )
                             exec_summary_output = gr.Markdown(
                                 "Run an analysis, then click **Generate summary** for a "
                                 "management-friendly write-up of the KPIs above.",
