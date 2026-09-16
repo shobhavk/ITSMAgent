@@ -6,9 +6,18 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    volumes:
+      # SQLite (ticket/file cache) lives at /app/data by default - see
+      # ITSM_DB_PATH in app/services/persistence.py. Without this volume,
+      # `read_only: true` below would make that write fail at startup;
+      # this is the one path the container is allowed to write to.
+      - itsm_data:/app/data
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
+
+volumes:
+  itsm_data:
