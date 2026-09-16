@@ -42,7 +42,8 @@ def normalize_and_validate(df: pd.DataFrame) -> tuple[list[TicketRecord], list[d
     # Ensure expected columns exist even if the source lacked them
     for col in ["ticket_id", "short_description", "description", "worklog",
                 "priority", "status", "assignment_group", "configuration_item",
-                "opened_at", "closed_at"]:
+                "opened_at", "closed_at", "created_at", "resolved_at",
+                "responded_at", "detected_at"]:
         if col not in df.columns:
             df[col] = None
 
@@ -77,6 +78,10 @@ def normalize_and_validate(df: pd.DataFrame) -> tuple[list[TicketRecord], list[d
             configuration_item=_clean_str(row.get("configuration_item")) or None,
             opened_at=_coerce_datetime(row.get("opened_at")),
             closed_at=_coerce_datetime(row.get("closed_at")),
+            created_at=_coerce_datetime(row.get("created_at")),
+            resolved_at=_coerce_datetime(row.get("resolved_at")),
+            responded_at=_coerce_datetime(row.get("responded_at")),
+            detected_at=_coerce_datetime(row.get("detected_at")),
             source_row=idx,
         )
         valid.append(record)

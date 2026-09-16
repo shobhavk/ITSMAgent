@@ -97,6 +97,16 @@ class TicketCache(Base):
     configuration_item = Column(String(256), nullable=True)
     llm_worklog_scoring_enabled = Column(Boolean, default=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # Carried through so a cache-hit ticket still has its timestamps for
+    # trend/resolution-metric analysis - these describe the ticket itself,
+    # not the LLM processing, so they're safe to reuse across re-uploads
+    # even though category/score are keyed on unchanged content.
+    opened_at = Column(DateTime, nullable=True)
+    closed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    responded_at = Column(DateTime, nullable=True)
+    detected_at = Column(DateTime, nullable=True)
 
 
 Base.metadata.create_all(engine)
@@ -135,6 +145,12 @@ def get_ticket_cache_bulk(ticket_ids: list[str]) -> dict[str, dict]:
                 "host": r.host,
                 "configuration_item": r.configuration_item,
                 "llm_worklog_scoring_enabled": r.llm_worklog_scoring_enabled,
+                "opened_at": r.opened_at,
+                "closed_at": r.closed_at,
+                "created_at": r.created_at,
+                "resolved_at": r.resolved_at,
+                "responded_at": r.responded_at,
+                "detected_at": r.detected_at,
             }
             for r in rows
         }
@@ -146,7 +162,8 @@ def save_ticket_cache_bulk(entries: list[dict]) -> None:
     """Upserts a batch of freshly-processed tickets into the cache.
     Each entry needs: ticket_id, content_hash, category, category_confidence,
     category_method, worklog_score, worklog_flags, host, configuration_item,
-    llm_worklog_scoring_enabled."""
+    llm_worklog_scoring_enabled, opened_at, closed_at, created_at,
+    resolved_at, responded_at, detected_at (the last six may be None)."""
     if not entries:
         return
     session = SessionLocal()
@@ -171,6 +188,12 @@ def save_ticket_cache_bulk(entries: list[dict]) -> None:
             row.host = e["host"]
             row.configuration_item = e["configuration_item"]
             row.llm_worklog_scoring_enabled = e["llm_worklog_scoring_enabled"]
+            row.opened_at = e.get("opened_at")
+            row.closed_at = e.get("closed_at")
+            row.created_at = e.get("created_at")
+            row.resolved_at = e.get("resolved_at")
+            row.responded_at = e.get("responded_at")
+            row.detected_at = e.get("detected_at")
             row.updated_at = datetime.now(timezone.utc)
         session.commit()
     finally:

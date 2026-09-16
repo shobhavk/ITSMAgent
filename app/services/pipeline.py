@@ -182,6 +182,17 @@ async def _run_pipeline(df) -> AnalysisResponse:
             worklog_score=cached["worklog_score"],
             worklog_flags=cached["worklog_flags"],
             validation_flags=validation_flags,
+            # Timestamps describe the ticket itself, not the cached LLM
+            # processing - use whichever is fresher: the current upload's
+            # values if it has them (e.g. a status/close-date update on an
+            # otherwise-unchanged ticket), falling back to what's in the
+            # cache from a prior upload.
+            opened_at=rec.opened_at or cached.get("opened_at"),
+            closed_at=rec.closed_at or cached.get("closed_at"),
+            created_at=rec.created_at or cached.get("created_at"),
+            resolved_at=rec.resolved_at or cached.get("resolved_at"),
+            responded_at=rec.responded_at or cached.get("responded_at"),
+            detected_at=rec.detected_at or cached.get("detected_at"),
         )
 
     for state in final_states:
@@ -228,6 +239,12 @@ async def _run_pipeline(df) -> AnalysisResponse:
             worklog_score=state["worklog_score"],
             worklog_flags=state["worklog_flags"],
             validation_flags=validation_flags,
+            opened_at=rec.opened_at,
+            closed_at=rec.closed_at,
+            created_at=rec.created_at,
+            resolved_at=rec.resolved_at,
+            responded_at=rec.responded_at,
+            detected_at=rec.detected_at,
         )
 
         new_cache_entries.append(
@@ -242,6 +259,12 @@ async def _run_pipeline(df) -> AnalysisResponse:
                 "host": host,
                 "configuration_item": rec.configuration_item,
                 "llm_worklog_scoring_enabled": llm_worklog_scoring_enabled,
+                "opened_at": rec.opened_at,
+                "closed_at": rec.closed_at,
+                "created_at": rec.created_at,
+                "resolved_at": rec.resolved_at,
+                "responded_at": rec.responded_at,
+                "detected_at": rec.detected_at,
             }
         )
 

@@ -46,10 +46,27 @@ COLUMN_ALIASES: dict[str, str] = {
     "server name": "configuration_item",
     "opened": "opened_at",
     "opened at": "opened_at",
-    "created": "opened_at",
+    "created": "created_at",
+    "created at": "created_at",
+    "sys_created_on": "created_at",
+    "resolved": "resolved_at",
+    "resolved at": "resolved_at",
+    "resolution time": "resolved_at",
     "closed": "closed_at",
-    "resolved": "closed_at",
     "closed at": "closed_at",
+    # Optional - present in some ITSM exports (rarely all of them). Used
+    # for MTTA/MTTD in trend_metrics.py when available; that module
+    # reports "not available" rather than guessing when they're missing.
+    "responded": "responded_at",
+    "responded at": "responded_at",
+    "first response": "responded_at",
+    "first response time": "responded_at",
+    "acknowledged": "responded_at",
+    "acknowledged at": "responded_at",
+    "detected": "detected_at",
+    "detected at": "detected_at",
+    "alert time": "detected_at",
+    "incident start": "detected_at",
 }
 
 

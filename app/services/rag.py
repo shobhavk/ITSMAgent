@@ -1,48 +1,52 @@
 """
-Chat/Q&A over the ticket set that was just analyzed - a hybrid RAG agent,
-not plain top-K retrieval.
+Chat/Q&A over the ticket set that was just analyzed - a tool-calling
+agent, not a single "stuff everything into the prompt" LLM call.
 
-Why plain retrieval isn't enough:
-  Top-K similarity search answers "find me tickets like X" well, but it
-  quietly breaks "how many P1 tickets are there" or "summarize the
-  database team's issues" - if 40 tickets match and only the 8 most
-  *similar* come back, the model either under-counts or guesses at the
-  rest. Completeness and similarity are different requirements; one
-  retrieval strategy can't serve both.
+    User -> Agent -> selects a tool -> pandas (chat_tools.py) -> Agent -> Answer
 
-The fix - two tools, not one, bound to the chat model via LangChain's
-bind_tools()/.ainvoke() (same async tool-calling pattern used elsewhere
-in this codebase):
-  - filter_tickets     : deterministic, exact-match filtering (category /
-                          priority / status / host / assignment group /
-                          worklog score range) over EVERY analyzed ticket,
-                          done as a plain Python loop over the batch - no
-                          LLM, no embeddings, no sampling. Returns the
-                          TRUE total count plus a capped sample. This is
-                          the tool for anything needing completeness:
-                          counts, "list all", "summarize category X".
-  - search_similar_tickets : the semantic/keyword TicketIndex search from
-                          before - for "show me an example of..." style
-                          questions where a handful of illustrative
-                          tickets is the actual goal, not every match.
-The model decides which to call (or both - filter first to narrow, then
-search or summarize within that narrowed set) based on each tool's
-docstring, which doubles as its LLM-facing description.
+Six domain-specific tools (see chat_tools.py for the actual pandas logic -
+this module only wraps them for the LLM and runs the tool-calling loop):
+  - get_incident_summary    : totals, P1/P2 counts, avg resolution time,
+                               avg worklog score, % poor worklog
+  - get_category_analysis   : incident count by category, top categories
+  - get_priority_analysis   : incident count by priority, distribution %
+  - get_server_analysis     : incident count by server, top servers
+  - get_recurring_issues    : wraps recurring_issues.detect_exact_recurrence
+  - search_incidents        : filter by incident ID / server / category /
+                               priority / keyword, capped sample + true count
 
-Design choice - still no separate vector database:
-  filter_tickets needs no vector store at all (it's a plain filter over
-  a Python list). search_similar_tickets keeps the same in-memory numpy
-  cosine-similarity index as before - a single analysis batch is small
-  enough that this remains simpler to operate than standing up a vector
-  DB for a v1 feature. See TicketIndex below.
+Why tools instead of one prompt with everything stuffed in: each of these
+needs the WHOLE batch inspected accurately (a true count, a true average),
+not an LLM guess from a sample - the same reasoning that led to
+filter_tickets in the previous version of this file. The upgrade here is
+scoping that idea to the actual domain questions a management user asks
+(summary / category / priority / server / recurring / search) instead of
+one generic filter, and routing each through the analytics modules that
+already back the dashboard (trend_metrics.py, recurring_issues.py) so the
+agent's answer and the dashboard can never disagree.
 
-Degradation, consistent with the rest of the app: no chat model
-configured (LLM_PROVIDER=rule_based) -> no tool-calling loop is possible,
-so answer_question() falls back to a best-effort heuristic: it tries to
-detect an explicit category/priority/host/team name in the question text
-and runs filter_tickets directly against that; otherwise it falls back to
-keyword search. Either way it never raises - any failure degrades to a
-stats-only answer.
+Bound to the chat model via LangChain's bind_tools()/.ainvoke() (same
+async tool-calling pattern already used elsewhere in this codebase). The
+model decides which tool(s) to call from each tool's docstring, and may
+call more than one per question (MAX_TOOL_ROUNDS below).
+
+IMPORTANT DATA-FLOW RULE: the full analysis dataframe is NEVER sent to the
+LLM. Tools take the dataframe as a Python argument (server-side only) and
+return a small JSON-serializable dict - see chat_tools.py's module
+docstring for how that's enforced. The LLM only ever sees tool results and
+the running conversation.
+
+Degradation, consistent with the rest of the app: no chat model configured
+(LLM_PROVIDER=rule_based) -> no tool-calling loop is possible, so
+answer_question() falls back to a best-effort keyword-based dispatch
+across the same 7 tools (see _no_llm_fallback) rather than an LLM. Either
+way, a tool or the whole turn failing never raises - see the try/except in
+every chat_tools function and the outer try/except here.
+
+TicketIndex below is UNCHANGED from the previous version of this file -
+it backs recurring_issues.py's semantic-clustering ("Detect Similar
+Recurring Issues" button), which is a separate feature from chat and must
+keep working exactly as before.
 """
 import json
 import logging
@@ -52,6 +56,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import tool
 
 from app.security import sanitize_for_llm
+from app.services import chat_tools, recommendations
 from app.services.llm_client import (
     SYSTEM_GUARDRAIL,
     embeddings_retry,
@@ -65,35 +70,52 @@ logger = logging.getLogger(__name__)
 TOP_K = 8
 MAX_HISTORY_TURNS = 4
 MAX_TOOL_ROUNDS = 4
-FILTER_SAMPLE_LIMIT = 15
 
 AGENT_SYSTEM_PROMPT = (
     SYSTEM_GUARDRAIL + "\n\n"
-    "You are answering a manager's question about a batch of IT incident tickets that has "
-    "already been analyzed and categorized. You have two tools:\n\n"
-    "- filter_tickets: deterministic, exact-match filtering over EVERY analyzed ticket by "
-    "category / priority / status / host / assignment_group / worklog score range. Returns "
-    "the TRUE total count of matches (not a sample) plus a capped list of example tickets. "
-    "ALWAYS use this for anything involving counting, \"how many\", \"list all\", or "
-    "summarizing a specific category/team/host/priority - anywhere completeness matters "
-    "more than similarity.\n"
-    "- search_similar_tickets: fuzzy semantic/keyword search returning a handful of "
-    "illustrative tickets. Use this only for \"show me an example of...\" style questions, "
-    "or to look for patterns inside a set you've already narrowed with filter_tickets.\n\n"
-    "AGGREGATE STATS FOR THE WHOLE BATCH:\n{stats}\n\n"
-    "Rules: never state a number you did not get from a tool call or the aggregate stats "
-    "above. If a question needs both a filter and a summary of what's inside it (e.g. "
-    "\"what's driving P1 incidents\"), call filter_tickets first, then summarize using the "
-    "sample tickets it returns. Be concise and management-friendly: lead with the direct "
-    "answer, then one or two sentences of support. Cite ticket IDs in parentheses when "
-    "referencing specific tickets. If, after using your tools, you still don't have enough "
-    "information, say so plainly rather than guessing."
+    "You are an agent answering a manager's question about a batch of IT incident tickets "
+    "that has already been analyzed and categorized. You do not have the data memorized - "
+    "you MUST call one or more of these tools to get real numbers:\n\n"
+    "- get_incident_summary: total incidents, P1/P2 counts, average resolution time, average "
+    "worklog score, percentage of tickets with a poor worklog. Use for \"give me an overall "
+    "summary\" or general-health questions.\n"
+    "- get_category_analysis: incident count by category, top categories. Use for \"what "
+    "categories\" / \"most common issue types\" questions.\n"
+    "- get_priority_analysis: incident count by priority, percentage distribution. Use for "
+    "\"how many P1/P2\" or priority-breakdown questions.\n"
+    "- get_server_analysis: incident count by server/host, top affected servers. Use for "
+    "\"which server has the most incidents\" questions.\n"
+    "- get_recurring_issues: recurring issues (same host+category repeating), their "
+    "frequency, and affected servers. Use for \"what's recurring\" / \"what keeps happening\" "
+    "questions.\n"
+    "- get_recommendations: actionable, data-backed recommendations for this batch - recurring "
+    "issues needing root-cause work, priority/SLA problems, slow-resolving categories, servers "
+    "and assignment groups, worklog-quality gaps, and hosts or categories carrying "
+    "disproportionate volume. Each item comes with its own evidence, attention level, and "
+    "expected benefit. Use for \"what should we do\" / \"what needs attention\" / \"how do we "
+    "improve\" questions, and quote its numbers as-is rather than recomputing them.\n"
+    "- search_incidents: filter tickets by any combination of incident_id, server, category, "
+    "priority, and/or a free-text keyword. Returns the true total match count plus a capped "
+    "sample. Use for specific lookups like \"show me P1 incidents on server X\".\n\n"
+    "Call more than one tool if the question needs it (e.g. a question about both priority "
+    "and category). Never state a number, percentage, or fact you did not get from a tool "
+    "call - if a tool returns an error or says data is unavailable, say plainly that the "
+    "information is unavailable rather than guessing or estimating. Be concise and "
+    "management-friendly: lead with the direct answer, then one or two sentences of support. "
+    "Cite specific incident IDs in parentheses when a tool result includes them."
 )
 
 
 class TicketIndex:
-    """In-memory semantic index over one analysis batch's tickets. Backs
-    the search_similar_tickets tool (and the no-LLM fallback search)."""
+    """In-memory semantic index over one analysis batch's tickets.
+
+    UNCHANGED from the previous chat implementation - this class no
+    longer backs chat (see _make_tools/answer_question below, which now
+    operate on the dataframe directly via chat_tools.py), but it still
+    backs recurring_issues.py's semantic-clustering feature
+    (cluster_similar, used by the "Detect Similar Recurring Issues"
+    button in ui/gradio_app.py) via build_index_from_dataframe below.
+    Do not remove without checking that call site."""
 
     def __init__(self, rows: list[dict]):
         # each row: ticket_id, category, priority, status, host,
@@ -114,7 +136,7 @@ class TicketIndex:
             vectors = await embed_fn([r["text"] for r in self.rows])
             self._vectors = np.array(vectors)
         except Exception as exc:
-            logger.info("RAG embedding index unavailable, falling back to keyword search: %s", exc)
+            logger.info("Embedding index unavailable, falling back to keyword clustering: %s", exc)
 
     async def search(self, query: str, top_k: int = TOP_K) -> list[dict]:
         if not self.rows:
@@ -131,15 +153,70 @@ class TicketIndex:
                 top_idx = np.argsort(-sims)[:top_k]
                 return [self.rows[i] for i in top_idx]
             except Exception as exc:
-                logger.info("RAG similarity search failed, falling back to keyword search: %s", exc)
+                logger.info("Similarity search failed, falling back to keyword search: %s", exc)
 
-        # No embeddings model (rule_based mode) or the call failed:
-        # plain keyword-overlap fallback so chat still works without an LLM.
         terms = [t for t in query.lower().split() if len(t) > 2]
         scored = [(sum(1 for t in terms if t in row["text"].lower()), row) for row in self.rows]
         scored.sort(key=lambda pair: pair[0], reverse=True)
         hits = [row for count, row in scored if count > 0]
         return hits[:top_k] if hits else self.rows[:top_k]
+
+    async def cluster_similar(self, similarity_cutoff: float = 0.85, min_cluster_size: int = 3) -> list[list[int]]:
+        """Groups tickets into clusters of similar text via connected
+        components over a cosine-similarity graph (union-find on pairs
+        above similarity_cutoff). Returns only clusters with at least
+        min_cluster_size members, each as a list of row indices into
+        self.rows, largest cluster first."""
+        n = len(self.rows)
+        if n == 0:
+            return []
+
+        await self._ensure_vectors()
+        if self._vectors is None:
+            return self._keyword_cluster(min_cluster_size)
+
+        norms = np.linalg.norm(self._vectors, axis=1, keepdims=True)
+        norms[norms == 0] = 1e-9
+        unit = self._vectors / norms
+        similarity = unit @ unit.T
+
+        parent = list(range(n))
+
+        def find(x: int) -> int:
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(a: int, b: int) -> None:
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[ra] = rb
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                if similarity[i, j] >= similarity_cutoff:
+                    union(i, j)
+
+        groups: dict[int, list[int]] = {}
+        for i in range(n):
+            groups.setdefault(find(i), []).append(i)
+
+        clusters = [members for members in groups.values() if len(members) >= min_cluster_size]
+        clusters.sort(key=len, reverse=True)
+        return clusters
+
+    def _keyword_cluster(self, min_cluster_size: int) -> list[list[int]]:
+        """No-embeddings fallback: groups tickets whose text normalizes to
+        the exact same value. Reduced recall, still functional."""
+        buckets: dict[str, list[int]] = {}
+        for i, row in enumerate(self.rows):
+            key = " ".join(row["text"].lower().split())
+            if key:
+                buckets.setdefault(key, []).append(i)
+        clusters = [members for members in buckets.values() if len(members) >= min_cluster_size]
+        clusters.sort(key=len, reverse=True)
+        return clusters
 
 
 def _row_from_fields(ticket_id, category, priority, status, host, assignment_group, worklog_score, *text_parts) -> dict:
@@ -156,22 +233,10 @@ def _row_from_fields(ticket_id, category, priority, status, host, assignment_gro
     }
 
 
-def build_index_from_tickets(tickets: list) -> "TicketIndex":
-    """Builds an index from a list of AnalyzedTicket (pydantic) objects -
-    used by the REST /api/v1/chat endpoint."""
-    rows = [
-        _row_from_fields(
-            t.ticket_id, t.category, t.priority, t.status, t.host, t.assignment_group, t.worklog_score,
-            t.short_description, t.description, t.worklog,
-        )
-        for t in tickets
-    ]
-    return TicketIndex(rows)
-
-
 def build_index_from_dataframe(full_df) -> "TicketIndex":
-    """Builds an index from the results dataframe used by the Gradio UI
-    (same shape as the CSV export)."""
+    """Builds a semantic index from the results dataframe - used only by
+    the "Detect Similar Recurring Issues" button (ui/gradio_app.py), not
+    by chat anymore (see _make_tools/answer_question below)."""
     if full_df is None or len(full_df) == 0:
         return TicketIndex([])
     rows = [
@@ -185,133 +250,166 @@ def build_index_from_dataframe(full_df) -> "TicketIndex":
     return TicketIndex(rows)
 
 
-def _filter_rows(
-    rows: list[dict],
-    category: str | None = None,
-    priority: str | None = None,
-    status: str | None = None,
-    host: str | None = None,
-    assignment_group: str | None = None,
-    min_score: int | None = None,
-    max_score: int | None = None,
-    limit: int = FILTER_SAMPLE_LIMIT,
-) -> dict:
-    """Pure-Python exact-match filter over every row - no LLM, no
-    embeddings, no sampling. This is what makes filter_tickets's count
-    trustworthy: it inspects the whole batch, every time."""
+def _make_tools(full_df) -> list:
+    """Wraps the 6 chat_tools functions as LangChain tools bound to this
+    analysis batch via closure. Each tool returns a JSON string (LangChain
+    tool outputs must be strings) - the dict chat_tools builds is already
+    small and JSON-safe (see chat_tools._to_native), so this is a plain
+    json.dumps, no further processing needed.
 
-    def _matches(row: dict) -> bool:
-        if category and row["category"].lower() != category.lower():
-            return False
-        if priority and row["priority"].lower() != priority.lower():
-            return False
-        if status and row["status"].lower() != status.lower():
-            return False
-        if host and row["host"].lower() != host.lower():
-            return False
-        if assignment_group and row["assignment_group"].lower() != assignment_group.lower():
-            return False
-        score = row["worklog_score"]
-        if min_score is not None and (score is None or score < min_score):
-            return False
-        if max_score is not None and (score is None or score > max_score):
-            return False
-        return True
-
-    matched = [r for r in rows if _matches(r)]
-    scores = [r["worklog_score"] for r in matched if r["worklog_score"] is not None]
-    return {
-        "total_matching": len(matched),
-        "avg_worklog_score": round(sum(scores) / len(scores), 1) if scores else None,
-        "sample_tickets": [_public_row(r, 300) for r in matched[:limit]],
-    }
-
-
-def _public_row(row: dict, excerpt_len: int) -> dict:
-    """A tool-result-safe view of a row: no raw 'text' key, an already
-    length-capped/sanitized excerpt instead."""
-    return {
-        "ticket_id": row["ticket_id"],
-        "category": row["category"],
-        "priority": row["priority"],
-        "status": row["status"],
-        "host": row["host"],
-        "assignment_group": row["assignment_group"],
-        "worklog_score": row["worklog_score"],
-        "excerpt": sanitize_for_llm(row["text"], max_len=excerpt_len),
-    }
-
-
-def _make_tools(index: "TicketIndex") -> list:
-    """Builds the two tools bound to this analysis batch via closure, so
-    each chat call gets fresh tools scoped to the right ticket set."""
+    Every call is wrapped in try/except even though chat_tools functions
+    already catch their own errors - this is a second layer of defense so
+    a totally unexpected failure (e.g. a bad argument type from the LLM)
+    still comes back as a tool result the agent can react to, instead of
+    crashing the whole turn."""
 
     @tool
-    async def filter_tickets(
-        category: str = "",
-        priority: str = "",
-        status: str = "",
-        host: str = "",
-        assignment_group: str = "",
-        min_score: int = -1,
-        max_score: int = -1,
+    def get_incident_summary() -> str:
+        """Returns overall incident health: total incidents, P1 count, P2 count, average
+        resolution time (hours), average worklog score, and the percentage of tickets with a
+        poor worklog. Use this for "give me an overall summary" or general-health questions."""
+        try:
+            return json.dumps(chat_tools.get_incident_summary(full_df), default=str)
+        except Exception as exc:
+            return json.dumps({"error": str(exc)})
+
+    @tool
+    def get_category_analysis() -> str:
+        """Returns incident count broken down by category, plus the top categories by volume.
+        Use this for "what categories" or "most common issue types" questions."""
+        try:
+            return json.dumps(chat_tools.get_category_analysis(full_df), default=str)
+        except Exception as exc:
+            return json.dumps({"error": str(exc)})
+
+    @tool
+    def get_priority_analysis() -> str:
+        """Returns incident count broken down by priority (P1/P2/P3/P4/Unspecified) and the
+        percentage distribution across priorities. Use this for "how many P1" or
+        priority-breakdown questions."""
+        try:
+            return json.dumps(chat_tools.get_priority_analysis(full_df), default=str)
+        except Exception as exc:
+            return json.dumps({"error": str(exc)})
+
+    @tool
+    def get_server_analysis() -> str:
+        """Returns incident count broken down by server/host, plus the top affected servers.
+        Use this for "which server has the most incidents" questions."""
+        try:
+            return json.dumps(chat_tools.get_server_analysis(full_df), default=str)
+        except Exception as exc:
+            return json.dumps({"error": str(exc)})
+
+    @tool
+    def get_recurring_issues(threshold: int = 3) -> str:
+        """Returns recurring issues - the same host+category combination repeating at least
+        `threshold` times (default 3) - with their frequency, affected servers, and how many
+        days apart they typically recur. Use this for "what's recurring" or "what keeps
+        happening" questions."""
+        try:
+            return json.dumps(chat_tools.get_recurring_issues(full_df, threshold=threshold), default=str)
+        except Exception as exc:
+            return json.dumps({"error": str(exc)})
+
+    @tool
+    def get_recommendations() -> str:
+        """Returns actionable, data-backed ITSM recommendations derived from this batch:
+        recurring issues needing root-cause work, high-priority/SLA problems, slow-resolving
+        categories/servers/assignment groups, worklog-quality gaps, and hosts or categories
+        carrying disproportionate volume. Each item has an observation, the evidence behind it,
+        the recommended action, an attention level, and the expected benefit. Use this for
+        "what should we do", "what needs attention", or "how do we improve" questions - the
+        numbers in it are already calculated, so quote them as-is rather than recomputing."""
+        try:
+            return json.dumps(recommendations.get_recommendations(full_df), default=str)
+        except Exception as exc:
+            return json.dumps({"error": str(exc)})
+
+    @tool
+    def search_incidents(
+        incident_id: str = "", server: str = "", category: str = "",
+        priority: str = "", keyword: str = "",
     ) -> str:
-        """Deterministically filters ALL analyzed tickets by exact-match category, priority,
-        status, host, and/or assignment_group, and/or a worklog score range (min_score/
-        max_score, 0-100). Leave a field empty/-1 to not filter on it. Returns the true total
-        count of matching tickets (not a sample) plus up to 15 example tickets with a short
-        excerpt each. Use this for any question about counts, "how many", "list all", or a
-        summary of a specific category/team/host/priority - anywhere completeness matters."""
-        result = _filter_rows(
-            index.rows,
-            category=category or None,
-            priority=priority or None,
-            status=status or None,
-            host=host or None,
-            assignment_group=assignment_group or None,
-            min_score=min_score if min_score >= 0 else None,
-            max_score=max_score if max_score >= 0 else None,
-        )
-        return json.dumps(result, default=str)
+        """Searches/filters incidents by any combination of incident_id, server, category,
+        priority, and/or a free-text keyword (matched against description and worklog notes).
+        Leave a field empty to not filter on it. Returns the true total match count plus a
+        capped sample of matching tickets. Use this for specific lookups like "show me P1
+        incidents on server ABC" or "find incidents mentioning VPN"."""
+        try:
+            return json.dumps(
+                chat_tools.search_incidents(
+                    full_df, incident_id=incident_id, server=server, category=category,
+                    priority=priority, keyword=keyword,
+                ),
+                default=str,
+            )
+        except Exception as exc:
+            return json.dumps({"error": str(exc)})
 
-    @tool
-    async def search_similar_tickets(query: str) -> str:
-        """Fuzzy semantic/keyword search for a handful of tickets whose text resembles the
-        query - good for "find an example of X" or "what does a ticket about Y look like"
-        questions. Does NOT guarantee completeness - use filter_tickets for counts or "all
-        tickets matching..." questions."""
-        rows = await index.search(query)
-        return json.dumps({"tickets": [_public_row(r, 300) for r in rows]}, default=str)
-
-    return [filter_tickets, search_similar_tickets]
+    return [
+        get_incident_summary, get_category_analysis, get_priority_analysis,
+        get_server_analysis, get_recurring_issues, get_recommendations, search_incidents,
+    ]
 
 
-def _detect_filters_from_question(question: str, rows: list[dict]) -> dict:
-    """Best-effort keyword detection used only when no chat model is
-    configured (rule_based mode), so filter_tickets-equivalent behavior
-    is still available without tool-calling. Looks for an exact category/
-    priority/host/assignment_group value from the batch mentioned in the
-    question text."""
+# Maps a keyword found in the question to the tool that answers it, used
+# only by _no_llm_fallback below (rule_based mode - no tool-calling model
+# available). Order matters: first match wins, so more specific intents
+# (recurring, server, priority, category) are checked before the generic
+# "summary" catch-all.
+_NO_LLM_INTENT_KEYWORDS = [
+    # Checked before "recurring"/"summary": "what do you recommend about
+    # recurring issues" is a recommendation request, and the
+    # recommendations tool already covers recurrence as one of its areas.
+    (("recommend", "recommendation", "what should we do", "suggest", "improve", "action plan", "needs attention"), "recommend"),
+    (("recurring", "repeat", "keeps happening", "again and again"), "recurring"),
+    (("server", "host", "affected server", "which server"), "server"),
+    (("p1", "p2", "priority", "critical", "high priority"), "priority"),
+    (("category", "categories", "issue type", "issue types"), "category"),
+    (("summary", "overall", "overview", "health"), "summary"),
+]
+
+
+def _no_llm_fallback(question: str, full_df) -> str:
+    """rule_based mode: no chat model, so no tool-calling loop is
+    possible. Dispatches to the same 6 tool functions directly via a
+    simple keyword match on the question, so the app stays useful without
+    an LLM - just without the natural-language routing/summary a real
+    model would add."""
     q = question.lower()
-    filters: dict = {}
-    for field in ("category", "priority", "assignment_group", "host"):
-        values = {r[field] for r in rows if r[field]}
-        for value in values:
-            if value.lower() in q:
-                filters[field] = value
-                break
-    return filters
 
+    for keywords, intent in _NO_LLM_INTENT_KEYWORDS:
+        if any(kw in q for kw in keywords):
+            if intent == "recommend":
+                result = recommendations.get_recommendations(full_df)
+            elif intent == "recurring":
+                result = chat_tools.get_recurring_issues(full_df)
+            elif intent == "server":
+                result = chat_tools.get_server_analysis(full_df)
+            elif intent == "priority":
+                result = chat_tools.get_priority_analysis(full_df)
+            elif intent == "category":
+                result = chat_tools.get_category_analysis(full_df)
+            else:
+                result = chat_tools.get_incident_summary(full_df)
+            return json.dumps(result, indent=2, default=str)
 
-def _format_stats(stats: dict) -> str:
-    lines = []
-    for key, value in stats.items():
-        if isinstance(value, dict):
-            top = sorted(value.items(), key=lambda kv: kv[1], reverse=True)[:8]
-            lines.append(f"{key}: " + ", ".join(f"{k}={v}" for k, v in top))
-        else:
-            lines.append(f"{key}: {value}")
-    return "\n".join(lines)
+    # No intent keyword matched - try search_incidents with any exact
+    # category/priority value mentioned verbatim in the question, else
+    # fall back to the overall summary as a safe default.
+    try:
+        categories = set(full_df.get("Category", []).dropna().astype(str)) if full_df is not None else set()
+        priorities = set(full_df.get("Priority", []).dropna().astype(str)) if full_df is not None else set()
+        matched_category = next((c for c in categories if c and c.lower() in q), "")
+        matched_priority = next((p for p in priorities if p and p.lower() in q), "")
+        if matched_category or matched_priority:
+            result = chat_tools.search_incidents(full_df, category=matched_category, priority=matched_priority)
+            return json.dumps(result, indent=2, default=str)
+    except Exception as exc:
+        logger.info("No-LLM fallback intent detection failed, using summary instead: %s", exc)
+
+    return json.dumps(chat_tools.get_incident_summary(full_df), indent=2, default=str)
 
 
 def _history_to_messages(history: list[tuple[str, str]]) -> list:
@@ -323,46 +421,43 @@ def _history_to_messages(history: list[tuple[str, str]]) -> list:
     return messages
 
 
-def _no_llm_fallback(question: str, index: "TicketIndex", stats_text: str) -> str:
-    """rule_based mode: no chat model, so no tool-calling loop is
-    possible. Still tries to give a grounded, useful answer."""
-    filters = _detect_filters_from_question(question, index.rows)
-    if filters:
-        result = _filter_rows(index.rows, **filters, limit=10)
-        lines = [
-            f"Found {result['total_matching']} matching ticket(s)"
-            + (f", average worklog score {result['avg_worklog_score']}" if result["avg_worklog_score"] is not None else "")
-            + ":"
-        ]
-        for t in result["sample_tickets"]:
-            lines.append(f"- [{t['ticket_id']}] {t['category']} / {t['priority']} / score={t['worklog_score']}: {t['excerpt']}")
-        return "\n".join(lines)
-
-    return f"Based on the analyzed batch:\n{stats_text}"
-
-
 async def answer_question(
     question: str,
-    index: "TicketIndex",
-    stats: dict,
+    full_df,
+    stats: dict | None = None,
     history: list[tuple[str, str]] | None = None,
 ) -> str:
-    """Answers a management question using a small tool-calling loop
-    (filter_tickets for completeness, search_similar_tickets for
-    examples) grounded in the given ticket index + aggregate stats.
-    Never raises - degrades to a stats-only or filter-only answer on any
-    failure so the chat UI always gets something useful back."""
+    """Answers a management question by letting the chat model choose
+    from 6 domain-specific tools (see _make_tools), each backed by a
+    pandas function in chat_tools.py operating on `full_df` - the same
+    analysis dataframe the dashboard/CSV export use. Never raises -
+    degrades to a keyword-dispatched tool result (no chat model) or a
+    plain error message (any other failure) so the chat UI always gets
+    something useful back.
+
+    `stats` is currently unused here (kept in the signature for backward
+    compatibility with existing callers - ui/gradio_app.py and
+    routers/chat.py both still pass it) - the aggregate figures it used
+    to carry are now sourced live via get_incident_summary() instead of
+    being pre-computed once and pasted into the prompt, so the agent's
+    numbers can never go stale relative to what's actually in full_df."""
     question = sanitize_for_llm(question, max_len=1000).strip()
     if not question:
         return 'Ask a question about the analyzed tickets - e.g. "how many P1 tickets are there?"'
 
-    stats_text = _format_stats(stats)
+    if full_df is None or len(full_df) == 0:
+        return "No analyzed tickets are available yet - run an analysis first, then come back and ask away."
+
     raw_chat_model = get_raw_chat_model()
     if raw_chat_model is None:
-        return _no_llm_fallback(question, index, stats_text)
+        try:
+            return _no_llm_fallback(question, full_df)
+        except Exception:
+            logger.exception("No-LLM fallback failed")
+            return "I couldn't compute an answer right now - please try again."
 
     try:
-        tools = _make_tools(index)
+        tools = _make_tools(full_df)
         tool_map = {t.name: t for t in tools}
         # bind_tools() must be called on the RAW model - with_chat_retry()
         # returns a RunnableRetry, which doesn't expose bind_tools() (see
@@ -370,7 +465,7 @@ async def answer_question(
         # then wrap the bound runnable in retry so 429s are still handled.
         model_with_tools = with_chat_retry(raw_chat_model.bind_tools(tools))
 
-        messages = [SystemMessage(content=AGENT_SYSTEM_PROMPT.format(stats=stats_text))]
+        messages = [SystemMessage(content=AGENT_SYSTEM_PROMPT)]
         messages += _history_to_messages(history)
         messages.append(HumanMessage(content=question))
 
@@ -383,8 +478,9 @@ async def answer_question(
             for call in response.tool_calls:
                 tool_fn = tool_map.get(call["name"])
                 try:
-                    result = await tool_fn.ainvoke(call["args"]) if tool_fn else json.dumps({"error": "unknown tool"})
+                    result = await tool_fn.ainvoke(call["args"]) if tool_fn else json.dumps({"error": f"Unknown tool: {call['name']}"})
                 except Exception as exc:
+                    logger.warning("Tool %s failed: %s", call.get("name"), exc)
                     result = json.dumps({"error": str(exc)})
                 messages.append(ToolMessage(content=result, tool_call_id=call["id"]))
 
@@ -394,6 +490,9 @@ async def answer_question(
             messages + [HumanMessage(content="Answer the original question now, using only the information already gathered above.")]
         )
         return final.content.strip()
-    except Exception as exc:
-        logger.exception("Chat answer generation failed, falling back to raw stats")
-        return "I couldn't reach the assistant model just now. Here's what the data shows directly:\n\n" + stats_text
+    except Exception:
+        logger.exception("Chat answer generation failed")
+        try:
+            return "I couldn't reach the assistant model just now. Here's what the data shows directly:\n\n" + _no_llm_fallback(question, full_df)
+        except Exception:
+            return "I couldn't generate an answer right now - please try again."

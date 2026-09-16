@@ -24,6 +24,8 @@ Recurring issue detection - two complementary, independently-useful layers.
 """
 import pandas as pd
 
+from app.services import trend_metrics
+
 DEFAULT_RECURRENCE_THRESHOLD = 3
 DEFAULT_SIMILARITY_CUTOFF = 0.85
 # Semantic clustering is O(n^2) in memory (a full similarity matrix) - cap
@@ -50,11 +52,7 @@ def detect_exact_recurrence(full_df: pd.DataFrame, threshold: int = DEFAULT_RECU
     category_col = d["Category"].fillna("Unknown").astype(str)
     group_key = host_col.where(host_col != "", "(no host)") + "\u241f" + category_col
 
-    opened = (
-        pd.to_datetime(d["Opened At"], errors="coerce")
-        if "Opened At" in d.columns
-        else pd.Series([pd.NaT] * len(d), index=d.index)
-    )
+    opened = trend_metrics.effective_open_resolve_times(d)["start"]
 
     results = []
     for key, idx in group_key.groupby(group_key).groups.items():
