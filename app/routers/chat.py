@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.models.schemas import ChatRequest, ChatResponse
 from app.security import verify_api_key
-from app.services import rag
+from app.services import chat_tools, rag
 from app.services.session_store import get_last_result
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ async def chat(req: ChatRequest, api_key: str = Depends(verify_api_key)):
     if not result:
         raise HTTPException(status_code=404, detail="No analysis found for this API key yet. Run /analyze first.")
 
-    index = rag.build_index_from_tickets(result.results)
+    full_df = chat_tools.tickets_to_dataframe(result.results)
     stats = {
         "total_records": result.total_records,
         "valid_records": result.valid_records,
@@ -28,7 +28,7 @@ async def chat(req: ChatRequest, api_key: str = Depends(verify_api_key)):
     }
 
     try:
-        answer = await rag.answer_question(req.question, index, stats, req.history)
+        answer = await rag.answer_question(req.question, full_df, stats, req.history)
     except Exception:
         logger.exception("Chat failed")
         raise HTTPException(status_code=500, detail="Failed to answer the question.")
