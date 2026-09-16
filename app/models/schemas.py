@@ -36,6 +36,24 @@ class TicketRecord(BaseModel):
     configuration_item: Optional[str] = None
     opened_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
+    # created_at/resolved_at are distinct from opened_at/closed_at when a
+    # source system exports all four (e.g. ServiceNow's sys_created_on +
+    # opened_at + resolved_at + closed_at). Kept separate rather than
+    # aliased onto opened_at/closed_at - collapsing "Created"+"Opened" (or
+    # "Resolved"+"Closed") onto one column name produced duplicate-named
+    # columns and silently broke date parsing when a dataset had all four.
+    # See trend_metrics.effective_open_resolve_times for how these
+    # combine into one consistent start/end pair.
+    created_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
+    # Optional - only populated if the source data has a matching column
+    # (see COLUMN_ALIASES in data_ingestion.py). Most ITSM exports don't
+    # carry a true detection timestamp; responded_at (first response /
+    # acknowledgment) is more commonly present. Resolution-metric
+    # calculations in trend_metrics.py report "not available" rather than
+    # guessing when these are absent - see that module's docstring.
+    responded_at: Optional[datetime] = None
+    detected_at: Optional[datetime] = None
     source_row: int = Field(description="Original row index for traceability")
 
     @field_validator("ticket_id", mode="before")
@@ -74,6 +92,16 @@ class AnalyzedTicket(BaseModel):
     worklog_score: int
     worklog_flags: list[str]
     validation_flags: list[str] = []
+    # Carried through from TicketRecord (previously dropped here - trend/
+    # resolution-metric analysis needs them). See TicketRecord for notes
+    # on created_at/resolved_at vs opened_at/closed_at, and on
+    # responded_at/detected_at's availability.
+    opened_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
+    responded_at: Optional[datetime] = None
+    detected_at: Optional[datetime] = None
 
 
 class AnalysisResponse(BaseModel):
