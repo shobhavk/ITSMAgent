@@ -1585,7 +1585,8 @@ NAV_ITEMS = [
     # renumbering every gr.Tab id after it in build_ui below.
     ("recommendations", "💡", "Recommendations"),
     ("qa", "💬", "Q&A (Agent)"),
-    ("export", "⬇️", "Export"),
+    # The Export tab was removed; its download button now sits under the
+    # Recent Incidents table in Categorization, next to the data it exports.
     ("settings", "⚙️", "Settings"),
 ]
 
@@ -1623,7 +1624,8 @@ def build_ui() -> gr.Blocks:
                             summary_md = gr.HTML(_OVERVIEW_KPI_PLACEHOLDER)
 
                         # Single full-width input bar - upload, paste, and the
-                        # analyze action sit on one row (download moved to Export).
+                        # analyze action sit on one row (download lives under
+                        # the Recent Incidents table in Categorization).
                         with gr.Row(elem_id="input-row", elem_classes=["dash-card"], equal_height=False):
                             with gr.Column(scale=3, min_width=260):
                                 file_input = gr.File(
@@ -1708,6 +1710,19 @@ def build_ui() -> gr.Blocks:
                                 prev_btn = gr.Button("← Previous", size="sm")
                                 page_indicator = gr.Markdown("Page 1 of 1  ·  0 tickets", elem_id="page-indicator")
                                 next_btn = gr.Button("Next →", size="sm")
+
+                        # Export: relocated here verbatim from the former
+                        # Export tab, right below the table it downloads.
+                        # download_file itself, and everything that
+                        # populates it (_analyze's CSV-writing step), is
+                        # unchanged - only its position in the layout moved.
+                        with gr.Column(elem_classes=["dash-card"], elem_id="export-card"):
+                            gr.Markdown("### ⬇️ Download Results", elem_classes=["section-heading"])
+                            gr.Markdown(
+                                "Full, untruncated results as a CSV - always reflects the latest analysis.",
+                                elem_classes=["severity-note"],
+                            )
+                            download_file = gr.File(label="Full results (CSV)", interactive=False)
 
                     with gr.Tab("Trends & Insights", id=2):
                         # KPI trend - ticket volume + worklog quality over
@@ -1830,17 +1845,7 @@ def build_ui() -> gr.Blocks:
                                 chat_send = gr.Button("Send", variant="primary", scale=1)
                             chat_clear_btn = gr.Button("Clear conversation", size="sm", elem_id="chat-clear-btn")
 
-                    with gr.Tab("Export", id=5):
-                        gr.Markdown(
-                            "Run an analysis on the Overview tab, then download the full, "
-                            "untruncated results as a CSV here.",
-                            elem_classes=["severity-note"],
-                        )
-                        with gr.Column(elem_classes=["dash-card"], elem_id="export-card"):
-                            gr.Markdown("### ⬇️ Download Results", elem_classes=["section-heading"])
-                            download_file = gr.File(label="Full results (CSV)", interactive=False)
-
-                    with gr.Tab("Settings", id=6):
+                    with gr.Tab("Settings", id=5):
                         with gr.Column(elem_classes=["dash-card"]):
                             gr.Markdown("### ⚙️ Settings", elem_classes=["section-heading"])
                             gr.Markdown(
