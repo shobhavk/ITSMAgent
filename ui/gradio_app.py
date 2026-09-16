@@ -421,6 +421,91 @@ button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; 
 #rec-writeup-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
 #rec-writeup-output {margin-top: 4px; font-size: 0.88rem; color: var(--dash-text); line-height: 1.55;}
 #rec-writeup-output p {margin: 0 0 8px 0;}
+
+/* Custom "download full results" icon injected into the Recent Incidents
+   table's built-in toolbar (next to the copy-table-data icon) - see the
+   injection script in RESULTS_TABLE_DOWNLOAD_BUTTON_JS below. Styled to
+   match Gradio's own toolbar icon buttons so it looks native. */
+.df-download-btn {
+    display: inline-flex !important; align-items: center !important; justify-content: center !important;
+    width: 28px; height: 28px; border-radius: 6px; border: none;
+    background: transparent; color: var(--dash-text-muted); cursor: pointer; padding: 0; margin: 0;
+}
+.df-download-btn:hover {background: rgba(15, 23, 42, 0.08); color: var(--dash-text);}
+.df-download-btn svg {width: 16px; height: 16px; display: block;}
+"""
+
+# Injected into <head> (via gr.Blocks(head=...) below) so it runs once the
+# page loads. It adds a download icon immediately before the Dataframe's
+# built-in "copy table data" icon in the Categorization tab's Recent
+# Incidents table toolbar. Clicking it just clicks the actual (hidden)
+# download link that _analyze already populates - no new download logic,
+# no change to what gets downloaded, only where the trigger lives.
+RESULTS_TABLE_DOWNLOAD_BUTTON_JS = """
+<script>
+(function () {
+    function findDownloadAnchor() {
+        var wrap = document.getElementById("download-file-hidden");
+        if (!wrap) return null;
+        return wrap.querySelector("a[href]");
+    }
+
+    function triggerDownload() {
+        var a = findDownloadAnchor();
+        if (a) {
+            a.click();
+        } else {
+            alert("No analyzed results yet - run an analysis first.");
+        }
+    }
+
+    function makeDownloadButton() {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "df-download-btn";
+        btn.setAttribute("aria-label", "Download full results (CSV)");
+        btn.title = "Download full results (CSV)";
+        btn.innerHTML =
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/>' +
+            '<path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>';
+        btn.addEventListener("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            triggerDownload();
+        });
+        return btn;
+    }
+
+    function ensureButtonInjected() {
+        var tableRoot = document.getElementById("results-table");
+        if (!tableRoot) return;
+        var buttons = tableRoot.querySelectorAll("button[aria-label]");
+        var copyBtn = null;
+        for (var i = 0; i < buttons.length; i++) {
+            var label = (buttons[i].getAttribute("aria-label") || "").toLowerCase();
+            if (label.indexOf("copy") !== -1) {
+                copyBtn = buttons[i];
+                break;
+            }
+        }
+        if (!copyBtn || !copyBtn.parentElement) return;
+        if (copyBtn.parentElement.querySelector(".df-download-btn")) return;
+        copyBtn.parentElement.insertBefore(makeDownloadButton(), copyBtn);
+    }
+
+    document.addEventListener("DOMContentLoaded", ensureButtonInjected);
+    new MutationObserver(ensureButtonInjected).observe(document.body, {
+        childList: true,
+        subtree: true,
+    });
+    var tries = 0;
+    var poll = setInterval(function () {
+        ensureButtonInjected();
+        if (++tries > 60) clearInterval(poll);
+    }, 500);
+})();
+</script>
 """
 
 AGENT_PROGRESS_HTML = """
@@ -1592,7 +1677,11 @@ NAV_ITEMS = [
 
 
 def build_ui() -> gr.Blocks:
-    with gr.Blocks(title="ITSM Quality Analysis Agent", css=CUSTOM_CSS) as demo:
+    with gr.Blocks(
+        title="ITSM Quality Analysis Agent",
+        css=CUSTOM_CSS,
+        head=RESULTS_TABLE_DOWNLOAD_BUTTON_JS,
+    ) as demo:
         # App shell: dark nav rail on the left, everything else scrolls in
         # the main column on the right. The nav items below are real
         # buttons that switch between the gr.Tab sections built further
@@ -1711,18 +1800,25 @@ def build_ui() -> gr.Blocks:
                                 page_indicator = gr.Markdown("Page 1 of 1  ·  0 tickets", elem_id="page-indicator")
                                 next_btn = gr.Button("Next →", size="sm")
 
-                        # Export: relocated here verbatim from the former
-                        # Export tab, right below the table it downloads.
-                        # download_file itself, and everything that
-                        # populates it (_analyze's CSV-writing step), is
-                        # unchanged - only its position in the layout moved.
-                        with gr.Column(elem_classes=["dash-card"], elem_id="export-card"):
+                        # Export card is no longer shown in the layout - the
+                        # download is now triggered from the download icon
+                        # injected into the Recent Incidents table's toolbar
+                        # (see RESULTS_TABLE_DOWNLOAD_BUTTON_JS) instead of a
+                        # separate "Download Results" section. download_file
+                        # itself, and everything that populates it
+                        # (_analyze's CSV-writing step), is unchanged - it's
+                        # only hidden (visible=False), not removed, so the
+                        # existing outputs=[...] wiring below still works and
+                        # the injected button still has a real link to click.
+                        with gr.Column(elem_classes=["dash-card"], elem_id="export-card", visible=False):
                             gr.Markdown("### ⬇️ Download Results", elem_classes=["section-heading"])
                             gr.Markdown(
                                 "Full, untruncated results as a CSV - always reflects the latest analysis.",
                                 elem_classes=["severity-note"],
                             )
-                            download_file = gr.File(label="Full results (CSV)", interactive=False)
+                            download_file = gr.File(
+                                label="Full results (CSV)", interactive=False, elem_id="download-file-hidden",
+                            )
 
                     with gr.Tab("Trends & Insights", id=2):
                         # KPI trend - ticket volume + worklog quality over
