@@ -1,0 +1,58 @@
+# --- Secrets / environment ---
+.env
+.env.*
+!.env.example
+
+# --- Python bytecode / cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Packaging / build artifacts ---
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Test / coverage / type-checker caches ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# --- App runtime data (SQLite DB, generated exports) ---
+data/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# --- Uploaded/generated files (if ever written locally outside data/) ---
+*.csv.tmp
+outputs/
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
+
+# --- Jupyter (in case notebooks are used for exploration) ---
+.ipynb_checkpoints/

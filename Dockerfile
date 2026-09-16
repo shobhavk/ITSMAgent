@@ -24,7 +24,14 @@ COPY --from=builder /opt/venv /opt/venv
 COPY app ./app
 COPY ui ./ui
 
-RUN chown -R itsm:itsm /app
+# Pre-create the SQLite data directory so it exists (with correct
+# ownership) in the image *before* a named volume is mounted over it -
+# Docker copies a mount point's existing image content/permissions into a
+# fresh named volume on first use, which is what makes writes from the
+# non-root `itsm` user below actually work against docker-compose.yml's
+# `itsm_data:/app/data` volume (needed because the compose file also sets
+# `read_only: true` on the container - see persistence.py's DB_PATH).
+RUN mkdir -p /app/data && chown -R itsm:itsm /app
 USER itsm
 
 EXPOSE 8000
