@@ -1572,16 +1572,17 @@ TOPBAR_HTML = """
 # drives both the buttons drawn in the sidebar and the tabs built below.
 NAV_ITEMS = [
     ("overview", "🏠", "Overview"),
-    ("analysis", "📈", "Incident Analysis"),
+    # The Incident Analysis tab was removed; its Recent Incidents table now
+    # lives at the bottom of Categorization, below the category/priority
+    # breakdown it belongs with.
     ("categorization", "🗂️", "Categorization"),
     ("trends", "📊", "Trends & Insights"),
     # Recommendations sits directly after Trends & Insights: it's the
     # "so what do we do about it" reading of everything on that tab, so
-    # it belongs next to the analysis it's derived from rather than
-    # tacked on after Settings. NOTE: this list's index is the gr.Tab id
-    # each button opens (see _make_nav_handler), so inserting here shifts
-    # the ids of Q&A/Export/Settings by one - they're renumbered to match
-    # in build_ui below.
+    # it belongs next to the analysis it's derived from. NOTE: this
+    # list's index is the gr.Tab id each button opens (see
+    # _make_nav_handler), so adding or removing an entry here means
+    # renumbering every gr.Tab id after it in build_ui below.
     ("recommendations", "💡", "Recommendations"),
     ("qa", "💬", "Q&A (Agent)"),
     ("export", "⬇️", "Export"),
@@ -1675,8 +1676,24 @@ def build_ui() -> gr.Blocks:
                                 elem_id="exec-summary-output",
                             )
 
-                    with gr.Tab("Incident Analysis", id=1):
-                        # Recent Incidents: the primary, full-width table.
+                    with gr.Tab("Categorization", id=1):
+                        # Category breakdown + priority donut.
+                        with gr.Row(elem_id="panel-row-1"):
+                            with gr.Column(scale=1, elem_classes=["dash-card"]):
+                                gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
+                                category_bar_html = gr.HTML(
+                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+                                )
+                            with gr.Column(scale=1, elem_classes=["dash-card"]):
+                                gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
+                                category_chart = gr.Plot(show_label=False)
+
+                        # Recent Incidents: relocated here verbatim from the
+                        # former Incident Analysis tab. The components and
+                        # their event wiring (_refresh_view / prev_btn /
+                        # next_btn) are untouched - only the parent tab
+                        # changed - so pagination and filtering behave
+                        # exactly as before.
                         with gr.Column(elem_id="results-section", elem_classes=["dash-card"]):
                             gr.Markdown("### 📋 Recent Incidents (Analyzed &amp; Categorized)", elem_classes=["section-heading"])
                             results_table = gr.Dataframe(
@@ -1692,19 +1709,7 @@ def build_ui() -> gr.Blocks:
                                 page_indicator = gr.Markdown("Page 1 of 1  ·  0 tickets", elem_id="page-indicator")
                                 next_btn = gr.Button("Next →", size="sm")
 
-                    with gr.Tab("Categorization", id=2):
-                        # Category breakdown + priority donut.
-                        with gr.Row(elem_id="panel-row-1"):
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
-                                category_bar_html = gr.HTML(
-                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                                )
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
-                                category_chart = gr.Plot(show_label=False)
-
-                    with gr.Tab("Trends & Insights", id=3):
+                    with gr.Tab("Trends & Insights", id=2):
                         # KPI trend - ticket volume + worklog quality over
                         # time, toggle between daily/weekly/monthly views.
                         with gr.Column(elem_classes=["dash-card"]):
@@ -1771,7 +1776,7 @@ def build_ui() -> gr.Blocks:
                                     '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                                 )
 
-                    with gr.Tab("Recommendations", id=4):
+                    with gr.Tab("Recommendations", id=3):
                         gr.Markdown(
                             "Data-backed recommendations for this batch. Every figure below is "
                             "calculated with pandas from the incidents you analyzed - recurrence, "
@@ -1801,7 +1806,7 @@ def build_ui() -> gr.Blocks:
                                 elem_id="rec-writeup-output",
                             )
 
-                    with gr.Tab("Q&A (Agent)", id=5):
+                    with gr.Tab("Q&A (Agent)", id=4):
                         # Single bounded chat panel (intro + transcript +
                         # composer) instead of loosely stacked components -
                         # keeps the tab a fixed height with the transcript
@@ -1825,7 +1830,7 @@ def build_ui() -> gr.Blocks:
                                 chat_send = gr.Button("Send", variant="primary", scale=1)
                             chat_clear_btn = gr.Button("Clear conversation", size="sm", elem_id="chat-clear-btn")
 
-                    with gr.Tab("Export", id=6):
+                    with gr.Tab("Export", id=5):
                         gr.Markdown(
                             "Run an analysis on the Overview tab, then download the full, "
                             "untruncated results as a CSV here.",
@@ -1835,7 +1840,7 @@ def build_ui() -> gr.Blocks:
                             gr.Markdown("### ⬇️ Download Results", elem_classes=["section-heading"])
                             download_file = gr.File(label="Full results (CSV)", interactive=False)
 
-                    with gr.Tab("Settings", id=7):
+                    with gr.Tab("Settings", id=6):
                         with gr.Column(elem_classes=["dash-card"]):
                             gr.Markdown("### ⚙️ Settings", elem_classes=["section-heading"])
                             gr.Markdown(
