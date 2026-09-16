@@ -8,6 +8,7 @@ and avoids needing an API key inside the browser session. The REST API
 use cases, secured with its own API key as usual.
 """
 import io
+import json
 import os
 import re
 from datetime import datetime
@@ -16,7 +17,7 @@ import gradio as gr
 import pandas as pd
 import plotly.graph_objects as go
 
-from app.services import rag
+from app.services import overview_metrics, rag, recommendations, recurring_issues, trend_metrics
 from app.services.pipeline import run_pipeline_from_bytes, run_pipeline_from_text
 from app.services.persistence import compute_file_hash, get_cached_result, save_result
 
@@ -29,8 +30,10 @@ CUSTOM_CSS = """
     --dash-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 
+html, body {margin: 0 !important; padding: 0 !important; background: #0f1f33 !important;}
+
 .gradio-container {
-    max-width: 1680px !important; margin: auto; padding: 0 !important;
+    max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important;
     background: var(--dash-bg) !important; font-family: "Inter", "Segoe UI", system-ui, sans-serif;
 }
 footer {display: none !important;}
@@ -59,22 +62,29 @@ footer {display: none !important;}
 .nav-item .nav-icon {font-size: 0.95rem; width: 18px; text-align: center;}
 .nav-item.active {background: #1d5fe0; color: #fff; font-weight: 600;}
 
+/* Nav items are now real Gradio buttons (so they can switch tabs), styled
+   to look like the plain divs they replaced instead of default buttons. */
+#sidebar-col {gap: 2px !important;}
+#nav-buttons {gap: 2px !important;}
+button.nav-item, button.nav-item:active, button.nav-item:focus {
+    all: unset; box-sizing: border-box; cursor: pointer;
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 9px 12px; border-radius: 9px;
+    color: #aab6c7; font-size: 0.85rem; font-weight: 500; margin-bottom: 2px;
+}
+button.nav-item:hover {background: rgba(255, 255, 255, 0.08); color: #fff;}
+button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; font-weight: 600 !important;}
+
+/* The sidebar now drives navigation, so hide Gradio's own tab strip -
+   otherwise there would be two competing sets of tab controls. */
+#main-tabs > .tab-nav {display: none !important;}
+#main-tabs > .tabitem, #main-tabs {border: none !important; padding: 0 !important; background: transparent !important;}
+
 /* Top bar - plain title/subtitle on the left, a status badge on the
    right, replacing the old solid-color banner to match the reference. */
 #topbar {align-items: center !important; margin-bottom: 16px; gap: 14px !important;}
 #topbar h1 {margin: 0; font-size: 1.3rem; font-weight: 700; color: var(--dash-text); letter-spacing: -0.01em;}
 #topbar p {margin: 3px 0 0; font-size: 0.85rem; color: var(--dash-text-muted);}
-.mgmt-badge {
-    display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--dash-border);
-    border-radius: 10px; padding: 8px 14px; box-shadow: var(--dash-shadow); float: right;
-}
-.mgmt-badge-icon {
-    width: 30px; height: 30px; border-radius: 50%; background: #e2e8f0; color: #475569;
-    display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
-}
-.mgmt-badge-title {font-size: 0.8rem; font-weight: 600; color: var(--dash-text); line-height: 1.2;}
-.mgmt-badge-sub {font-size: 0.72rem; color: var(--dash-text-muted); line-height: 1.2;}
-
 .severity-note {font-size: 0.78rem; color: var(--dash-text-muted); margin: 0 0 18px 2px; font-style: italic;}
 .severity-note p {margin: 0;}
 
@@ -114,6 +124,7 @@ footer {display: none !important;}
    of a plain card since the icon already carries the accent color. */
 .kpi-card-v2 {display: flex; align-items: center; gap: 12px; border-left: 1px solid var(--dash-border);}
 .kpi-icon {width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0;}
+.kpi-note {font-size: 0.68rem; color: var(--dash-text-muted); margin-top: 4px; line-height: 1.3;}
 
 /* Horizontal bar-list panels (category / host breakdowns). */
 .bar-list {display: flex; flex-direction: column; gap: 12px;}
@@ -140,22 +151,27 @@ footer {display: none !important;}
 
 /* Full-width input bar - a single horizontal card housing the upload,
    paste, analyze, and download controls with consistent alignment. */
-#input-row {gap: 20px !important; margin-bottom: 18px; align-items: end !important;}
+#input-row {gap: 20px !important; margin-bottom: 18px; align-items: end !important; padding: 12px 20px !important;}
 #input-row label {font-weight: 600; font-size: 0.82rem; color: var(--dash-text);}
 #input-row .gr-button.primary, #input-row button.primary {
     border-radius: 10px !important; font-weight: 600 !important; box-shadow: 0 1px 2px rgba(15,23,42,.18);
-    height: 42px !important;
+    height: 36px !important;
 }
-#action-col {display: flex; flex-direction: column; gap: 10px; justify-content: flex-end;}
+#action-col {display: flex; flex-direction: column; gap: 6px; justify-content: flex-end;}
+#action-col .gr-file, #action-col [data-testid="file"] {min-height: 0 !important;}
 
 /* Compact upload dropzone - the default Gradio File drop area is tall
    and mostly empty space; shrink it down to a slim strip. */
 #file-upload {min-height: 0 !important;}
 #file-upload .wrap {
-    min-height: 54px !important; padding: 8px 12px !important;
+    min-height: 38px !important; padding: 6px 10px !important;
 }
-#file-upload .wrap svg {width: 18px !important; height: 18px !important; margin-bottom: 2px !important;}
-#file-upload .wrap > * {font-size: 0.75rem !important;}
+#file-upload .wrap svg {width: 15px !important; height: 15px !important; margin-bottom: 1px !important;}
+#file-upload .wrap > * {font-size: 0.72rem !important;}
+
+/* Paste-text box in the same row - trim its line height/padding so it
+   matches the shrunk upload dropzone instead of towering over it. */
+#input-row textarea {min-height: 0 !important; padding: 6px 10px !important; font-size: 0.8rem !important;}
 
 #results-section {margin-bottom: 20px;}
 
@@ -234,10 +250,10 @@ footer {display: none !important;}
     100% {opacity: 0;}
 }
 
-/* Ask the Agent - bounded chat panel. Everything (intro, transcript,
-   composer) lives inside one fixed-height card so the tab no longer
-   grows to the length of the conversation; only the transcript itself
-   scrolls internally. */
+/* Q&A (Agent) - bounded, dribbble-style chat panel. Intro, transcript,
+   and composer all live inside one fixed-height card instead of loosely
+   stacked components, so the tab stays a fixed height and only the
+   transcript scrolls internally, like a real chat product. */
 #chat-panel {
     display: flex !important; flex-direction: column !important;
     height: 640px !important; max-height: 78vh !important;
@@ -247,7 +263,7 @@ footer {display: none !important;}
     margin: 0 !important; padding: 14px 20px 12px !important;
     border-bottom: 1px solid var(--dash-border); flex-shrink: 0;
 }
-#chatbot {flex: 1 1 auto !important; min-height: 0 !important;}
+#chatbot {flex: 1 1 auto !important; min-height: 0 !important; border: none !important;}
 #chatbot .wrap {background: #f8fafc !important;}
 #chatbot .bubble-wrap, #chatbot .message-wrap {padding: 16px 20px !important; gap: 12px !important;}
 
@@ -265,12 +281,10 @@ footer {display: none !important;}
     background: #ffffff !important; color: var(--dash-text) !important;
     border: 1px solid var(--dash-border) !important;
 }
-#chatbot .avatar-container {
-    border-radius: 10px !important; box-shadow: var(--dash-shadow);
-}
+#chatbot .avatar-container {border-radius: 10px !important; box-shadow: var(--dash-shadow);}
 
-/* Composer - pinned to the bottom of the panel, pill-shaped input to
-   read as a real chat composer rather than a generic form row. */
+/* Composer - pinned to the bottom of the panel, pill-shaped input/button
+   so it reads as a real chat composer rather than a generic form row. */
 #chat-input-row {
     flex-shrink: 0 !important; margin: 0 !important; gap: 10px !important;
     align-items: center !important; padding: 14px 20px !important;
@@ -290,6 +304,123 @@ footer {display: none !important;}
     color: var(--dash-text-muted) !important; background: transparent !important;
     border: 1px solid var(--dash-border) !important; box-shadow: none !important;
 }
+
+/* Overview - Incident Health traffic-light grid. Reuses the same card
+   look as .kpi-card (white panel, left accent bar) so it reads as part
+   of the same dashboard rather than a new visual language. */
+.health-grid {display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;}
+.health-card {
+    background: #ffffff; border: 1px solid var(--dash-border); border-radius: 14px;
+    padding: 14px 16px; box-shadow: var(--dash-shadow); border-left: 4px solid var(--accent, #94a3b8);
+}
+.health-card-top {display: flex; align-items: center; gap: 8px; margin-bottom: 6px;}
+.health-dot {width: 9px; height: 9px; border-radius: 999px; background: var(--accent, #94a3b8); flex-shrink: 0;}
+.health-label {font-size: 0.78rem; font-weight: 600; color: var(--dash-text);}
+.health-status {font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; color: var(--accent, #94a3b8);}
+.health-detail {font-size: 0.76rem; color: var(--dash-text-muted); line-height: 1.35;}
+
+/* Overview - Attention Required list. Same card language as the mini
+   bar-list rows elsewhere, colored by severity via a left accent bar. */
+.attention-list {display: flex; flex-direction: column; gap: 10px;}
+.attention-item {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px;
+    border-radius: 10px; border-left: 4px solid var(--accent, #94a3b8);
+    background: #f8fafc; font-size: 0.82rem;
+}
+.attention-icon {flex-shrink: 0; font-size: 0.95rem; line-height: 1.4;}
+.attention-title {font-weight: 600; color: var(--dash-text);}
+.attention-detail {color: var(--dash-text-muted); font-size: 0.78rem; margin-top: 2px;}
+.attention-ok {
+    padding: 10px 14px; border-radius: 10px; background: #f0fdf4; border: 1px solid #bbf7d0;
+    color: #166534; font-size: 0.85rem;
+}
+
+/* Overview - Executive Summary card/button. The button is pinned with
+   position:absolute onto the card's own padding box (via
+   #exec-summary-card {position:relative}) instead of living inside a
+   gr.Row next to the heading - Gradio applies its own negative side
+   margins to Row internals to get edge-to-edge children, which was
+   pulling the button outside the card's visible border. Taking it out
+   of the normal flow entirely avoids that regardless of Gradio version. */
+#exec-summary-card {margin-top: 14px; position: relative !important; overflow: visible;}
+#exec-summary-card .section-heading {padding-right: 150px !important;}
+#exec-summary-btn {
+    position: absolute !important; top: 18px !important; right: 20px !important;
+    z-index: 5 !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
+    background: #ffffff !important; color: #2563eb !important;
+    border: 1px solid #bfdbfe !important; border-radius: 999px !important;
+    font-size: 0.78rem !important; font-weight: 600 !important; line-height: 1 !important;
+    padding: 7px 16px !important; height: auto !important; min-width: 0 !important;
+    width: auto !important; box-shadow: 0 1px 2px rgba(15,23,42,0.06) !important; white-space: nowrap !important;
+}
+#exec-summary-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
+#exec-summary-output {
+    margin-top: 4px; font-size: 0.88rem; color: var(--dash-text); line-height: 1.55;
+}
+#exec-summary-output p {margin: 0 0 8px 0;}
+
+/* Recommendations tab. Deliberately reuses .dash-card / the same left
+   accent bar as .attention-item and .health-card so this reads as another
+   panel of the same dashboard, not a new visual language. The card is a
+   fixed five-part structure (observation / evidence / recommendation /
+   attention / expected benefit) because every recommendation has exactly
+   those parts - see app/services/recommendations.py. */
+.rec-summary-bar {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+}
+.rec-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+    border-radius: 999px; background: #f1f5f9; border: 1px solid var(--dash-border);
+    font-size: 0.76rem; font-weight: 600; color: var(--dash-text);
+}
+.rec-chip-count {
+    background: #ffffff; border-radius: 999px; padding: 0 7px;
+    font-size: 0.72rem; color: var(--dash-text-muted);
+}
+.rec-list {display: flex; flex-direction: column; gap: 12px;}
+.rec-card {
+    border: 1px solid var(--dash-border); border-left: 4px solid var(--accent, #94a3b8);
+    border-radius: 10px; background: #ffffff; padding: 14px 16px;
+    box-shadow: var(--dash-shadow);
+}
+.rec-card-top {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px; margin-bottom: 8px;
+}
+.rec-observation {font-weight: 600; font-size: 0.88rem; color: var(--dash-text); line-height: 1.4;}
+.rec-badges {display: flex; gap: 6px; flex-shrink: 0;}
+.rec-badge {
+    border-radius: 999px; padding: 3px 10px; font-size: 0.7rem;
+    font-weight: 700; white-space: nowrap; line-height: 1.4;
+}
+.rec-badge-area {background: #f1f5f9; color: var(--dash-text-muted); font-weight: 600;}
+.rec-row {display: flex; gap: 8px; font-size: 0.81rem; line-height: 1.5; margin-top: 6px;}
+.rec-row-label {
+    flex-shrink: 0; width: 132px; color: var(--dash-text-muted);
+    font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.02em;
+    padding-top: 1px;
+}
+.rec-row-value {color: var(--dash-text);}
+.rec-empty {
+    padding: 14px 16px; border-radius: 10px; background: #f0fdf4;
+    border: 1px solid #bbf7d0; color: #166534; font-size: 0.85rem; line-height: 1.5;
+}
+/* Same pinned-button treatment as #exec-summary-btn above, for the same
+   Gradio negative-margin reason - see that comment. */
+#rec-writeup-card {margin-top: 14px; position: relative !important; overflow: visible;}
+#rec-writeup-card .section-heading {padding-right: 210px !important;}
+#rec-writeup-btn {
+    position: absolute !important; top: 18px !important; right: 20px !important;
+    z-index: 5 !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
+    background: #ffffff !important; color: #2563eb !important;
+    border: 1px solid #bfdbfe !important; border-radius: 999px !important;
+    font-size: 0.78rem !important; font-weight: 600 !important; line-height: 1 !important;
+    padding: 7px 16px !important; height: auto !important; min-width: 0 !important;
+    width: auto !important; box-shadow: 0 1px 2px rgba(15,23,42,0.06) !important; white-space: nowrap !important;
+}
+#rec-writeup-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
+#rec-writeup-output {margin-top: 4px; font-size: 0.88rem; color: var(--dash-text); line-height: 1.55;}
+#rec-writeup-output p {margin: 0 0 8px 0;}
 """
 
 AGENT_PROGRESS_HTML = """
@@ -337,6 +468,7 @@ ALL_COLUMNS = [
     "Short Description", "Description", "Worklog Notes", "Worklog Score",
     "Worklog Rating", "Worklog Flags", "Priority", "Status",
     "Assignment Group", "Host / CI", "Validation Notes",
+    "Opened At", "Closed At", "Created At", "Resolved At", "Responded At", "Detected At",
 ]
 DEFAULT_VISIBLE_COLUMNS = [
     "Ticket ID", "Category", "Priority", "Host / CI", "Assignment Group",
@@ -367,6 +499,15 @@ def _results_to_full_dataframe(analysis) -> pd.DataFrame:
                 "Assignment Group": r.assignment_group or "",
                 "Host / CI": r.host or "",
                 "Validation Notes": "; ".join(r.validation_flags) if r.validation_flags else "",
+                # Trend/resolution-metric inputs (Trends & Insights tab).
+                # Kept as real datetimes (not strings) so trend_metrics.py
+                # can parse them without a round-trip through text.
+                "Opened At": r.opened_at,
+                "Closed At": r.closed_at,
+                "Created At": r.created_at,
+                "Resolved At": r.resolved_at,
+                "Responded At": r.responded_at,
+                "Detected At": r.detected_at,
             }
         )
     return pd.DataFrame(rows)
@@ -490,29 +631,56 @@ def _bar_list_html(items: list, max_items: int = 6, color: str = "#3b82f6") -> s
     return '<div class="bar-list">' + "".join(rows) + "</div>"
 
 
-def _top_host_issues(full_df: pd.DataFrame, top_n: int = 6) -> list:
-    """Cross-tabs Host / CI x Category to find each host's most frequent
-    issue type - the "Repeated Issues (Top Hosts)" panel."""
-    if full_df is None or len(full_df) == 0 or "Host / CI" not in full_df.columns:
-        return []
-    d = full_df[full_df["Host / CI"].fillna("").astype(str).str.strip() != ""]
-    if d.empty:
-        return []
-    grp = d.groupby(["Host / CI", "Category"]).size().reset_index(name="Count")
-    grp = grp.sort_values("Count", ascending=False).head(top_n)
-    return grp.to_dict("records")
-
-
-def _repeated_issues_table_html(rows: list) -> str:
+def _recurring_issues_table_html(rows: list) -> str:
+    """Renders detect_exact_recurrence()'s output - each row is a (host,
+    category) combo meeting the recurrence threshold, with a real time
+    dimension instead of just a count."""
     if not rows:
-        return '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">No repeated issues yet - run an analysis first.</p>'
+        return (
+            '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">'
+            "No recurring issues at the current threshold - run an analysis first, "
+            "or this batch simply doesn't have repeat offenders yet.</p>"
+        )
     body = "".join(
-        f'<tr><td>{r["Host / CI"]}</td><td>{r["Category"]}</td><td>{r["Count"]}</td></tr>'
+        "<tr>"
+        f'<td>{r["host"] or "(no host)"}</td><td>{r["category"]}</td><td>{r["count"]}</td>'
+        f'<td>{r["avg_interval_days"] if r["avg_interval_days"] is not None else "—"}</td>'
+        f'<td>{r["first_seen"] or "—"} → {r["last_seen"] or "—"}</td>'
+        "</tr>"
         for r in rows
     )
     return (
-        '<table class="mini-table"><thead><tr><th>Host / Server</th><th>Issue Type</th><th>Count</th></tr></thead>'
-        f"<tbody>{body}</tbody></table>"
+        '<table class="mini-table"><thead><tr>'
+        "<th>Host / Server</th><th>Issue Type</th><th>Count</th>"
+        "<th>Avg. days between</th><th>First → last seen</th>"
+        f"</tr></thead><tbody>{body}</tbody></table>"
+    )
+
+
+def _semantic_clusters_html(result: dict) -> str:
+    """Renders detect_semantic_recurrence()'s output."""
+    if not result.get("available"):
+        note = result.get("note") or "Click \"Detect Similar Recurring Issues\" to run this."
+        return f'<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">{note}</p>'
+    clusters = result.get("clusters", [])
+    if not clusters:
+        return (
+            '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">'
+            "No semantically similar recurring clusters found at this threshold.</p>"
+        )
+    body = "".join(
+        "<tr>"
+        f'<td>{c["count"]}</td>'
+        f'<td>{", ".join(c["categories"]) or "—"}</td>'
+        f'<td>{", ".join(c["sample_ticket_ids"])}</td>'
+        f'<td style="max-width:320px; white-space:normal;">{c["excerpt"]}</td>'
+        "</tr>"
+        for c in clusters
+    )
+    return (
+        '<table class="mini-table"><thead><tr>'
+        "<th>Count</th><th>Categories involved</th><th>Sample ticket IDs</th><th>Representative text</th>"
+        f"</tr></thead><tbody>{body}</tbody></table>"
     )
 
 
@@ -596,11 +764,12 @@ def _summary_kpi_html(stats: dict) -> str:
     )
 
 
-def _kpi_card_v2(icon: str, label: str, value, accent: str) -> str:
+def _kpi_card_v2(icon: str, label: str, value, accent: str, note: str = "") -> str:
+    note_html = f'<div class="kpi-note">{note}</div>' if note else ""
     return (
         f'<div class="kpi-card kpi-card-v2" style="--accent:{accent}">'
         f'<div class="kpi-icon" style="background:{accent}1a; color:{accent};">{icon}</div>'
-        f'<div><div class="kpi-label">{label}</div><div class="kpi-value">{value}</div></div>'
+        f'<div><div class="kpi-label">{label}</div><div class="kpi-value">{value}</div>{note_html}</div>'
         "</div>"
     )
 
@@ -632,6 +801,431 @@ def _summary_kpi_html_v2(stats: dict, full_df: pd.DataFrame) -> str:
     )
 
 
+_OVERVIEW_KPI_PLACEHOLDER = (
+    '<div class="kpi-grid kpi-grid-5">'
+    + _kpi_card_v2("🎫", "Total Incidents", "—", "#3b82f6")
+    + _kpi_card_v2("🔴", "P1/P2 Incidents", "—", "#ef4444")
+    + _kpi_card_v2("⏱️", "Avg Resolution Time", "—", "#0ea5e9")
+    + _kpi_card_v2("📝", "Avg Worklog Score", "—", "#f59e0b")
+    + _kpi_card_v2("⚠️", "Poor Worklog %", "—", "#f97316")
+    + "</div>"
+)
+
+
+def _overview_kpi_html(kpis: dict) -> str:
+    """Renders the five executive KPI cards from overview_metrics'
+    aggregated kpis dict. Pure presentation - all the numbers are already
+    computed by overview_metrics.compute_overview_kpis."""
+    try:
+        resolution_value = (
+            f'{kpis["avg_resolution_hours"]}h' if kpis.get("avg_resolution_hours") is not None else "N/A"
+        )
+        return (
+            '<div class="kpi-grid kpi-grid-5">'
+            + _kpi_card_v2("🎫", "Total Incidents", kpis.get("total_incidents", 0), "#3b82f6")
+            + _kpi_card_v2(
+                "🔴", "P1/P2 Incidents", kpis.get("high_priority_count", 0), "#ef4444",
+                note=f'{kpis.get("high_priority_pct", 0)}% of total',
+            )
+            + _kpi_card_v2("⏱️", "Avg Resolution Time", resolution_value, "#0ea5e9")
+            + _kpi_card_v2("📝", "Avg Worklog Score", f'{kpis.get("avg_worklog_score", 0)} / 100', "#f59e0b")
+            + _kpi_card_v2(
+                "⚠️", "Poor Worklog %", f'{kpis.get("poor_worklog_pct", 0)}%', "#f97316",
+                note=f'{kpis.get("poor_worklog_count", 0)} incident(s)',
+            )
+            + "</div>"
+        )
+    except Exception:
+        return _OVERVIEW_KPI_PLACEHOLDER
+
+
+_HEALTH_STATUS_STYLE = {
+    "good": ("#10b981", "Good"),
+    "warning": ("#f59e0b", "Needs Attention"),
+    "critical": ("#ef4444", "Critical"),
+    "unknown": ("#94a3b8", "No Data"),
+}
+
+_HEALTH_LABELS = [
+    ("priority_health", "Priority Health"),
+    ("resolution_performance", "Resolution Performance"),
+    ("worklog_quality", "Worklog Quality"),
+    ("data_quality", "Data Quality"),
+]
+
+_HEALTH_PLACEHOLDER = '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+
+
+def _health_indicators_html(health: dict) -> str:
+    """Renders the four Incident Health traffic-light cards (Priority
+    Health, Resolution Performance, Worklog Quality, Data Quality) from
+    overview_metrics.compute_health_indicators's output."""
+    if not health:
+        return _HEALTH_PLACEHOLDER
+    try:
+        cards = []
+        for key, label in _HEALTH_LABELS:
+            entry = health.get(key, {"status": "unknown", "detail": ""})
+            accent, status_label = _HEALTH_STATUS_STYLE.get(entry.get("status"), _HEALTH_STATUS_STYLE["unknown"])
+            cards.append(
+                f'<div class="health-card" style="--accent:{accent}">'
+                f'<div class="health-card-top"><span class="health-dot"></span><span class="health-label">{label}</span></div>'
+                f'<div class="health-status">{status_label}</div>'
+                f'<div class="health-detail">{entry.get("detail", "")}</div>'
+                "</div>"
+            )
+        return '<div class="health-grid">' + "".join(cards) + "</div>"
+    except Exception:
+        return _HEALTH_PLACEHOLDER
+
+
+_ATTENTION_ICON = {"critical": "🔴", "warning": "🟡"}
+_ATTENTION_PLACEHOLDER = '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+
+
+def _attention_html(items: list) -> str:
+    """Renders the Attention Required panel from
+    overview_metrics.compute_attention_items's output - one card per
+    metric currently outside a healthy threshold, or a single "all clear"
+    banner when nothing needs attention."""
+    if items is None:
+        return _ATTENTION_PLACEHOLDER
+    try:
+        if not items:
+            return '<div class="attention-ok">✅ No urgent issues - all monitored metrics are within healthy ranges.</div>'
+        accents = {"critical": "#ef4444", "warning": "#f59e0b"}
+        rows = []
+        for item in items:
+            accent = accents.get(item.get("severity"), "#94a3b8")
+            icon = _ATTENTION_ICON.get(item.get("severity"), "⚪")
+            rows.append(
+                f'<div class="attention-item" style="--accent:{accent}">'
+                f'<span class="attention-icon">{icon}</span>'
+                f'<div><div class="attention-title">{item.get("title", "")}</div>'
+                f'<div class="attention-detail">{item.get("detail", "")}</div></div>'
+                "</div>"
+            )
+        return '<div class="attention-list">' + "".join(rows) + "</div>"
+    except Exception:
+        return _ATTENTION_PLACEHOLDER
+
+
+def _overview_trend_figure(full_df: pd.DataFrame) -> go.Figure:
+    """Simple single-line chart of daily incident volume for the Overview
+    page - deliberately simpler than the dual-axis volume/quality chart on
+    the Trends & Insights tab, and built from the same underlying series
+    (overview_metrics.compute_volume_trend -> trend_metrics.compute_time_series)
+    so the two tabs never disagree on ticket counts."""
+    try:
+        series = overview_metrics.compute_volume_trend(full_df)
+        fig = go.Figure()
+        if not series:
+            fig.update_layout(
+                annotations=[dict(
+                    text="No Opened-date data yet - run an analysis first.",
+                    showarrow=False, font=dict(size=13),
+                )],
+                height=260,
+                margin=dict(t=20, b=10, l=10, r=10),
+            )
+            return fig
+        periods = [p["period"] for p in series]
+        counts = [p["count"] for p in series]
+        fig.add_trace(go.Scatter(
+            x=periods, y=counts, mode="lines+markers", name="Incidents",
+            line=dict(color="#2563eb", width=2), marker=dict(size=5),
+            fill="tozeroy", fillcolor="rgba(37, 99, 235, 0.08)",
+        ))
+        fig.update_layout(
+            height=260,
+            margin=dict(t=20, b=10, l=10, r=10),
+            xaxis=dict(title=""),
+            yaxis=dict(title="Incidents", rangemode="tozero"),
+            showlegend=False,
+        )
+        return fig
+    except Exception:
+        fig = go.Figure()
+        fig.update_layout(
+            annotations=[dict(text="Could not render the volume trend.", showarrow=False, font=dict(size=13))],
+            height=260,
+            margin=dict(t=20, b=10, l=10, r=10),
+        )
+        return fig
+
+
+def _refresh_overview(full_df: pd.DataFrame, summary_stats: dict):
+    """Recomputes every Overview section (KPI cards, health indicators,
+    attention list, volume trend) from the latest analysis."""
+    try:
+        kpis = overview_metrics.compute_overview_kpis(full_df, summary_stats or {})
+        health = overview_metrics.compute_health_indicators(full_df, kpis)
+        attention = overview_metrics.compute_attention_items(health)
+        return (
+            _overview_kpi_html(kpis),
+            _health_indicators_html(health),
+            _attention_html(attention),
+            _overview_trend_figure(full_df),
+        )
+    except Exception:
+        return _OVERVIEW_KPI_PLACEHOLDER, _HEALTH_PLACEHOLDER, _ATTENTION_PLACEHOLDER, _overview_trend_figure(None)
+
+
+async def _llm_executive_summary(payload: dict) -> "tuple[str, bool]":
+    """Sends ONLY the small aggregated `payload` dict (KPIs/health/
+    attention/trend direction - no ticket rows, descriptions, or worklog
+    text) to the LLM and asks for a short management-friendly summary.
+    Falls back to a deterministic, rule-based summary (same underlying
+    numbers, no LLM) if the API key/package isn't available or the call
+    fails for any reason, so the button never errors out for the user.
+
+    Returns (summary_text, used_llm).
+    """
+    try:
+        import anthropic  # local import - optional dependency for this feature only
+
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY not configured")
+
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        prompt = (
+            "You are an ITSM reporting assistant writing for a management audience. "
+            "Using ONLY the aggregated incident metrics in the JSON below, write a short "
+            "(4-6 sentence) executive summary in plain English. Do not invent any numbers "
+            "that aren't present in the data, and do not mention individual tickets - these "
+            "are already-aggregated figures.\n\n"
+            f"Aggregated metrics (JSON):\n{json.dumps(payload, default=str)}"
+        )
+        response = await client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=400,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        summary = "".join(
+            block.text for block in response.content if getattr(block, "type", "") == "text"
+        ).strip()
+        if not summary:
+            raise RuntimeError("empty LLM response")
+        return summary, True
+    except Exception:
+        return overview_metrics.fallback_summary_text(payload), False
+
+
+async def _generate_executive_summary(full_df: pd.DataFrame, summary_stats: dict):
+    """Click handler for "Generate Executive Summary": computes all KPIs/
+    health/attention data via pandas (overview_metrics), sends only that
+    small aggregated dict to the LLM, and renders the resulting text.
+    Never sends per-ticket rows/descriptions/worklog text to the LLM."""
+    try:
+        if full_df is None or len(full_df) == 0:
+            return gr.update(value="Run an analysis on the Overview tab first, then generate the summary.")
+
+        kpis = overview_metrics.compute_overview_kpis(full_df, summary_stats or {})
+        health = overview_metrics.compute_health_indicators(full_df, kpis)
+        attention = overview_metrics.compute_attention_items(health)
+        volume_trend = overview_metrics.compute_volume_trend(full_df)
+        payload = overview_metrics.build_aggregated_payload(kpis, health, attention, volume_trend)
+
+        summary_text, used_llm = await _llm_executive_summary(payload)
+        note = "" if used_llm else "\n\n_(LLM unavailable right now - showing a rule-based summary of the same metrics.)_"
+        return gr.update(value=f"{summary_text}{note}")
+    except Exception as exc:
+        return gr.update(value=f"Could not generate the executive summary right now ({exc}).")
+
+
+# --- Recommendations -------------------------------------------------
+# Rendering + handlers for the Recommendations tab. All numbers come from
+# app/services/recommendations.py (pure pandas over the existing
+# analytics); nothing is computed here. The deterministic cards below are
+# always what's shown - the LLM write-up is an optional, opt-in extra
+# layer on the same already-computed content, exactly like the Overview
+# tab's Executive Summary.
+
+_RECOMMENDATIONS_PLACEHOLDER = (
+    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">'
+    "Run an analysis on the Overview tab - recommendations are generated automatically "
+    "from that batch.</p>"
+)
+
+_REC_ATTENTION_STYLE = {
+    "Critical": ("#ef4444", "#fef2f2", "🔴 Critical"),
+    "High": ("#f59e0b", "#fffbeb", "🟠 High"),
+    "Medium": ("#3b82f6", "#eff6ff", "🔵 Medium"),
+    "Low": ("#94a3b8", "#f8fafc", "⚪ Low"),
+}
+
+
+def _recommendations_html(result: dict) -> str:
+    """Renders recommendations.generate_recommendations()'s output as one
+    card per recommendation, each showing the fixed five-part structure:
+    Observation / Evidence / Recommendation / Attention / Expected
+    benefit. A batch that crosses no thresholds renders an explicit
+    "nothing to flag" banner rather than padding the panel with generic
+    advice."""
+    try:
+        if not result or not result.get("available"):
+            note = (result or {}).get("note") or ""
+            return (
+                f'<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">{_strip_html(note)}</p>'
+                if note else _RECOMMENDATIONS_PLACEHOLDER
+            )
+
+        recommendations_list = result.get("recommendations") or []
+        if not recommendations_list:
+            return f'<div class="rec-empty">✅ {_strip_html(result.get("note", ""))}</div>'
+
+        chips = "".join(
+            f'<span class="rec-chip">{_strip_html(area)}'
+            f'<span class="rec-chip-count">{count}</span></span>'
+            for area, count in (result.get("counts_by_area") or {}).items()
+        )
+        header = f'<div class="rec-summary-bar">{chips}</div>' if chips else ""
+
+        cards = []
+        for rec in recommendations_list:
+            accent, tint, label = _REC_ATTENTION_STYLE.get(
+                rec.get("attention"), _REC_ATTENTION_STYLE["Low"]
+            )
+            cards.append(
+                f'<div class="rec-card" style="--accent:{accent}">'
+                '<div class="rec-card-top">'
+                f'<div class="rec-observation">{_strip_html(rec.get("observation", ""))}</div>'
+                '<div class="rec-badges">'
+                f'<span class="rec-badge" style="background:{tint}; color:{accent}">{label}</span>'
+                f'<span class="rec-badge rec-badge-area">{_strip_html(rec.get("area", ""))}</span>'
+                "</div></div>"
+                f'<div class="rec-row"><div class="rec-row-label">Evidence</div>'
+                f'<div class="rec-row-value">{_strip_html(rec.get("evidence", ""))}</div></div>'
+                f'<div class="rec-row"><div class="rec-row-label">Recommendation</div>'
+                f'<div class="rec-row-value">{_strip_html(rec.get("recommendation", ""))}</div></div>'
+                f'<div class="rec-row"><div class="rec-row-label">Expected benefit</div>'
+                f'<div class="rec-row-value">{_strip_html(rec.get("expected_benefit", ""))}</div></div>'
+                "</div>"
+            )
+
+        note = result.get("note") or ""
+        footer = (
+            f'<p style="color:var(--dash-text-muted); font-size:0.78rem; margin:12px 0 0;">{_strip_html(note)}</p>'
+            if note else ""
+        )
+        return f'{header}<div class="rec-list">{"".join(cards)}</div>{footer}'
+    except Exception:
+        return _RECOMMENDATIONS_PLACEHOLDER
+
+
+def _refresh_recommendations(full_df: pd.DataFrame):
+    """Recomputes the Recommendations panel from the latest analysis.
+    Deterministic and LLM-free, so it can run automatically at the end of
+    every analysis without adding latency or an API dependency - the
+    panel is always populated the moment an analysis finishes.
+
+    Returns (cards_html, recommendations_state) so the LLM write-up
+    button can reuse the already-computed result instead of recomputing
+    it."""
+    try:
+        result = recommendations.generate_recommendations(full_df)
+        return _recommendations_html(result), result
+    except Exception:
+        return _RECOMMENDATIONS_PLACEHOLDER, {}
+
+
+async def _llm_recommendations_writeup(payload: dict) -> "tuple[str, bool]":
+    """Sends ONLY the small aggregated `payload` (the already-computed
+    recommendations and headline metrics from
+    recommendations.build_llm_payload - no ticket rows, descriptions, or
+    worklog text) and asks the model to re-voice them for management.
+
+    Tries the app's configured provider first (llm_client, i.e. whatever
+    LLM_PROVIDER is set to), then the same direct Anthropic path the
+    Executive Summary uses, then gives up and returns the deterministic
+    write-up built from the identical numbers - so the button always
+    returns something useful and never errors out.
+
+    Returns (text, used_llm).
+    """
+    prompt = (
+        "You are an ITSM reporting assistant writing for a management audience. The JSON below "
+        "contains recommendations that have ALREADY been calculated from incident data, each with "
+        "its own evidence, attention level, and expected benefit.\n\n"
+        "Rewrite them as a short, readable management briefing. Rules:\n"
+        "- Use ONLY the numbers present in the JSON. Never introduce, round differently, "
+        "recalculate, or estimate any figure.\n"
+        "- Do not invent recommendations that are not in the JSON, and do not drop any.\n"
+        "- Keep the most urgent items first, and name the specific servers, categories, and "
+        "groups involved.\n"
+        "- Lead with a 2-3 sentence framing paragraph, then one short paragraph or bullet per "
+        "recommendation.\n\n"
+        f"Recommendations (JSON):\n{json.dumps(payload, default=str)}"
+    )
+
+    # 1. The app's own configured provider (SAP GenAI Hub / OpenAI-compatible).
+    try:
+        from app.services.llm_client import get_chat_model
+
+        chat_model = get_chat_model()
+        if chat_model is not None:
+            response = await chat_model.ainvoke(prompt)
+            text = getattr(response, "content", "") or ""
+            if isinstance(text, list):  # some providers return content blocks
+                text = "".join(part.get("text", "") for part in text if isinstance(part, dict))
+            if text.strip():
+                return text.strip(), True
+    except Exception:
+        pass
+
+    # 2. Same direct Anthropic path the Executive Summary already uses.
+    try:
+        import anthropic  # local import - optional dependency for this feature only
+
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY not configured")
+
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        response = await client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1200,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = "".join(
+            block.text for block in response.content if getattr(block, "type", "") == "text"
+        ).strip()
+        if not text:
+            raise RuntimeError("empty LLM response")
+        return text, True
+    except Exception:
+        return "", False
+
+
+async def _generate_recommendations_writeup(full_df: pd.DataFrame, cached_result: dict):
+    """Click handler for the Recommendations tab's write-up button.
+    Reuses the recommendations already computed when the analysis
+    finished (cached_result) rather than recalculating them, so the
+    narrative can never describe different numbers than the cards above
+    it. Only the small aggregated payload reaches the LLM."""
+    try:
+        if full_df is None or len(full_df) == 0:
+            return gr.update(value="Run an analysis on the Overview tab first, then generate the write-up.")
+
+        result = cached_result if (cached_result or {}).get("available") else \
+            recommendations.generate_recommendations(full_df)
+
+        if not result.get("available") or not result.get("recommendations"):
+            return gr.update(value=recommendations.fallback_recommendations_markdown(result))
+
+        payload = recommendations.build_llm_payload(result)
+        text, used_llm = await _llm_recommendations_writeup(payload)
+        if not used_llm:
+            return gr.update(
+                value=recommendations.fallback_recommendations_markdown(result)
+                + "\n\n_(LLM unavailable right now - showing the rule-based write-up of the same recommendations.)_"
+            )
+        return gr.update(value=text)
+    except Exception as exc:
+        return gr.update(value=f"Could not generate the recommendations write-up right now ({exc}).")
+
+
 def _analysis_to_summary_stats(analysis) -> dict:
     return {
         "total_records": analysis.total_records,
@@ -639,6 +1233,91 @@ def _analysis_to_summary_stats(analysis) -> dict:
         "rejected_records": analysis.rejected_records,
         "average_worklog_score": analysis.average_worklog_score,
     }
+
+
+_RESOLUTION_METRICS_PLACEHOLDER = (
+    '<div class="kpi-grid">'
+    + _kpi_card_v2("🔍", "MTTD (Detect)", "—", "#6366f1")
+    + _kpi_card_v2("📨", "MTTA (Acknowledge)", "—", "#0ea5e9")
+    + _kpi_card_v2("🛠️", "MTTR (Resolve)", "—", "#10b981")
+    + _kpi_card_v2("🎯", "SLA Compliance", "—", "#f59e0b")
+    + "</div>"
+)
+
+
+def _trend_figure(full_df: pd.DataFrame, granularity: str) -> go.Figure:
+    """Dual-axis chart: ticket volume as bars (left axis), average worklog
+    score as a line (right axis), bucketed by day/week/month on Opened At."""
+    series = trend_metrics.compute_time_series(full_df, granularity)
+    fig = go.Figure()
+    if not series:
+        fig.update_layout(
+            annotations=[dict(
+                text="No Opened-date data yet - run an analysis first (dates come from the "
+                     "Opened/Created column in your upload).",
+                showarrow=False, font=dict(size=13),
+            )],
+            height=340,
+            margin=dict(t=30, b=10, l=10, r=10),
+        )
+        return fig
+
+    periods = [p["period"] for p in series]
+    counts = [p["ticket_count"] for p in series]
+    scores = [p["avg_worklog_score"] for p in series]
+
+    fig.add_trace(go.Bar(x=periods, y=counts, name="Ticket volume", marker_color="#3b82f6", yaxis="y1"))
+    fig.add_trace(go.Scatter(
+        x=periods, y=scores, name="Avg worklog score", mode="lines+markers",
+        line=dict(color="#f59e0b", width=2), marker=dict(size=6), yaxis="y2",
+    ))
+    fig.update_layout(
+        title=f"Ticket volume & worklog quality - {granularity}",
+        height=340,
+        margin=dict(t=40, b=10, l=10, r=10),
+        xaxis=dict(title=""),
+        yaxis=dict(title="Tickets", side="left", rangemode="tozero"),
+        yaxis2=dict(title="Avg score", overlaying="y", side="right", range=[0, 100]),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        bargap=0.25,
+    )
+    return fig
+
+
+def _resolution_metrics_html(full_df: pd.DataFrame) -> str:
+    """Four KPI cards: MTTD, MTTA, MTTR, SLA compliance. Any metric whose
+    required timestamp column wasn't in the uploaded data shows "N/A" with
+    an explanatory note instead of a fabricated number - see
+    trend_metrics.compute_resolution_metrics for why MTTD/MTTA are often
+    unavailable while MTTR/SLA (which only need Opened/Closed) are not."""
+    metrics = trend_metrics.compute_resolution_metrics(full_df)
+
+    def _duration_card(icon, label, accent, m):
+        if not m["available"]:
+            return _kpi_card_v2(icon, label, "N/A", "#94a3b8", note=m["note"])
+        return _kpi_card_v2(icon, label, f'{m["value_hours"]}h', accent, note=f'Based on {m["sample_size"]} ticket(s)')
+
+    sla = metrics["sla"]
+    if not sla["available"]:
+        sla_card = _kpi_card_v2("🎯", "SLA Compliance", "N/A", "#94a3b8", note=sla["note"])
+    else:
+        sla_card = _kpi_card_v2(
+            "🎯", "SLA Compliance", f'{sla["compliance_pct"]}%', "#f59e0b",
+            note=f'{sla["sample_size"]} resolved ticket(s), target by priority',
+        )
+
+    return (
+        '<div class="kpi-grid">'
+        + _duration_card("🔍", "MTTD (Detect)", "#6366f1", metrics["mttd"])
+        + _duration_card("📨", "MTTA (Acknowledge)", "#0ea5e9", metrics["mtta"])
+        + _duration_card("🛠️", "MTTR (Resolve)", "#10b981", metrics["mttr"])
+        + sla_card
+        + "</div>"
+    )
+
+
+def _refresh_trend(full_df: pd.DataFrame, granularity: str):
+    return _trend_figure(full_df, granularity), _resolution_metrics_html(full_df)
 
 
 def _truncate_full_df(full_df: pd.DataFrame) -> pd.DataFrame:
@@ -659,18 +1338,33 @@ def _truncate_full_df(full_df: pd.DataFrame) -> pd.DataFrame:
 
 
 async def _analyze(file_obj, pasted_text):
-    if file_obj is None and not (pasted_text and pasted_text.strip()):
+    has_file = file_obj is not None
+    has_text = bool(pasted_text and pasted_text.strip())
+
+    if not has_file and not has_text:
         raise gr.Error("Upload a file (CSV/XLSX/TXT) or paste incident text first.")
+    if has_file and has_text:
+        # Both fields are populated - almost always a leftover value from a
+        # previous analysis still sitting in the file uploader, not two
+        # inputs the user actually intends together. Rather than silently
+        # picking the file (which is what used to happen, and produced a
+        # confusing "already categorized" result while the newly-pasted
+        # text was quietly ignored), make the user disambiguate.
+        raise gr.Error(
+            "Both a file and pasted text are present - please clear one of them. "
+            "(If you analyzed a file earlier, use the ✕ on the file box to remove it "
+            "before pasting text, or vice versa.)"
+        )
 
     # Show the animated agent progress bar in its single fixed spot before
     # doing any work; other outputs are left untouched (gr.update()) so
     # nothing under them flickers or shows its own loading state.
-    yield (gr.update(visible=True),) + (gr.update(),) * 10
+    yield (gr.update(visible=True),) + (gr.update(),) * 13
 
     # Hash the raw input (file bytes, or the pasted text) so an identical
     # upload/paste can be served straight from the DB instead of hitting
     # the LLM pipeline again.
-    if file_obj is not None:
+    if has_file:
         with open(file_obj.name, "rb") as f:
             content = f.read()
         input_label = file_obj.name
@@ -693,7 +1387,7 @@ async def _analyze(file_obj, pasted_text):
             visible=True,
         )
     else:
-        if file_obj is not None:
+        if has_file:
             analysis = await run_pipeline_from_bytes(file_obj.name, content)
         else:
             analysis = await run_pipeline_from_text(pasted_text)
@@ -715,7 +1409,8 @@ async def _analyze(file_obj, pasted_text):
         cache_notice = gr.update(value="", visible=False)
 
     df = _truncate_full_df(full_df)
-    summary = _summary_kpi_html_v2(summary_stats, full_df)
+    overview_kpis = overview_metrics.compute_overview_kpis(full_df, summary_stats)
+    summary = _overview_kpi_html(overview_kpis)
 
     # Prepare CSV for download - always the FULL untruncated result set,
     # independent of whatever filter/page/truncation the on-screen table
@@ -738,7 +1433,7 @@ async def _analyze(file_obj, pasted_text):
     host_bar_html = _bar_list_html(
         sorted(host_counts.items(), key=lambda kv: kv[1], reverse=True), color="#3b82f6"
     )
-    repeated_issues_html = _repeated_issues_table_html(_top_host_issues(full_df))
+    recurring_issues_html = _recurring_issues_table_html(recurring_issues.detect_exact_recurrence(full_df))
     assignment_group_html = _assignment_group_table_html(_assignment_group_performance(full_df))
 
     # Aggregate stats handed to the chat/RAG tab alongside the retrieved
@@ -752,16 +1447,31 @@ async def _analyze(file_obj, pasted_text):
 
     yield (
         gr.update(visible=False), summary, chart, csv_path, df, cache_notice,
-        category_bar_html, host_bar_html, repeated_issues_html, assignment_group_html,
+        category_bar_html, host_bar_html, recurring_issues_html, assignment_group_html,
         chat_stats,
+        # Clear both inputs now that this run is done, so a stale file or
+        # stale pasted text can't get silently reused (and mistaken for
+        # "both provided") on the next click.
+        gr.update(value=None), gr.update(value=""),
+        # summary_stats_state - feeds the Overview health/attention/exec
+        # summary calculations without needing to re-run the pipeline.
+        summary_stats,
     )
 
 
 def _build_chat_index(full_df: pd.DataFrame) -> "rag.TicketIndex":
     """Rebuilds the chat/RAG index from the latest analysis dataframe.
     Cheap and synchronous - embeddings are computed lazily on first
-    question (see rag.TicketIndex._ensure_vectors), not here."""
+    question (see rag.TicketIndex._ensure_vectors), not here. Also the
+    index the "Detect Similar Recurring Issues" button clusters over -
+    whichever of chat or that button runs first pays the one embedding
+    call; the other reuses the same cached vectors for free."""
     return rag.build_index_from_dataframe(full_df)
+
+
+async def _detect_semantic_recurrence(index) -> str:
+    result = await recurring_issues.detect_semantic_recurrence(index)
+    return _semantic_clusters_html(result)
 
 
 def _history_to_messages(history: list[tuple[str, str]]) -> list[dict]:
@@ -775,15 +1485,15 @@ def _history_to_messages(history: list[tuple[str, str]]) -> list[dict]:
     return messages
 
 
-async def _chat_respond(message: str, history: list, index, stats: dict):
+async def _chat_respond(message: str, history: list, full_df, stats: dict):
     message = (message or "").strip()
     if not message:
         return _history_to_messages(history), history, ""
 
-    if index is None or not getattr(index, "rows", None):
+    if full_df is None or len(full_df) == 0:
         answer = "Run an analysis on the Dashboard tab first - then come back and ask away."
     else:
-        answer = await rag.answer_question(message, index, stats or {}, history)
+        answer = await rag.answer_question(message, full_df, stats or {}, history)
 
     history = history + [(message, answer)]
     return _history_to_messages(history), history, ""
@@ -843,7 +1553,7 @@ def _go_to_page(filtered_df, page, page_size, delta):
     return _select_columns(page_df), indicator, new_page
 
 
-SIDEBAR_HTML = """
+SIDEBAR_BRAND_HTML = """
 <div class="side-brand">
   <div class="side-brand-icon">🤖</div>
   <div>
@@ -851,49 +1561,68 @@ SIDEBAR_HTML = """
     <div class="side-brand-sub">Incident Analytics</div>
   </div>
 </div>
-<div class="nav-item active"><span class="nav-icon">🏠</span>Overview</div>
-<div class="nav-item"><span class="nav-icon">📈</span>Incident Analysis</div>
-<div class="nav-item"><span class="nav-icon">🗂️</span>Categorization</div>
-<div class="nav-item"><span class="nav-icon">📊</span>Trends &amp; Insights</div>
-<div class="nav-item"><span class="nav-icon">💬</span>Q&amp;A (Agent)</div>
-<div class="nav-item"><span class="nav-icon">⬇️</span>Export</div>
-<div class="nav-item"><span class="nav-icon">⚙️</span>Settings</div>
 """
 
 TOPBAR_HTML = """
-<div class="mgmt-badge">
-  <div class="mgmt-badge-icon">👤</div>
-  <div>
-    <div class="mgmt-badge-title">Management View</div>
-    <div class="mgmt-badge-sub">IT Operations</div>
-  </div>
-</div>
 <h1>ITSM Incident Analytics</h1>
 <p>AI-powered insights for better service and faster resolution</p>
 """
 
+# Sidebar nav items -> the id of the gr.Tab each one opens. Order here
+# drives both the buttons drawn in the sidebar and the tabs built below.
+NAV_ITEMS = [
+    ("overview", "🏠", "Overview"),
+    ("analysis", "📈", "Incident Analysis"),
+    ("categorization", "🗂️", "Categorization"),
+    ("trends", "📊", "Trends & Insights"),
+    # Recommendations sits directly after Trends & Insights: it's the
+    # "so what do we do about it" reading of everything on that tab, so
+    # it belongs next to the analysis it's derived from rather than
+    # tacked on after Settings. NOTE: this list's index is the gr.Tab id
+    # each button opens (see _make_nav_handler), so inserting here shifts
+    # the ids of Q&A/Export/Settings by one - they're renumbered to match
+    # in build_ui below.
+    ("recommendations", "💡", "Recommendations"),
+    ("qa", "💬", "Q&A (Agent)"),
+    ("export", "⬇️", "Export"),
+    ("settings", "⚙️", "Settings"),
+]
+
 
 def build_ui() -> gr.Blocks:
     with gr.Blocks(title="ITSM Quality Analysis Agent", css=CUSTOM_CSS) as demo:
-        # App shell: dark nav rail (visual shell only - today's app is a
-        # single Overview screen, so only that item is "active"; the rest
-        # mirror the reference dashboard's sections for a management-tool
-        # look without implying pages that don't exist yet) + main column.
+        # App shell: dark nav rail on the left, everything else scrolls in
+        # the main column on the right. The nav items below are real
+        # buttons that switch between the gr.Tab sections built further
+        # down, so the sidebar is an actual working nav, not a static mock.
         with gr.Row(elem_id="app-shell", equal_height=False):
             with gr.Column(scale=0, min_width=210, elem_id="sidebar-col"):
-                gr.HTML(SIDEBAR_HTML)
+                gr.HTML(SIDEBAR_BRAND_HTML)
+                nav_buttons = []
+                with gr.Column(elem_id="nav-buttons"):
+                    for i, (key, icon, label) in enumerate(NAV_ITEMS):
+                        btn = gr.Button(
+                            f"{icon}  {label}",
+                            elem_classes=["nav-item", "active"] if i == 0 else ["nav-item"],
+                        )
+                        nav_buttons.append(btn)
 
             with gr.Column(scale=1, elem_id="main-col"):
                 gr.HTML(TOPBAR_HTML, elem_id="topbar")
                 gr.Markdown(f"_{SEVERITY_NOTE}_", elem_classes=["severity-note"])
 
-                with gr.Tabs():
-                    with gr.Tab("📊 Dashboard"):
+                with gr.Tabs(elem_id="main-tabs") as main_tabs:
+                    with gr.Tab("Overview", id=0):
                         agent_progress = gr.HTML(AGENT_PROGRESS_HTML, elem_id="agent-progress", visible=False)
                         cache_notice = gr.Markdown(visible=False, elem_id="cache-notice")
 
+                        # KPI strip - headline numbers for management at a glance,
+                        # shown above the upload bar so totals are the first thing seen.
+                        with gr.Row(elem_id="metrics-row"):
+                            summary_md = gr.HTML(_OVERVIEW_KPI_PLACEHOLDER)
+
                         # Single full-width input bar - upload, paste, and the
-                        # analyze/download actions all sit on one row.
+                        # analyze action sit on one row (download moved to Export).
                         with gr.Row(elem_id="input-row", elem_classes=["dash-card"], equal_height=False):
                             with gr.Column(scale=3, min_width=260):
                                 file_input = gr.File(
@@ -902,47 +1631,52 @@ def build_ui() -> gr.Blocks:
                                     elem_id="file-upload",
                                 )
                             with gr.Column(scale=4, min_width=320):
-                                text_input = gr.Textbox(label="...or paste unstructured incident text", lines=3,
+                                text_input = gr.Textbox(label="...or paste unstructured incident text", lines=2,
                                                           placeholder="INC0012345\nShort description: ...\nWorklog: ...")
                             with gr.Column(scale=2, min_width=180, elem_id="action-col"):
                                 analyze_btn = gr.Button("Analyze", variant="primary")
-                                download_file = gr.File(label="Download full results as CSV", interactive=False)
 
-                        # KPI strip - headline numbers for management at a glance.
-                        with gr.Row(elem_id="metrics-row"):
-                            summary_md = gr.HTML(_KPI_PLACEHOLDER_V2)
+                        # Incident Health - four traffic-light indicators so
+                        # management can scan overall status in a second.
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown("### 🩺 Incident Health", elem_classes=["section-heading"])
+                            health_html = gr.HTML(_HEALTH_PLACEHOLDER)
 
-                        # Panel row 1: category breakdown + priority donut.
-                        with gr.Row(elem_id="panel-row-1"):
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
-                                category_bar_html = gr.HTML(
-                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                                )
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
-                                category_chart = gr.Plot(show_label=False)
+                        # Incident Volume Trend - a simple line chart, distinct
+                        # from the dual-axis chart on Trends & Insights.
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown("### 📈 Incident Volume Trend", elem_classes=["section-heading"])
+                            overview_trend_chart = gr.Plot(show_label=False)
 
-                        # Panel row 2: top hosts, repeated issues, assignment group performance.
-                        with gr.Row(elem_id="panel-row-2"):
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🖥️ Top Affected Servers / Hosts", elem_classes=["section-heading"])
-                                host_bar_html = gr.HTML(
-                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                                )
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🔁 Repeated Issues (Top Hosts)", elem_classes=["section-heading"])
-                                repeated_issues_html = gr.HTML(
-                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                                )
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 👥 Assignment Group Performance", elem_classes=["section-heading"])
-                                assignment_group_html = gr.HTML(
-                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                                )
+                        # Attention Required - a short, management-facing
+                        # roll-up of anything currently outside a healthy range.
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown("### 🚩 Attention Required", elem_classes=["section-heading"])
+                            attention_html = gr.HTML(_ATTENTION_PLACEHOLDER)
 
-                        # Recent Incidents: the primary, full-width table - at the
-                        # bottom, matching the reference layout.
+                        # Executive Summary - computes KPIs/trends with
+                        # pandas first, then sends only that small
+                        # aggregated dict to the LLM for a short write-up.
+                        # The button is NOT inside a gr.Row with the
+                        # heading - Gradio gives Row children negative
+                        # side margins for edge-to-edge layout, which was
+                        # pushing the button past the card's own border.
+                        # Instead it's a normal sibling, pinned on top of
+                        # the card with CSS position:absolute, so it can
+                        # never escape the card's visible edges.
+                        with gr.Column(elem_classes=["dash-card"], elem_id="exec-summary-card"):
+                            gr.Markdown("### 🧾 Executive Summary", elem_classes=["section-heading"])
+                            exec_summary_btn = gr.Button(
+                                "✨ Generate summary", size="sm", elem_id="exec-summary-btn",
+                            )
+                            exec_summary_output = gr.Markdown(
+                                "Run an analysis, then click **Generate summary** for a "
+                                "management-friendly write-up of the KPIs above.",
+                                elem_id="exec-summary-output",
+                            )
+
+                    with gr.Tab("Incident Analysis", id=1):
+                        # Recent Incidents: the primary, full-width table.
                         with gr.Column(elem_id="results-section", elem_classes=["dash-card"]):
                             gr.Markdown("### 📋 Recent Incidents (Analyzed &amp; Categorized)", elem_classes=["section-heading"])
                             results_table = gr.Dataframe(
@@ -958,7 +1692,116 @@ def build_ui() -> gr.Blocks:
                                 page_indicator = gr.Markdown("Page 1 of 1  ·  0 tickets", elem_id="page-indicator")
                                 next_btn = gr.Button("Next →", size="sm")
 
-                    with gr.Tab("💬 Ask the Agent"):
+                    with gr.Tab("Categorization", id=2):
+                        # Category breakdown + priority donut.
+                        with gr.Row(elem_id="panel-row-1"):
+                            with gr.Column(scale=1, elem_classes=["dash-card"]):
+                                gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
+                                category_bar_html = gr.HTML(
+                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+                                )
+                            with gr.Column(scale=1, elem_classes=["dash-card"]):
+                                gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
+                                category_chart = gr.Plot(show_label=False)
+
+                    with gr.Tab("Trends & Insights", id=3):
+                        # KPI trend - ticket volume + worklog quality over
+                        # time, toggle between daily/weekly/monthly views.
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown("### 📈 Ticket Trend", elem_classes=["section-heading"])
+                            trend_granularity = gr.Radio(
+                                ["Daily", "Weekly", "Monthly"], value="Daily",
+                                show_label=False, elem_id="trend-granularity",
+                            )
+                            trend_chart = gr.Plot(show_label=False)
+
+                        # Resolution metrics - MTTD/MTTA/MTTR/SLA. Any
+                        # metric whose timestamp column isn't in the
+                        # uploaded data shows "N/A" with an explanation
+                        # rather than a fabricated number.
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown("### ⏱️ Resolution Metrics", elem_classes=["section-heading"])
+                            resolution_metrics_html = gr.HTML(_RESOLUTION_METRICS_PLACEHOLDER)
+
+                        # Recurring issues, exact-match: (host, category)
+                        # combos meeting a recurrence threshold, with a
+                        # real time dimension (first/last seen, average
+                        # days between occurrences) - not just a raw count.
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown("### 🔁 Recurring Issues", elem_classes=["section-heading"])
+                            recurring_issues_html = gr.HTML(
+                                '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+                            )
+
+                        # Recurring issues, semantic: catches the same
+                        # underlying problem even when it's logged under
+                        # different categories or worded differently each
+                        # time. Opt-in (button) rather than automatic,
+                        # since clustering needs the whole batch embedded
+                        # first - one embedding call, same cost the chat
+                        # tab pays lazily on its first question. Reuses
+                        # chat_index_state so whichever feature runs first
+                        # makes the other free.
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown(
+                                "### 🔬 Semantic Recurrence Detection",
+                                elem_classes=["section-heading"],
+                            )
+                            gr.Markdown(
+                                "Finds recurring issues that don't share an exact category or host - "
+                                "e.g. the same underlying problem logged inconsistently. Costs one "
+                                "embedding call for the batch the first time it (or the chat tab) runs.",
+                                elem_classes=["severity-note"],
+                            )
+                            semantic_recurrence_btn = gr.Button("Detect Similar Recurring Issues", size="sm")
+                            semantic_recurrence_html = gr.HTML(
+                                '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis, then click the button above.</p>'
+                            )
+
+                        # Top hosts, assignment group performance.
+                        with gr.Row(elem_id="panel-row-2"):
+                            with gr.Column(scale=1, elem_classes=["dash-card"]):
+                                gr.Markdown("### 🖥️ Top Affected Servers / Hosts", elem_classes=["section-heading"])
+                                host_bar_html = gr.HTML(
+                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+                                )
+                            with gr.Column(scale=1, elem_classes=["dash-card"]):
+                                gr.Markdown("### 👥 Assignment Group Performance", elem_classes=["section-heading"])
+                                assignment_group_html = gr.HTML(
+                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+                                )
+
+                    with gr.Tab("Recommendations", id=4):
+                        gr.Markdown(
+                            "Data-backed recommendations for this batch. Every figure below is "
+                            "calculated with pandas from the incidents you analyzed - recurrence, "
+                            "priority mix, SLA attainment, per-group resolution times, worklog "
+                            "quality, and volume concentration. Nothing here is generic advice, and "
+                            "an area that crosses no threshold simply isn't listed.",
+                            elem_classes=["severity-note"],
+                        )
+
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown("### 💡 Recommended Actions", elem_classes=["section-heading"])
+                            recommendations_html = gr.HTML(_RECOMMENDATIONS_PLACEHOLDER)
+
+                        # Optional LLM layer: re-voices the cards above for
+                        # a management audience. Only the small aggregated
+                        # payload is sent (see _llm_recommendations_writeup);
+                        # the cards themselves never depend on it.
+                        with gr.Column(elem_classes=["dash-card"], elem_id="rec-writeup-card"):
+                            gr.Markdown("### 🧾 Management Write-Up", elem_classes=["section-heading"])
+                            rec_writeup_btn = gr.Button(
+                                "✨ Generate write-up", size="sm", elem_id="rec-writeup-btn",
+                            )
+                            rec_writeup_output = gr.Markdown(
+                                "Run an analysis, then click **Generate write-up** to turn the "
+                                "recommendations above into a management-ready briefing. The same "
+                                "numbers are used either way.",
+                                elem_id="rec-writeup-output",
+                            )
+
+                    with gr.Tab("Q&A (Agent)", id=5):
                         # Single bounded chat panel (intro + transcript +
                         # composer) instead of loosely stacked components -
                         # keeps the tab a fixed height with the transcript
@@ -969,7 +1812,7 @@ def build_ui() -> gr.Blocks:
                                 "*\"what's driving high-priority incidents?\"*, "
                                 "*\"which assignment group has the worst worklog quality?\"*, or "
                                 "*\"summarize the recurring issues on our database servers.\"* "
-                                "Answers are grounded only in the analyzed batch (Dashboard tab) - "
+                                "Answers are grounded only in the analyzed batch (Overview tab) - "
                                 "run an analysis first if you haven't yet.",
                                 elem_classes=["severity-note", "chat-intro"],
                             )
@@ -981,6 +1824,25 @@ def build_ui() -> gr.Blocks:
                                 )
                                 chat_send = gr.Button("Send", variant="primary", scale=1)
                             chat_clear_btn = gr.Button("Clear conversation", size="sm", elem_id="chat-clear-btn")
+
+                    with gr.Tab("Export", id=6):
+                        gr.Markdown(
+                            "Run an analysis on the Overview tab, then download the full, "
+                            "untruncated results as a CSV here.",
+                            elem_classes=["severity-note"],
+                        )
+                        with gr.Column(elem_classes=["dash-card"], elem_id="export-card"):
+                            gr.Markdown("### ⬇️ Download Results", elem_classes=["section-heading"])
+                            download_file = gr.File(label="Full results (CSV)", interactive=False)
+
+                    with gr.Tab("Settings", id=7):
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown("### ⚙️ Settings", elem_classes=["section-heading"])
+                            gr.Markdown(
+                                "Nothing configurable here yet - this tab is a placeholder for "
+                                "future options (e.g. default page size, scoring thresholds).",
+                                elem_classes=["severity-note"],
+                            )
 
         full_results_state = gr.State(pd.DataFrame())
         filtered_results_state = gr.State(pd.DataFrame())
@@ -1000,14 +1862,26 @@ def build_ui() -> gr.Blocks:
         chat_stats_state = gr.State({})
         chat_history_state = gr.State([])
 
+        # Raw summary_stats dict (total/valid/rejected records, avg
+        # worklog score) from the latest analysis - feeds the Overview
+        # KPI/health/attention calculations and the executive summary
+        # without needing to re-run the pipeline.
+        summary_stats_state = gr.State({})
+        # Holds the recommendations computed at the end of each analysis,
+        # so the Management Write-Up button re-voices exactly those rather
+        # than recomputing (and possibly drifting from) the cards on screen.
+        recommendations_state = gr.State({})
+
         analyze_btn.click(
             fn=_analyze,
             inputs=[file_input, text_input],
             outputs=[
                 agent_progress, summary_md, category_chart, download_file,
                 full_results_state, cache_notice,
-                category_bar_html, host_bar_html, repeated_issues_html, assignment_group_html,
+                category_bar_html, host_bar_html, recurring_issues_html, assignment_group_html,
                 chat_stats_state,
+                file_input, text_input,
+                summary_stats_state,
             ],
         ).then(
             fn=_refresh_view,
@@ -1017,6 +1891,46 @@ def build_ui() -> gr.Blocks:
             fn=_build_chat_index,
             inputs=[full_results_state],
             outputs=[chat_index_state],
+        ).then(
+            fn=_refresh_trend,
+            inputs=[full_results_state, trend_granularity],
+            outputs=[trend_chart, resolution_metrics_html],
+        ).then(
+            fn=_refresh_overview,
+            inputs=[full_results_state, summary_stats_state],
+            outputs=[summary_md, health_html, attention_html, overview_trend_chart],
+        ).then(
+            # Recommendations refresh automatically with every new batch.
+            # Chained as a separate .then() rather than folded into
+            # _analyze's yield so that function's existing 14-output
+            # contract is untouched.
+            fn=_refresh_recommendations,
+            inputs=[full_results_state],
+            outputs=[recommendations_html, recommendations_state],
+        )
+
+        rec_writeup_btn.click(
+            fn=_generate_recommendations_writeup,
+            inputs=[full_results_state, recommendations_state],
+            outputs=[rec_writeup_output],
+        )
+
+        exec_summary_btn.click(
+            fn=_generate_executive_summary,
+            inputs=[full_results_state, summary_stats_state],
+            outputs=[exec_summary_output],
+        )
+
+        trend_granularity.change(
+            fn=_refresh_trend,
+            inputs=[full_results_state, trend_granularity],
+            outputs=[trend_chart, resolution_metrics_html],
+        )
+
+        semantic_recurrence_btn.click(
+            fn=_detect_semantic_recurrence,
+            inputs=[chat_index_state],
+            outputs=[semantic_recurrence_html],
         )
 
         prev_btn.click(
@@ -1032,14 +1946,28 @@ def build_ui() -> gr.Blocks:
 
         chat_send.click(
             fn=_chat_respond,
-            inputs=[chat_input, chat_history_state, chat_index_state, chat_stats_state],
+            inputs=[chat_input, chat_history_state, full_results_state, chat_stats_state],
             outputs=[chatbot, chat_history_state, chat_input],
         )
         chat_input.submit(
             fn=_chat_respond,
-            inputs=[chat_input, chat_history_state, chat_index_state, chat_stats_state],
+            inputs=[chat_input, chat_history_state, full_results_state, chat_stats_state],
             outputs=[chatbot, chat_history_state, chat_input],
         )
         chat_clear_btn.click(fn=_chat_clear, outputs=[chatbot, chat_history_state])
+
+        # Wire each sidebar nav button to (a) switch the visible tab and
+        # (b) move the "active" highlight to itself and off the rest.
+        def _make_nav_handler(selected_idx: int):
+            def _handler():
+                updates = [gr.Tabs(selected=selected_idx)]
+                for i in range(len(NAV_ITEMS)):
+                    classes = ["nav-item", "active"] if i == selected_idx else ["nav-item"]
+                    updates.append(gr.update(elem_classes=classes))
+                return updates
+            return _handler
+
+        for i, btn in enumerate(nav_buttons):
+            btn.click(fn=_make_nav_handler(i), inputs=[], outputs=[main_tabs, *nav_buttons])
 
     return demo
