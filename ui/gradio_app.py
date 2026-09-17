@@ -175,6 +175,28 @@ button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; 
 
 #results-section {margin-bottom: 20px;}
 
+/* Recent Incidents card - icon-only download button pinned to the
+   card's own top-right corner, same technique/reasoning as
+   #exec-summary-btn below (position:absolute on the card rather than a
+   gr.Row, since Gradio's own negative Row margins would otherwise push
+   it outside the card border). Sits right next to the table's own
+   built-in copy/fullscreen toolbar icons, which live in the table's own
+   top-right corner - Gradio doesn't expose a hook to place a button
+   inside that native toolbar itself. */
+#results-section {position: relative !important; overflow: visible;}
+#results-section .section-heading {padding-right: 56px !important;}
+#results-download-btn {
+    position: absolute !important; top: 16px !important; right: 20px !important;
+    z-index: 5 !important; display: inline-flex !important; align-items: center !important;
+    justify-content: center !important;
+    background: #ffffff !important; color: #2563eb !important;
+    border: 1px solid #bfdbfe !important; border-radius: 999px !important;
+    font-size: 0.95rem !important; line-height: 1 !important;
+    padding: 0 !important; height: 32px !important; width: 32px !important; min-width: 0 !important;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.06) !important;
+}
+#results-download-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
+
 /* Results table - fixed-height, single-line rows instead of letting long
    Description/Worklog text blow rows out. The Python side already
    truncates + strips HTML tags (see _preview_html); this just makes sure
@@ -421,91 +443,6 @@ button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; 
 #rec-writeup-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
 #rec-writeup-output {margin-top: 4px; font-size: 0.88rem; color: var(--dash-text); line-height: 1.55;}
 #rec-writeup-output p {margin: 0 0 8px 0;}
-
-/* Custom "download full results" icon injected into the Recent Incidents
-   table's built-in toolbar (next to the copy-table-data icon) - see the
-   injection script in RESULTS_TABLE_DOWNLOAD_BUTTON_JS below. Styled to
-   match Gradio's own toolbar icon buttons so it looks native. */
-.df-download-btn {
-    display: inline-flex !important; align-items: center !important; justify-content: center !important;
-    width: 28px; height: 28px; border-radius: 6px; border: none;
-    background: transparent; color: var(--dash-text-muted); cursor: pointer; padding: 0; margin: 0;
-}
-.df-download-btn:hover {background: rgba(15, 23, 42, 0.08); color: var(--dash-text);}
-.df-download-btn svg {width: 16px; height: 16px; display: block;}
-"""
-
-# Injected into <head> (via gr.Blocks(head=...) below) so it runs once the
-# page loads. It adds a download icon immediately before the Dataframe's
-# built-in "copy table data" icon in the Categorization tab's Recent
-# Incidents table toolbar. Clicking it just clicks the actual (hidden)
-# download link that _analyze already populates - no new download logic,
-# no change to what gets downloaded, only where the trigger lives.
-RESULTS_TABLE_DOWNLOAD_BUTTON_JS = """
-<script>
-(function () {
-    function findDownloadAnchor() {
-        var wrap = document.getElementById("download-file-hidden");
-        if (!wrap) return null;
-        return wrap.querySelector("a[href]");
-    }
-
-    function triggerDownload() {
-        var a = findDownloadAnchor();
-        if (a) {
-            a.click();
-        } else {
-            alert("No analyzed results yet - run an analysis first.");
-        }
-    }
-
-    function makeDownloadButton() {
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "df-download-btn";
-        btn.setAttribute("aria-label", "Download full results (CSV)");
-        btn.title = "Download full results (CSV)";
-        btn.innerHTML =
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
-            'stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/>' +
-            '<path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>';
-        btn.addEventListener("click", function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            triggerDownload();
-        });
-        return btn;
-    }
-
-    function ensureButtonInjected() {
-        var tableRoot = document.getElementById("results-table");
-        if (!tableRoot) return;
-        var buttons = tableRoot.querySelectorAll("button[aria-label]");
-        var copyBtn = null;
-        for (var i = 0; i < buttons.length; i++) {
-            var label = (buttons[i].getAttribute("aria-label") || "").toLowerCase();
-            if (label.indexOf("copy") !== -1) {
-                copyBtn = buttons[i];
-                break;
-            }
-        }
-        if (!copyBtn || !copyBtn.parentElement) return;
-        if (copyBtn.parentElement.querySelector(".df-download-btn")) return;
-        copyBtn.parentElement.insertBefore(makeDownloadButton(), copyBtn);
-    }
-
-    document.addEventListener("DOMContentLoaded", ensureButtonInjected);
-    new MutationObserver(ensureButtonInjected).observe(document.body, {
-        childList: true,
-        subtree: true,
-    });
-    var tries = 0;
-    var poll = setInterval(function () {
-        ensureButtonInjected();
-        if (++tries > 60) clearInterval(poll);
-    }, 500);
-})();
-</script>
 """
 
 AGENT_PROGRESS_HTML = """
@@ -706,6 +643,41 @@ def _bar_list_html(items: list, max_items: int = 6, color: str = "#3b82f6") -> s
     rows = []
     for label, count in items:
         pct = max(4, round(count / max_count * 100))
+        rows.append(
+            '<div class="bar-row">'
+            f'<span class="bar-label" title="{label}">{label}</span>'
+            f'<div class="bar-track"><div class="bar-fill" style="width:{pct}%; background:{color};"></div></div>'
+            f'<span class="bar-count">{count}</span>'
+            "</div>"
+        )
+    return '<div class="bar-list">' + "".join(rows) + "</div>"
+
+
+def _overview_category_counts(full_df: pd.DataFrame) -> dict:
+    """Category counts derived straight from full_df, the same way
+    _priority_counts derives priority counts - lets the Overview copy of
+    the Incidents by Category card refresh from full_results_state alone,
+    without needing the pipeline's separately-aggregated category_counts."""
+    if full_df is None or len(full_df) == 0 or "Category" not in full_df.columns:
+        return {}
+    series = full_df["Category"].fillna("").astype(str).str.strip()
+    series = series.replace("", "Unspecified")
+    return series.value_counts().to_dict()
+
+
+def _priority_bar_list_html(priority_counts: dict) -> str:
+    """Same bar-list rendering as _bar_list_html, but colored per priority
+    tier (via _priority_color) instead of a single flat color, and shown
+    beneath the Incidents by Priority donut on Overview so each priority's
+    raw count is visible at a glance instead of only on hover."""
+    if not priority_counts:
+        return '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">No data to show yet - run an analysis first.</p>'
+    items = sorted(priority_counts.items(), key=lambda kv: kv[1], reverse=True)
+    max_count = max(c for _, c in items) or 1
+    rows = []
+    for label, count in items:
+        pct = max(4, round(count / max_count * 100))
+        color = _priority_color(label)
         rows.append(
             '<div class="bar-row">'
             f'<span class="bar-label" title="{label}">{label}</span>'
@@ -1054,6 +1026,32 @@ def _refresh_overview(full_df: pd.DataFrame, summary_stats: dict):
         )
     except Exception:
         return _OVERVIEW_KPI_PLACEHOLDER, _HEALTH_PLACEHOLDER, _ATTENTION_PLACEHOLDER, _overview_trend_figure(None)
+
+
+_OVERVIEW_BREAKDOWN_PLACEHOLDER = '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+
+
+def _refresh_overview_breakdown(full_df: pd.DataFrame):
+    """Feeds the Incidents by Category / Incidents by Priority cards that
+    now sit on Overview, copied from Categorization in place of the old
+    Attention Required card. Kept as its own function/.then() step - same
+    pattern as _refresh_overview and _refresh_recommendations - so the
+    existing _analyze/_refresh_overview output contracts stay untouched."""
+    try:
+        category_counts = _overview_category_counts(full_df)
+        priority_counts = _priority_counts(full_df)
+        bar_html = _bar_list_html(
+            sorted(category_counts.items(), key=lambda kv: kv[1], reverse=True), color="#3b82f6"
+        )
+        chart = _donut_figure(priority_counts, "Incidents by Priority", color_fn=_priority_color)
+        priority_counts_html = _priority_bar_list_html(priority_counts)
+        return bar_html, chart, priority_counts_html
+    except Exception:
+        return (
+            _OVERVIEW_BREAKDOWN_PLACEHOLDER,
+            _donut_figure({}, "Incidents by Priority", color_fn=_priority_color),
+            _OVERVIEW_BREAKDOWN_PLACEHOLDER,
+        )
 
 
 async def _llm_executive_summary(payload: dict) -> "tuple[str, bool]":
@@ -1677,11 +1675,7 @@ NAV_ITEMS = [
 
 
 def build_ui() -> gr.Blocks:
-    with gr.Blocks(
-        title="ITSM Quality Analysis Agent",
-        css=CUSTOM_CSS,
-        head=RESULTS_TABLE_DOWNLOAD_BUTTON_JS,
-    ) as demo:
+    with gr.Blocks(title="ITSM Quality Analysis Agent", css=CUSTOM_CSS) as demo:
         # App shell: dark nav rail on the left, everything else scrolls in
         # the main column on the right. The nav items below are real
         # buttons that switch between the gr.Tab sections built further
@@ -1740,11 +1734,28 @@ def build_ui() -> gr.Blocks:
                             gr.Markdown("### 📈 Incident Volume Trend", elem_classes=["section-heading"])
                             overview_trend_chart = gr.Plot(show_label=False)
 
-                        # Attention Required - a short, management-facing
-                        # roll-up of anything currently outside a healthy range.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 🚩 Attention Required", elem_classes=["section-heading"])
-                            attention_html = gr.HTML(_ATTENTION_PLACEHOLDER)
+                        # Attention Required - still computed every run
+                        # (compute_attention_items feeds the exec-summary
+                        # payload below) but no longer has its own visible
+                        # card; kept as a hidden component so
+                        # _refresh_overview's existing output contract is
+                        # untouched.
+                        attention_html = gr.HTML(_ATTENTION_PLACEHOLDER, visible=False)
+
+                        # Incidents by Category / Incidents by Priority -
+                        # copied here from the Categorization tab, in place
+                        # of the old Attention Required card, so the
+                        # category/priority mix is visible without leaving
+                        # Overview. Categorization's own cards (below) are
+                        # untouched.
+                        with gr.Row(elem_id="overview-panel-row"):
+                            with gr.Column(scale=1, elem_classes=["dash-card"]):
+                                gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
+                                overview_category_bar_html = gr.HTML(_OVERVIEW_BREAKDOWN_PLACEHOLDER)
+                            with gr.Column(scale=1, elem_classes=["dash-card"]):
+                                gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
+                                overview_priority_chart = gr.Plot(show_label=False)
+                                overview_priority_counts_html = gr.HTML(_OVERVIEW_BREAKDOWN_PLACEHOLDER)
 
                         # Executive Summary - computes KPIs/trends with
                         # pandas first, then sends only that small
@@ -1785,8 +1796,25 @@ def build_ui() -> gr.Blocks:
                         # next_btn) are untouched - only the parent tab
                         # changed - so pagination and filtering behave
                         # exactly as before.
+                        #
+                        # download_file: was a separate "Download Results"
+                        # card; now an icon-only gr.DownloadButton pinned
+                        # into this card's own heading, in the same
+                        # top-right corner where the table's built-in
+                        # copy/fullscreen icons sit (see #results-download-btn
+                        # in CUSTOM_CSS - it can't literally sit inside
+                        # Gradio's native table toolbar, which is compiled
+                        # frontend Gradio doesn't expose a hook into, but
+                        # pinning it to this card's corner puts it right
+                        # next to that toolbar). It still receives the same
+                        # full, untruncated CSV path from _analyze, by the
+                        # same variable, in the same outputs list - clicking
+                        # it downloads immediately, no intermediate file box.
                         with gr.Column(elem_id="results-section", elem_classes=["dash-card"]):
                             gr.Markdown("### 📋 Recent Incidents (Analyzed &amp; Categorized)", elem_classes=["section-heading"])
+                            download_file = gr.DownloadButton(
+                                "⬇", elem_id="results-download-btn", size="sm",
+                            )
                             results_table = gr.Dataframe(
                                 label=None,
                                 show_label=False,
@@ -1799,26 +1827,15 @@ def build_ui() -> gr.Blocks:
                                 prev_btn = gr.Button("← Previous", size="sm")
                                 page_indicator = gr.Markdown("Page 1 of 1  ·  0 tickets", elem_id="page-indicator")
                                 next_btn = gr.Button("Next →", size="sm")
-
-                        # Export card is no longer shown in the layout - the
-                        # download is now triggered from the download icon
-                        # injected into the Recent Incidents table's toolbar
-                        # (see RESULTS_TABLE_DOWNLOAD_BUTTON_JS) instead of a
-                        # separate "Download Results" section. download_file
-                        # itself, and everything that populates it
-                        # (_analyze's CSV-writing step), is unchanged - it's
-                        # only hidden (visible=False), not removed, so the
-                        # existing outputs=[...] wiring below still works and
-                        # the injected button still has a real link to click.
-                        with gr.Column(elem_classes=["dash-card"], elem_id="export-card", visible=False):
-                            gr.Markdown("### ⬇️ Download Results", elem_classes=["section-heading"])
-                            gr.Markdown(
-                                "Full, untruncated results as a CSV - always reflects the latest analysis.",
-                                elem_classes=["severity-note"],
-                            )
-                            download_file = gr.File(
-                                label="Full results (CSV)", interactive=False, elem_id="download-file-hidden",
-                            )
+                                page_size_selector = gr.Dropdown(
+                                    choices=[10, 25, 50, 100],
+                                    value=DEFAULT_PAGE_SIZE,
+                                    label="Rows/page",
+                                    show_label=True,
+                                    scale=0,
+                                    min_width=110,
+                                    elem_id="page-size-selector",
+                                )
 
                     with gr.Tab("Trends & Insights", id=2):
                         # KPI trend - ticket volume + worklog quality over
@@ -1953,12 +1970,13 @@ def build_ui() -> gr.Blocks:
         full_results_state = gr.State(pd.DataFrame())
         filtered_results_state = gr.State(pd.DataFrame())
         page_state = gr.State(1)
-        # Category/score filters and the rows-per-page control have been
-        # removed from the UI; these fixed states keep _apply_filters /
-        # _paginate (and their existing behavior) unchanged underneath.
+        # Category/score filters have been removed from the UI; these
+        # fixed states keep _apply_filters' existing behavior unchanged
+        # underneath. Rows-per-page now has its own control
+        # (page_size_selector, in the pagination row) instead of a fixed
+        # state.
         category_state = gr.State("All")
         min_score_state = gr.State(0)
-        page_size_state = gr.State(DEFAULT_PAGE_SIZE)
 
         # Chat/RAG state: the semantic index + aggregate stats are rebuilt
         # from the latest analysis; chat_history_state is the running
@@ -1991,7 +2009,7 @@ def build_ui() -> gr.Blocks:
             ],
         ).then(
             fn=_refresh_view,
-            inputs=[full_results_state, category_state, min_score_state, page_size_state],
+            inputs=[full_results_state, category_state, min_score_state, page_size_selector],
             outputs=[results_table, page_indicator, filtered_results_state, page_state],
         ).then(
             fn=_build_chat_index,
@@ -2005,6 +2023,10 @@ def build_ui() -> gr.Blocks:
             fn=_refresh_overview,
             inputs=[full_results_state, summary_stats_state],
             outputs=[summary_md, health_html, attention_html, overview_trend_chart],
+        ).then(
+            fn=_refresh_overview_breakdown,
+            inputs=[full_results_state],
+            outputs=[overview_category_bar_html, overview_priority_chart, overview_priority_counts_html],
         ).then(
             # Recommendations refresh automatically with every new batch.
             # Chained as a separate .then() rather than folded into
@@ -2041,13 +2063,21 @@ def build_ui() -> gr.Blocks:
 
         prev_btn.click(
             fn=lambda filtered_df, page, page_size: _go_to_page(filtered_df, page, page_size, -1),
-            inputs=[filtered_results_state, page_state, page_size_state],
+            inputs=[filtered_results_state, page_state, page_size_selector],
             outputs=[results_table, page_indicator, page_state],
         )
         next_btn.click(
             fn=lambda filtered_df, page, page_size: _go_to_page(filtered_df, page, page_size, 1),
-            inputs=[filtered_results_state, page_state, page_size_state],
+            inputs=[filtered_results_state, page_state, page_size_selector],
             outputs=[results_table, page_indicator, page_state],
+        )
+
+        # Changing rows-per-page re-paginates the current filtered set from
+        # page 1, same as a fresh analysis does - reuses _refresh_view as-is.
+        page_size_selector.change(
+            fn=_refresh_view,
+            inputs=[full_results_state, category_state, min_score_state, page_size_selector],
+            outputs=[results_table, page_indicator, filtered_results_state, page_state],
         )
 
         chat_send.click(
