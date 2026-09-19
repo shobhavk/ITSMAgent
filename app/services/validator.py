@@ -40,7 +40,7 @@ def normalize_and_validate(df: pd.DataFrame) -> tuple[list[TicketRecord], list[d
         return valid, rejected
 
     # Ensure expected columns exist even if the source lacked them
-    for col in ["ticket_id", "short_description", "description", "worklog",
+    for col in ["ticket_id", "short_description", "subject", "description", "worklog", "external_info",
                 "priority", "status", "assignment_group", "configuration_item",
                 "opened_at", "closed_at", "created_at", "resolved_at",
                 "responded_at", "detected_at"]:
@@ -54,10 +54,12 @@ def normalize_and_validate(df: pd.DataFrame) -> tuple[list[TicketRecord], list[d
     for idx, row in df.reset_index(drop=True).iterrows():
         ticket_id = _clean_str(row.get("ticket_id")) or f"AUTO-{idx+1}"
         short_desc = _clean_str(row.get("short_description"))
+        subject = _clean_str(row.get("subject"))
         desc = _clean_str(row.get("description"))
         worklog = _clean_str(row.get("worklog"))
+        external_info = _clean_str(row.get("external_info"))
 
-        if not any([short_desc, desc, worklog]):
+        if not any([short_desc, subject, desc, worklog]):
             rejected.append({"source_row": idx, "reason": "No description or worklog content found."})
             continue
 
@@ -70,8 +72,10 @@ def normalize_and_validate(df: pd.DataFrame) -> tuple[list[TicketRecord], list[d
         record = TicketRecord(
             ticket_id=ticket_id,
             short_description=short_desc,
+            subject=subject,
             description=desc,
             worklog=worklog,
+            external_info=external_info,
             priority=_clean_str(row.get("priority")) or None,
             status=_clean_str(row.get("status")) or None,
             assignment_group=_clean_str(row.get("assignment_group")) or None,
