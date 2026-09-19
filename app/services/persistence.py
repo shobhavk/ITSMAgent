@@ -118,11 +118,55 @@ def compute_file_hash(file_bytes: bytes) -> str:
     return hashlib.sha256(file_bytes).hexdigest()
 
 
-def compute_ticket_content_hash(short_description: str, description: str, worklog: str) -> str:
+# Same six columns _results_to_full_dataframe (ui/gradio_app.py) puts real
+# datetimes into for a fresh analysis - trend_metrics.py reads these by
+# name for MTTR/SLA/volume-trend, so a cache-hit load has to restore the
+# exact same dtype or those calculations silently go wrong.
+_CACHED_DATETIME_COLUMNS = [
+    "Opened At", "Closed At", "Created At", "Resolved At", "Responded At", "Detected At",
+]
+
+
+def _restore_cached_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Un-does what full_df.to_json()/pd.DataFrame(records) does to
+    datetime columns on the DB cache round-trip.
+
+    pandas' to_json() serializes a datetime column as epoch-milliseconds
+    (or, once we started passing date_format="iso" below, as an ISO 8601
+    string); pd.DataFrame(json.loads(...)) then reconstructs that column
+    as a plain int64 or string - never back as datetime64. If that's fed
+    straight into pd.to_datetime() with no unit given, an epoch-ms int is
+    silently misread as epoch-*nanoseconds*, landing every date around
+    1970-01-01 instead of its real value - resolution hours, SLA
+    compliance, and the volume-trend chart all go quietly wrong, with no
+    error raised anywhere. Detecting numeric vs. string per column here
+    handles both old rows already sitting in the DB from before this fix
+    (numeric epoch-ms) and new ones (ISO strings) without needing a
+    migration."""
+    for col in _CACHED_DATETIME_COLUMNS:
+        if col not in df.columns:
+            continue
+        try:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                df[col] = pd.to_datetime(df[col], unit="ms", errors="coerce")
+            else:
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+        except Exception:
+            df[col] = pd.NaT
+    return df
+
+
+def compute_ticket_content_hash(
+    short_description: str, description: str, worklog: str, subject: str = "", external_info: str = ""
+) -> str:
     """Hash of a ticket's actual content (not its ID) - used to detect
     when an Incident ID has been re-exported with edited text, so the
-    cache isn't served stale in that case."""
-    raw = f"{short_description or ''}|{description or ''}|{worklog or ''}".encode("utf-8")
+    cache isn't served stale in that case. subject/external_info default
+    to "" so this stays backward-compatible with any other caller."""
+    raw = (
+        f"{short_description or ''}|{subject or ''}|{description or ''}|"
+        f"{worklog or ''}|{external_info or ''}"
+    ).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -227,7 +271,7 @@ def get_cached_result(
 
         payload = json.loads(record.results_json)
         return {
-            "full_df": pd.DataFrame(payload["full_df"]),
+            "full_df": _restore_cached_datetime_columns(pd.DataFrame(payload["full_df"])),
             "summary_stats": payload["summary_stats"],
             "category_counts": payload["category_counts"],
             "host_counts": payload.get("host_counts", {}),
@@ -252,7 +296,11 @@ def save_result(
     cached load can rebuild the on-screen truncated view from it."""
     payload = json.dumps(
         {
-            "full_df": json.loads(full_df.to_json(orient="records")),
+            # date_format="iso" avoids the epoch-ms/nanosecond ambiguity
+            # _restore_cached_datetime_columns above has to work around for
+            # rows saved before this fix - new rows serialize their six
+            # date columns as unambiguous ISO 8601 strings instead.
+            "full_df": json.loads(full_df.to_json(orient="records", date_format="iso")),
             "summary_stats": summary_stats,
             "category_counts": category_counts,
             "host_counts": host_counts,
