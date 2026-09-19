@@ -80,7 +80,9 @@ async def _run_pipeline(df) -> AnalysisResponse:
     # served straight from ticket_cache - no LLM call for it at all, even
     # if the rest of this upload is brand new.
     content_hashes = {
-        rec.ticket_id: compute_ticket_content_hash(rec.short_description, rec.description, rec.worklog)
+        rec.ticket_id: compute_ticket_content_hash(
+            rec.short_description, rec.description, rec.worklog, rec.subject, rec.external_info
+        )
         for rec in valid_records
     }
     ticket_cache = get_ticket_cache_bulk(list(content_hashes.keys()))
@@ -102,7 +104,10 @@ async def _run_pipeline(df) -> AnalysisResponse:
     embeddings_model = get_embeddings_model()
 
     combined_texts: dict[str, str] = {
-        rec.ticket_id: " ".join(filter(None, [rec.short_description, rec.description])).strip() or rec.worklog
+        rec.ticket_id: (
+            " ".join(filter(None, [rec.subject, rec.short_description, rec.description])).strip()
+            or rec.worklog
+        )
         for rec in records_to_process
     }
 
@@ -123,7 +128,13 @@ async def _run_pipeline(df) -> AnalysisResponse:
             TicketState(
                 ticket_id=rec.ticket_id,
                 text=combined_texts[rec.ticket_id],
-                worklog=rec.worklog,
+                # External Info is additional evidence of diagnosis/
+                # resolution work - folded in here so both the heuristic
+                # rubric and the optional LLM scoring pass see it, without
+                # touching rec.worklog itself (still used unmodified for
+                # the displayed Worklog Notes column and the "No worklog
+                # present" flag below).
+                worklog=" ".join(filter(None, [rec.worklog, rec.external_info])).strip(),
                 category=pre.category if pre else None,
                 category_confidence=pre.confidence if pre else 0.0,
                 category_method=pre.method if pre else "",
@@ -158,7 +169,7 @@ async def _run_pipeline(df) -> AnalysisResponse:
             host_counts[host] = host_counts.get(host, 0) + 1
 
         validation_flags = []
-        if not rec.short_description and not rec.description:
+        if not rec.short_description and not rec.subject and not rec.description:
             validation_flags.append("Missing description - categorized from worklog only.")
         if not rec.worklog:
             validation_flags.append("No worklog present.")
@@ -214,7 +225,7 @@ async def _run_pipeline(df) -> AnalysisResponse:
             host_counts[host] = host_counts.get(host, 0) + 1
 
         validation_flags = []
-        if not rec.short_description and not rec.description:
+        if not rec.short_description and not rec.subject and not rec.description:
             validation_flags.append("Missing description - categorized from worklog only.")
         if not rec.worklog:
             validation_flags.append("No worklog present.")
