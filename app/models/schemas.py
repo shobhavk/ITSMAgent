@@ -28,8 +28,19 @@ class TicketRecord(BaseModel):
 
     ticket_id: str
     short_description: str = ""
+    # Optional - only populated if the source has a "Subject" column
+    # (see COLUMN_ALIASES). Combined with short_description/description
+    # for categorization in pipeline.py; kept separate from
+    # short_description rather than merged at ingestion time since some
+    # exports carry both as distinct columns.
+    subject: str = ""
     description: str = ""
     worklog: str = ""
+    # Optional - only populated if the source has an "External Info"
+    # column. Folded into the text scorer.heuristic_score sees
+    # (pipeline.py) as additional evidence of diagnosis/resolution work,
+    # not displayed as its own column.
+    external_info: str = ""
     priority: Optional[str] = None
     status: Optional[str] = None
     assignment_group: Optional[str] = None
