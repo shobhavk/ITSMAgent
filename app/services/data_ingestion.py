@@ -21,6 +21,12 @@ COLUMN_ALIASES: dict[str, str] = {
     "short description": "short_description",
     "summary": "short_description",
     "title": "short_description",
+    # Kept as its own canonical field rather than folded into
+    # short_description - some exports carry both a "Short Description"
+    # and a separate "Subject" column, and merging them under one alias
+    # would collide (two source columns -> one renamed column). Both are
+    # combined for categorization in pipeline.py's combined_texts instead.
+    "subject": "subject",
     "description": "description",
     "details": "description",
     "worklog": "worklog",
@@ -28,6 +34,11 @@ COLUMN_ALIASES: dict[str, str] = {
     "work notes": "worklog",
     "resolution notes": "worklog",
     "resolution": "worklog",
+    # Used to enrich worklog-quality scoring (pipeline.py folds this into
+    # the text scorer.heuristic_score sees) - not displayed as its own
+    # column, just extra evidence of what was actually done/found.
+    "external info": "external_info",
+    "external information": "external_info",
     "priority": "priority",
     "state": "status",
     "status": "status",
