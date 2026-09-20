@@ -30,7 +30,7 @@ CUSTOM_CSS = """
     --dash-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 
-html, body {margin: 0 !important; padding: 0 !important; background: #0f1f33 !important;}
+html, body {margin: 0 !important; padding: 0 !important; background: var(--dash-bg) !important;}
 
 .gradio-container {
     max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important;
@@ -38,46 +38,23 @@ html, body {margin: 0 !important; padding: 0 !important; background: #0f1f33 !im
 }
 footer {display: none !important;}
 
-/* App shell: dark nav rail on the left, everything else scrolls in the
-   main column on the right - matches the reference management dashboard. */
-#app-shell {gap: 0 !important; align-items: stretch !important;}
-#sidebar-col {
-    background: #0f1f33 !important; padding: 22px 16px !important; min-height: 100vh;
-    border-radius: 0 !important;
-}
-#main-col {padding: 20px 28px 32px !important;}
+/* Single-column app shell (the sidebar nav rail has been removed) -
+   content is centered with a max-width so cards don't stretch edge to
+   edge on wide screens, matching the reference dashboard. */
+#main-col {max-width: 1320px; margin: 0 auto !important; padding: 24px 28px 40px !important; box-sizing: border-box;}
 
-.side-brand {display: flex; align-items: center; gap: 10px; padding: 0 6px 20px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);}
-.side-brand-icon {
-    width: 34px; height: 34px; border-radius: 9px; background: #2563eb;
-    display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;
+/* Gradio's own tab strip is now the only navigation, since the sidebar
+   is gone - style it to sit quietly above the content instead of
+   looking like a default widget. */
+#main-tabs > .tab-nav {
+    border: none !important; background: transparent !important; gap: 4px !important; margin-bottom: 18px !important;
 }
-.side-brand-title {color: #fff; font-weight: 700; font-size: 0.92rem; line-height: 1.2;}
-.side-brand-sub {color: #8291a8; font-size: 0.72rem; line-height: 1.2;}
-
-.nav-item {
-    display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px;
-    color: #aab6c7; font-size: 0.85rem; font-weight: 500; margin-bottom: 2px;
+#main-tabs > .tab-nav button {
+    border: none !important; border-radius: 10px !important; font-weight: 600 !important;
+    font-size: 0.85rem !important; color: var(--dash-text-muted) !important; padding: 9px 16px !important;
+    background: transparent !important;
 }
-.nav-item .nav-icon {font-size: 0.95rem; width: 18px; text-align: center;}
-.nav-item.active {background: #1d5fe0; color: #fff; font-weight: 600;}
-
-/* Nav items are now real Gradio buttons (so they can switch tabs), styled
-   to look like the plain divs they replaced instead of default buttons. */
-#sidebar-col {gap: 2px !important;}
-#nav-buttons {gap: 2px !important;}
-button.nav-item, button.nav-item:active, button.nav-item:focus {
-    all: unset; box-sizing: border-box; cursor: pointer;
-    display: flex; align-items: center; gap: 10px; width: 100%;
-    padding: 9px 12px; border-radius: 9px;
-    color: #aab6c7; font-size: 0.85rem; font-weight: 500; margin-bottom: 2px;
-}
-button.nav-item:hover {background: rgba(255, 255, 255, 0.08); color: #fff;}
-button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; font-weight: 600 !important;}
-
-/* The sidebar now drives navigation, so hide Gradio's own tab strip -
-   otherwise there would be two competing sets of tab controls. */
-#main-tabs > .tab-nav {display: none !important;}
+#main-tabs > .tab-nav button.selected {background: #1d5fe0 !important; color: #fff !important;}
 #main-tabs > .tabitem, #main-tabs {border: none !important; padding: 0 !important; background: transparent !important;}
 
 /* Top bar - plain title/subtitle on the left, a status badge on the
@@ -146,7 +123,7 @@ button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; 
 .mini-table td {padding: 7px 8px; border-bottom: 1px solid #f1f4f8; color: var(--dash-text);}
 .mini-table tbody tr:last-child td {border-bottom: none;}
 
-#panel-row-1 {gap: 14px !important; margin-bottom: 14px;}
+#panel-row-1 {gap: 14px !important; margin-bottom: 14px; align-items: stretch !important;}
 #panel-row-2 {gap: 14px !important; margin-bottom: 20px;}
 
 /* Full-width input bar - a single horizontal card housing the upload,
@@ -395,8 +372,11 @@ button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; 
 .overview-header-title {margin: 0 0 6px; font-size: 1.3rem; font-weight: 700; color: var(--dash-text); letter-spacing: -0.01em;}
 .overview-header-sub {margin: 0; font-size: 0.86rem; color: var(--dash-text-muted); max-width: 780px; line-height: 1.5;}
 
-/* Overview - "Key Operational Indicators" 6-card grid (2 rows of 3). */
-.kpi-grid-6 {grid-template-columns: repeat(3, 1fr);}
+/* Overview - "Key Operational Indicators" 6-card grid (2 rows of 3).
+   align-items: stretch keeps every card the same height per row even
+   when one card's note text wraps to an extra line. */
+.kpi-grid-6 {grid-template-columns: repeat(3, 1fr); align-items: stretch;}
+.kpi-grid-6 .kpi-card-v2 {height: 100%; box-sizing: border-box;}
 
 /* Overview - Operational Velocity Trend card header row (heading + mode
    toggle side by side). */
@@ -463,7 +443,8 @@ button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; 
 #quick-export-card {
     background: #0f1f33 !important; border: none !important; border-radius: 16px !important;
     padding: 22px 26px !important; margin-top: 14px; margin-bottom: 14px;
-    display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 20px;
+    display: flex !important; align-items: center !important; justify-content: space-between !important;
+    flex-wrap: wrap !important; gap: 20px !important; overflow: hidden;
 }
 .qe-badge {
     display: inline-block; background: rgba(255,255,255,0.1); color: #c7d2fe; font-size: 0.7rem;
@@ -471,9 +452,13 @@ button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; 
 }
 .qe-title {color: #fff; font-size: 1.1rem; font-weight: 700; margin: 0 0 6px;}
 .qe-sub {color: #93a2ba; font-size: 0.82rem; margin: 0; max-width: 560px; line-height: 1.5;}
+#quick-export-actions {
+    display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important;
+    gap: 10px !important; flex-shrink: 0 !important; align-items: center !important;
+}
 #quick-export-card .gr-button, #quick-export-card button {
     border-radius: 10px !important; font-weight: 600 !important; font-size: 0.82rem !important;
-    white-space: nowrap !important;
+    white-space: nowrap !important; margin: 0 !important;
 }
 #quick-export-btn, #quick-export-btn button {
     background: #ffffff !important; color: #0f1f33 !important; border: none !important;
@@ -485,10 +470,12 @@ button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; 
 /* Overview - bottom row of quick-link cards into the other tabs. Each is
    a real gr.Button (for click-through navigation) restyled to look like
    a plain info card - first line (icon + tab name) reads as a title,
-   the rest wraps as a description via white-space: pre-line. */
-.quick-links-row {gap: 14px !important; margin-top: 4px;}
+   the rest wraps as a description via white-space: pre-line.
+   align-items: stretch keeps all four the same height regardless of how
+   much each card's description wraps. */
+.quick-links-row {gap: 14px !important; margin-top: 4px; align-items: stretch !important;}
 button.quick-link-card {
-    all: unset; cursor: pointer; box-sizing: border-box; display: block; width: 100%;
+    all: unset; cursor: pointer; box-sizing: border-box; display: block; width: 100%; height: 100%;
     background: #ffffff; border: 1px solid var(--dash-border); border-radius: 14px;
     padding: 14px 16px; box-shadow: var(--dash-shadow); transition: box-shadow 0.15s ease, transform 0.15s ease;
     white-space: pre-line; text-align: left; line-height: 1.45;
@@ -1973,42 +1960,10 @@ def _go_to_page(filtered_df, page, page_size, delta):
     return _select_columns(page_df), indicator, new_page
 
 
-SIDEBAR_BRAND_HTML = """
-<div class="side-brand">
-  <div class="side-brand-icon">🤖</div>
-  <div>
-    <div class="side-brand-title">ITSM Agent</div>
-    <div class="side-brand-sub">Incident Analytics</div>
-  </div>
-</div>
-"""
-
 TOPBAR_HTML = """
 <h1>ITSM Incident Analytics</h1>
 <p>AI-powered insights for better service and faster resolution</p>
 """
-
-# Sidebar nav items -> the id of the gr.Tab each one opens. Order here
-# drives both the buttons drawn in the sidebar and the tabs built below.
-NAV_ITEMS = [
-    ("overview", "🏠", "Overview"),
-    # The Incident Analysis tab was removed; its Recent Incidents table now
-    # lives at the bottom of Categorization, below the category/priority
-    # breakdown it belongs with.
-    ("categorization", "🗂️", "Categorization"),
-    ("trends", "📊", "Trends & Insights"),
-    # Recommendations sits directly after Trends & Insights: it's the
-    # "so what do we do about it" reading of everything on that tab, so
-    # it belongs next to the analysis it's derived from. NOTE: this
-    # list's index is the gr.Tab id each button opens (see
-    # _make_nav_handler), so adding or removing an entry here means
-    # renumbering every gr.Tab id after it in build_ui below.
-    ("recommendations", "💡", "Recommendations"),
-    ("qa", "💬", "Q&A (Agent)"),
-    # The Export tab was removed; its download button now sits under the
-    # Recent Incidents table in Categorization, next to the data it exports.
-    ("settings", "⚙️", "Settings"),
-]
 
 
 def build_ui() -> gr.Blocks:
@@ -2017,340 +1972,332 @@ def build_ui() -> gr.Blocks:
         # the main column on the right. The nav items below are real
         # buttons that switch between the gr.Tab sections built further
         # down, so the sidebar is an actual working nav, not a static mock.
-        with gr.Row(elem_id="app-shell", equal_height=False):
-            with gr.Column(scale=0, min_width=210, elem_id="sidebar-col"):
-                gr.HTML(SIDEBAR_BRAND_HTML)
-                nav_buttons = []
-                with gr.Column(elem_id="nav-buttons"):
-                    for i, (key, icon, label) in enumerate(NAV_ITEMS):
-                        btn = gr.Button(
-                            f"{icon}  {label}",
-                            elem_classes=["nav-item", "active"] if i == 0 else ["nav-item"],
+        # Single-column app shell - the sidebar nav rail has been
+        # removed. Navigation between sections now happens through
+        # gr.Tabs' own tab strip at the top (re-enabled in CSS)
+        # instead of a custom sidebar.
+        with gr.Column(elem_id="main-col"):
+            gr.HTML(TOPBAR_HTML, elem_id="topbar")
+            gr.Markdown(f"_{SEVERITY_NOTE}_", elem_classes=["severity-note"])
+
+            with gr.Tabs(elem_id="main-tabs") as main_tabs:
+                with gr.Tab("🏠 Overview", id=0):
+                    agent_progress = gr.HTML(AGENT_PROGRESS_HTML, elem_id="agent-progress", visible=False)
+                    cache_notice = gr.Markdown(visible=False, elem_id="cache-notice")
+
+                    # Header banner - badges, title, and a one-line
+                    # description, matching the reference dashboard's
+                    # "Management Executive Summary" header. Purely
+                    # presentational; the dataset count is filled in by
+                    # the same refresh chain as the KPI cards below.
+                    overview_header_html = gr.HTML(_OVERVIEW_HEADER_PLACEHOLDER)
+
+                    # Single full-width input bar - upload, paste, and the
+                    # analyze action sit on one row (a full CSV export
+                    # lives further down in the Quick Dataset Export
+                    # card, and again under Recent Incidents in
+                    # Categorization).
+                    with gr.Row(elem_id="input-row", elem_classes=["dash-card"], equal_height=False):
+                        with gr.Column(scale=3, min_width=260):
+                            file_input = gr.File(
+                                label="Upload incident file (.xlsx, .csv, .txt)",
+                                file_types=[".xlsx", ".xls", ".csv", ".txt"],
+                                elem_id="file-upload",
+                            )
+                        with gr.Column(scale=4, min_width=320):
+                            text_input = gr.Textbox(label="...or paste unstructured incident text", lines=2,
+                                                      placeholder="INC0012345\nShort description: ...\nWorklog: ...")
+                        with gr.Column(scale=2, min_width=180, elem_id="action-col"):
+                            analyze_btn = gr.Button("Analyze", variant="primary")
+
+                    # Key Operational Indicators & 30-Day Movement - the
+                    # six-card KPI grid plus the Operational Velocity
+                    # Trend chart, with a toggle between total incident
+                    # volume and average resolution time.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown(
+                            "### 📐 Key Operational Indicators & 30-Day Movement",
+                            elem_classes=["section-heading"],
                         )
-                        nav_buttons.append(btn)
+                        summary_md = gr.HTML(_OVERVIEW_KPI_PLACEHOLDER)
 
-            with gr.Column(scale=1, elem_id="main-col"):
-                gr.HTML(TOPBAR_HTML, elem_id="topbar")
-                gr.Markdown(f"_{SEVERITY_NOTE}_", elem_classes=["severity-note"])
-
-                with gr.Tabs(elem_id="main-tabs") as main_tabs:
-                    with gr.Tab("Overview", id=0):
-                        agent_progress = gr.HTML(AGENT_PROGRESS_HTML, elem_id="agent-progress", visible=False)
-                        cache_notice = gr.Markdown(visible=False, elem_id="cache-notice")
-
-                        # Header banner - badges, title, and a one-line
-                        # description, matching the reference dashboard's
-                        # "Management Executive Summary" header. Purely
-                        # presentational; the dataset count is filled in by
-                        # the same refresh chain as the KPI cards below.
-                        overview_header_html = gr.HTML(_OVERVIEW_HEADER_PLACEHOLDER)
-
-                        # Single full-width input bar - upload, paste, and the
-                        # analyze action sit on one row (a full CSV export
-                        # lives further down in the Quick Dataset Export
-                        # card, and again under Recent Incidents in
-                        # Categorization).
-                        with gr.Row(elem_id="input-row", elem_classes=["dash-card"], equal_height=False):
-                            with gr.Column(scale=3, min_width=260):
-                                file_input = gr.File(
-                                    label="Upload incident file (.xlsx, .csv, .txt)",
-                                    file_types=[".xlsx", ".xls", ".csv", ".txt"],
-                                    elem_id="file-upload",
-                                )
-                            with gr.Column(scale=4, min_width=320):
-                                text_input = gr.Textbox(label="...or paste unstructured incident text", lines=2,
-                                                          placeholder="INC0012345\nShort description: ...\nWorklog: ...")
-                            with gr.Column(scale=2, min_width=180, elem_id="action-col"):
-                                analyze_btn = gr.Button("Analyze", variant="primary")
-
-                        # Key Operational Indicators & 30-Day Movement - the
-                        # six-card KPI grid plus the Operational Velocity
-                        # Trend chart, with a toggle between total incident
-                        # volume and average resolution time.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown(
-                                "### 📐 Key Operational Indicators & 30-Day Movement",
-                                elem_classes=["section-heading"],
+                    with gr.Column(elem_classes=["dash-card"]):
+                        with gr.Row(elem_id="velocity-toggle-row"):
+                            gr.Markdown("### 📈 Operational Velocity Trend", elem_classes=["section-heading"])
+                            trend_mode = gr.Radio(
+                                ["Total Incidents", "Avg Resolution Time"],
+                                value="Total Incidents", show_label=False,
+                                elem_id="velocity-mode", container=False,
                             )
-                            summary_md = gr.HTML(_OVERVIEW_KPI_PLACEHOLDER)
+                        overview_trend_chart = gr.Plot(show_label=False)
 
-                        with gr.Column(elem_classes=["dash-card"]):
-                            with gr.Row(elem_id="velocity-toggle-row"):
-                                gr.Markdown("### 📈 Operational Velocity Trend", elem_classes=["section-heading"])
-                                trend_mode = gr.Radio(
-                                    ["Total Incidents", "Avg Resolution Time"],
-                                    value="Total Incidents", show_label=False,
-                                    elem_id="velocity-mode", container=False,
-                                )
-                            overview_trend_chart = gr.Plot(show_label=False)
+                    # Priority Distribution + Categorization Breakdown,
+                    # side by side - both derived straight from the
+                    # analyzed dataframe.
+                    with gr.Row(elem_id="panel-row-1"):
+                        with gr.Column(scale=1, elem_classes=["dash-card"]):
+                            gr.Markdown("### 🔺 Incident Priority Distribution", elem_classes=["section-heading"])
+                            priority_dist_html = gr.HTML(_PRIORITY_DIST_PLACEHOLDER)
+                        with gr.Column(scale=1, elem_classes=["dash-card"], elem_id="category-breakdown-card"):
+                            gr.Markdown("### 🗂️ Incident Categorization Breakdown", elem_classes=["section-heading"])
+                            full_categorization_btn = gr.Button(
+                                "Full Categorization Page →", size="sm", elem_id="full-categorization-btn",
+                            )
+                            category_breakdown_html = gr.HTML(_CATEGORY_RANK_PLACEHOLDER)
 
-                        # Priority Distribution + Categorization Breakdown,
-                        # side by side - both derived straight from the
-                        # analyzed dataframe.
-                        with gr.Row(elem_id="panel-row-1"):
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🔺 Incident Priority Distribution", elem_classes=["section-heading"])
-                                priority_dist_html = gr.HTML(_PRIORITY_DIST_PLACEHOLDER)
-                            with gr.Column(scale=1, elem_classes=["dash-card"], elem_id="category-breakdown-card"):
-                                gr.Markdown("### 🗂️ Incident Categorization Breakdown", elem_classes=["section-heading"])
-                                full_categorization_btn = gr.Button(
-                                    "Full Categorization Page →", size="sm", elem_id="full-categorization-btn",
-                                )
-                                category_breakdown_html = gr.HTML(_CATEGORY_RANK_PLACEHOLDER)
-
-                        # Quick Dataset Export - a dark call-to-action card
-                        # exporting the same CSV the Categorization tab's
-                        # download button produces, so it works without
-                        # switching tabs.
-                        with gr.Row(elem_id="quick-export-card"):
-                            gr.HTML(
-                                '<div><span class="qe-badge">⬇️ Quick Dataset Export</span>'
-                                '<div class="qe-title">Export Processed &amp; Categorized Dataset</div>'
-                                '<p class="qe-sub">Download the active dataset as CSV. The exported file includes '
-                                "the generated Category field, work log scores, resolution durations, and all "
-                                "canonical normalized fields.</p></div>"
+                    # Quick Dataset Export - a dark call-to-action card
+                    # exporting the same CSV the Categorization tab's
+                    # download button produces, so it works without
+                    # switching tabs.
+                    with gr.Row(elem_id="quick-export-card"):
+                        gr.HTML(
+                            '<div><span class="qe-badge">⬇️ Quick Dataset Export</span>'
+                            '<div class="qe-title">Export Processed &amp; Categorized Dataset</div>'
+                            '<p class="qe-sub">Download the active dataset as CSV. The exported file includes '
+                            "the generated Category field, work log scores, resolution durations, and all "
+                            "canonical normalized fields.</p></div>"
+                        )
+                        with gr.Column(elem_id="quick-export-actions", min_width=260):
+                            overview_download_btn = gr.DownloadButton(
+                                "⬇ Download Analyzed CSV", elem_id="quick-export-btn", size="sm",
                             )
-                            with gr.Row():
-                                overview_download_btn = gr.DownloadButton(
-                                    "⬇ Download Analyzed CSV", elem_id="quick-export-btn", size="sm",
-                                )
-                                export_page_nav_btn = gr.Button(
-                                    "Dedicated Export Page →", elem_id="quick-export-nav-btn", size="sm",
-                                )
-
-                        # Quick links into the rest of the app - each card
-                        # switches the sidebar's active tab, reusing the same
-                        # nav-switching wiring as the sidebar buttons.
-                        with gr.Row(elem_classes=["quick-links-row"]):
-                            ql_categorization_btn = gr.Button(
-                                "🔍 Categorization\nExplore normalized fields, log scores & search records.",
-                                elem_classes=["quick-link-card"],
-                            )
-                            ql_trends_btn = gr.Button(
-                                "📊 Trends & Insights\nDetect recurring issue clusters, hot spots & time velocity.",
-                                elem_classes=["quick-link-card"],
-                            )
-                            ql_recommendations_btn = gr.Button(
-                                "💡 Recommendations\nStructured observations, evidence & expected benefits.",
-                                elem_classes=["quick-link-card"],
-                            )
-                            ql_qa_btn = gr.Button(
-                                "💬 Q&A (Agent)\nAsk questions with tool-calling analytics & factual answers.",
-                                elem_classes=["quick-link-card"],
+                            export_page_nav_btn = gr.Button(
+                                "Dedicated Export Page →", elem_id="quick-export-nav-btn", size="sm",
                             )
 
-                        # Incident Health - four traffic-light indicators so
-                        # management can scan overall status in a second.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 🩺 Incident Health", elem_classes=["section-heading"])
-                            health_html = gr.HTML(_HEALTH_PLACEHOLDER)
+                    # Quick links into the rest of the app - each card
+                    # switches the sidebar's active tab, reusing the same
+                    # nav-switching wiring as the sidebar buttons.
+                    with gr.Row(elem_classes=["quick-links-row"]):
+                        ql_categorization_btn = gr.Button(
+                            "🔍 Categorization\nExplore normalized fields, log scores & search records.",
+                            elem_classes=["quick-link-card"],
+                        )
+                        ql_trends_btn = gr.Button(
+                            "📊 Trends & Insights\nDetect recurring issue clusters, hot spots & time velocity.",
+                            elem_classes=["quick-link-card"],
+                        )
+                        ql_recommendations_btn = gr.Button(
+                            "💡 Recommendations\nStructured observations, evidence & expected benefits.",
+                            elem_classes=["quick-link-card"],
+                        )
+                        ql_qa_btn = gr.Button(
+                            "💬 Q&A (Agent)\nAsk questions with tool-calling analytics & factual answers.",
+                            elem_classes=["quick-link-card"],
+                        )
 
-                        # Attention Required - a short, management-facing
-                        # roll-up of anything currently outside a healthy range.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 🚩 Attention Required", elem_classes=["section-heading"])
-                            attention_html = gr.HTML(_ATTENTION_PLACEHOLDER)
+                    # Incident Health - four traffic-light indicators so
+                    # management can scan overall status in a second.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 🩺 Incident Health", elem_classes=["section-heading"])
+                        health_html = gr.HTML(_HEALTH_PLACEHOLDER)
 
-                        # Executive Summary - computes KPIs/trends with
-                        # pandas first, then sends only that small
-                        # aggregated dict to the LLM for a short write-up.
-                        # The button is NOT inside a gr.Row with the
-                        # heading - Gradio gives Row children negative
-                        # side margins for edge-to-edge layout, which was
-                        # pushing the button past the card's own border.
-                        # Instead it's a normal sibling, pinned on top of
-                        # the card with CSS position:absolute, so it can
-                        # never escape the card's visible edges.
-                        with gr.Column(elem_classes=["dash-card"], elem_id="exec-summary-card"):
-                            gr.Markdown("### 🧾 Executive Summary", elem_classes=["section-heading"])
-                            exec_summary_btn = gr.Button(
-                                "✨ Generate summary", size="sm", elem_id="exec-summary-btn",
+                    # Attention Required - a short, management-facing
+                    # roll-up of anything currently outside a healthy range.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 🚩 Attention Required", elem_classes=["section-heading"])
+                        attention_html = gr.HTML(_ATTENTION_PLACEHOLDER)
+
+                    # Executive Summary - computes KPIs/trends with
+                    # pandas first, then sends only that small
+                    # aggregated dict to the LLM for a short write-up.
+                    # The button is NOT inside a gr.Row with the
+                    # heading - Gradio gives Row children negative
+                    # side margins for edge-to-edge layout, which was
+                    # pushing the button past the card's own border.
+                    # Instead it's a normal sibling, pinned on top of
+                    # the card with CSS position:absolute, so it can
+                    # never escape the card's visible edges.
+                    with gr.Column(elem_classes=["dash-card"], elem_id="exec-summary-card"):
+                        gr.Markdown("### 🧾 Executive Summary", elem_classes=["section-heading"])
+                        exec_summary_btn = gr.Button(
+                            "✨ Generate summary", size="sm", elem_id="exec-summary-btn",
+                        )
+                        exec_summary_output = gr.Markdown(
+                            "Run an analysis, then click **Generate summary** for a "
+                            "management-friendly write-up of the KPIs above.",
+                            elem_id="exec-summary-output",
+                        )
+
+                with gr.Tab("🗂️ Categorization", id=1):
+                    # Category breakdown + priority donut.
+                    with gr.Row(elem_id="panel-row-1"):
+                        with gr.Column(scale=1, elem_classes=["dash-card"]):
+                            gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
+                            category_bar_html = gr.HTML(
+                                '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                             )
-                            exec_summary_output = gr.Markdown(
-                                "Run an analysis, then click **Generate summary** for a "
-                                "management-friendly write-up of the KPIs above.",
-                                elem_id="exec-summary-output",
+                        with gr.Column(scale=1, elem_classes=["dash-card"]):
+                            gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
+                            category_chart = gr.Plot(show_label=False)
+
+                    # Recent Incidents: relocated here verbatim from the
+                    # former Incident Analysis tab. The components and
+                    # their event wiring (_refresh_view / prev_btn /
+                    # next_btn) are untouched - only the parent tab
+                    # changed - so pagination and filtering behave
+                    # exactly as before.
+                    #
+                    # download_file: was a separate "Download Results"
+                    # card; now an icon-only gr.DownloadButton pinned
+                    # into this card's own heading, in the same
+                    # top-right corner where the table's built-in
+                    # copy/fullscreen icons sit (see #results-download-btn
+                    # in CUSTOM_CSS - it can't literally sit inside
+                    # Gradio's native table toolbar, which is compiled
+                    # frontend Gradio doesn't expose a hook into, but
+                    # pinning it to this card's corner puts it right
+                    # next to that toolbar). It still receives the same
+                    # full, untruncated CSV path from _analyze, by the
+                    # same variable, in the same outputs list - clicking
+                    # it downloads immediately, no intermediate file box.
+                    with gr.Column(elem_id="results-section", elem_classes=["dash-card"]):
+                        gr.Markdown("### 📋 Recent Incidents (Analyzed &amp; Categorized)", elem_classes=["section-heading"])
+                        download_file = gr.DownloadButton(
+                            "⬇", elem_id="results-download-btn", size="sm",
+                        )
+                        results_table = gr.Dataframe(
+                            label=None,
+                            show_label=False,
+                            interactive=False,
+                            wrap=False,
+                            max_height=460,
+                            elem_id="results-table",
+                        )
+                        with gr.Row(elem_id="pagination-row"):
+                            prev_btn = gr.Button("← Previous", size="sm")
+                            page_indicator = gr.Markdown("Page 1 of 1  ·  0 tickets", elem_id="page-indicator")
+                            next_btn = gr.Button("Next →", size="sm")
+
+                with gr.Tab("📊 Trends & Insights", id=2):
+                    # KPI trend - ticket volume + worklog quality over
+                    # time, toggle between daily/weekly/monthly views.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 📈 Ticket Trend", elem_classes=["section-heading"])
+                        trend_granularity = gr.Radio(
+                            ["Daily", "Weekly", "Monthly"], value="Daily",
+                            show_label=False, elem_id="trend-granularity",
+                        )
+                        trend_chart = gr.Plot(show_label=False)
+
+                    # Resolution metrics - MTTD/MTTA/MTTR/SLA. Any
+                    # metric whose timestamp column isn't in the
+                    # uploaded data shows "N/A" with an explanation
+                    # rather than a fabricated number.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### ⏱️ Resolution Metrics", elem_classes=["section-heading"])
+                        resolution_metrics_html = gr.HTML(_RESOLUTION_METRICS_PLACEHOLDER)
+
+                    # Recurring issues, exact-match: (host, category)
+                    # combos meeting a recurrence threshold, with a
+                    # real time dimension (first/last seen, average
+                    # days between occurrences) - not just a raw count.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 🔁 Recurring Issues", elem_classes=["section-heading"])
+                        recurring_issues_html = gr.HTML(
+                            '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+                        )
+
+                    # Recurring issues, semantic: catches the same
+                    # underlying problem even when it's logged under
+                    # different categories or worded differently each
+                    # time. Opt-in (button) rather than automatic,
+                    # since clustering needs the whole batch embedded
+                    # first - one embedding call, same cost the chat
+                    # tab pays lazily on its first question. Reuses
+                    # chat_index_state so whichever feature runs first
+                    # makes the other free.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown(
+                            "### 🔬 Semantic Recurrence Detection",
+                            elem_classes=["section-heading"],
+                        )
+                        gr.Markdown(
+                            "Finds recurring issues that don't share an exact category or host - "
+                            "e.g. the same underlying problem logged inconsistently. Costs one "
+                            "embedding call for the batch the first time it (or the chat tab) runs.",
+                            elem_classes=["severity-note"],
+                        )
+                        semantic_recurrence_btn = gr.Button("Detect Similar Recurring Issues", size="sm")
+                        semantic_recurrence_html = gr.HTML(
+                            '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis, then click the button above.</p>'
+                        )
+
+                    # Top hosts, assignment group performance.
+                    with gr.Row(elem_id="panel-row-2"):
+                        with gr.Column(scale=1, elem_classes=["dash-card"]):
+                            gr.Markdown("### 🖥️ Top Affected Servers / Hosts", elem_classes=["section-heading"])
+                            host_bar_html = gr.HTML(
+                                '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                             )
-
-                    with gr.Tab("Categorization", id=1):
-                        # Category breakdown + priority donut.
-                        with gr.Row(elem_id="panel-row-1"):
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
-                                category_bar_html = gr.HTML(
-                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                                )
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
-                                category_chart = gr.Plot(show_label=False)
-
-                        # Recent Incidents: relocated here verbatim from the
-                        # former Incident Analysis tab. The components and
-                        # their event wiring (_refresh_view / prev_btn /
-                        # next_btn) are untouched - only the parent tab
-                        # changed - so pagination and filtering behave
-                        # exactly as before.
-                        #
-                        # download_file: was a separate "Download Results"
-                        # card; now an icon-only gr.DownloadButton pinned
-                        # into this card's own heading, in the same
-                        # top-right corner where the table's built-in
-                        # copy/fullscreen icons sit (see #results-download-btn
-                        # in CUSTOM_CSS - it can't literally sit inside
-                        # Gradio's native table toolbar, which is compiled
-                        # frontend Gradio doesn't expose a hook into, but
-                        # pinning it to this card's corner puts it right
-                        # next to that toolbar). It still receives the same
-                        # full, untruncated CSV path from _analyze, by the
-                        # same variable, in the same outputs list - clicking
-                        # it downloads immediately, no intermediate file box.
-                        with gr.Column(elem_id="results-section", elem_classes=["dash-card"]):
-                            gr.Markdown("### 📋 Recent Incidents (Analyzed &amp; Categorized)", elem_classes=["section-heading"])
-                            download_file = gr.DownloadButton(
-                                "⬇", elem_id="results-download-btn", size="sm",
-                            )
-                            results_table = gr.Dataframe(
-                                label=None,
-                                show_label=False,
-                                interactive=False,
-                                wrap=False,
-                                max_height=460,
-                                elem_id="results-table",
-                            )
-                            with gr.Row(elem_id="pagination-row"):
-                                prev_btn = gr.Button("← Previous", size="sm")
-                                page_indicator = gr.Markdown("Page 1 of 1  ·  0 tickets", elem_id="page-indicator")
-                                next_btn = gr.Button("Next →", size="sm")
-
-                    with gr.Tab("Trends & Insights", id=2):
-                        # KPI trend - ticket volume + worklog quality over
-                        # time, toggle between daily/weekly/monthly views.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 📈 Ticket Trend", elem_classes=["section-heading"])
-                            trend_granularity = gr.Radio(
-                                ["Daily", "Weekly", "Monthly"], value="Daily",
-                                show_label=False, elem_id="trend-granularity",
-                            )
-                            trend_chart = gr.Plot(show_label=False)
-
-                        # Resolution metrics - MTTD/MTTA/MTTR/SLA. Any
-                        # metric whose timestamp column isn't in the
-                        # uploaded data shows "N/A" with an explanation
-                        # rather than a fabricated number.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### ⏱️ Resolution Metrics", elem_classes=["section-heading"])
-                            resolution_metrics_html = gr.HTML(_RESOLUTION_METRICS_PLACEHOLDER)
-
-                        # Recurring issues, exact-match: (host, category)
-                        # combos meeting a recurrence threshold, with a
-                        # real time dimension (first/last seen, average
-                        # days between occurrences) - not just a raw count.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 🔁 Recurring Issues", elem_classes=["section-heading"])
-                            recurring_issues_html = gr.HTML(
+                        with gr.Column(scale=1, elem_classes=["dash-card"]):
+                            gr.Markdown("### 👥 Assignment Group Performance", elem_classes=["section-heading"])
+                            assignment_group_html = gr.HTML(
                                 '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                             )
 
-                        # Recurring issues, semantic: catches the same
-                        # underlying problem even when it's logged under
-                        # different categories or worded differently each
-                        # time. Opt-in (button) rather than automatic,
-                        # since clustering needs the whole batch embedded
-                        # first - one embedding call, same cost the chat
-                        # tab pays lazily on its first question. Reuses
-                        # chat_index_state so whichever feature runs first
-                        # makes the other free.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown(
-                                "### 🔬 Semantic Recurrence Detection",
-                                elem_classes=["section-heading"],
-                            )
-                            gr.Markdown(
-                                "Finds recurring issues that don't share an exact category or host - "
-                                "e.g. the same underlying problem logged inconsistently. Costs one "
-                                "embedding call for the batch the first time it (or the chat tab) runs.",
-                                elem_classes=["severity-note"],
-                            )
-                            semantic_recurrence_btn = gr.Button("Detect Similar Recurring Issues", size="sm")
-                            semantic_recurrence_html = gr.HTML(
-                                '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis, then click the button above.</p>'
-                            )
+                with gr.Tab("💡 Recommendations", id=3):
+                    gr.Markdown(
+                        "Data-backed recommendations for this batch. Every figure below is "
+                        "calculated with pandas from the incidents you analyzed - recurrence, "
+                        "priority mix, SLA attainment, per-group resolution times, worklog "
+                        "quality, and volume concentration. Nothing here is generic advice, and "
+                        "an area that crosses no threshold simply isn't listed.",
+                        elem_classes=["severity-note"],
+                    )
 
-                        # Top hosts, assignment group performance.
-                        with gr.Row(elem_id="panel-row-2"):
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🖥️ Top Affected Servers / Hosts", elem_classes=["section-heading"])
-                                host_bar_html = gr.HTML(
-                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                                )
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 👥 Assignment Group Performance", elem_classes=["section-heading"])
-                                assignment_group_html = gr.HTML(
-                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                                )
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 💡 Recommended Actions", elem_classes=["section-heading"])
+                        recommendations_html = gr.HTML(_RECOMMENDATIONS_PLACEHOLDER)
 
-                    with gr.Tab("Recommendations", id=3):
-                        gr.Markdown(
-                            "Data-backed recommendations for this batch. Every figure below is "
-                            "calculated with pandas from the incidents you analyzed - recurrence, "
-                            "priority mix, SLA attainment, per-group resolution times, worklog "
-                            "quality, and volume concentration. Nothing here is generic advice, and "
-                            "an area that crosses no threshold simply isn't listed.",
-                            elem_classes=["severity-note"],
+                    # Optional LLM layer: re-voices the cards above for
+                    # a management audience. Only the small aggregated
+                    # payload is sent (see _llm_recommendations_writeup);
+                    # the cards themselves never depend on it.
+                    with gr.Column(elem_classes=["dash-card"], elem_id="rec-writeup-card"):
+                        gr.Markdown("### 🧾 Management Write-Up", elem_classes=["section-heading"])
+                        rec_writeup_btn = gr.Button(
+                            "✨ Generate write-up", size="sm", elem_id="rec-writeup-btn",
+                        )
+                        rec_writeup_output = gr.Markdown(
+                            "Run an analysis, then click **Generate write-up** to turn the "
+                            "recommendations above into a management-ready briefing. The same "
+                            "numbers are used either way.",
+                            elem_id="rec-writeup-output",
                         )
 
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 💡 Recommended Actions", elem_classes=["section-heading"])
-                            recommendations_html = gr.HTML(_RECOMMENDATIONS_PLACEHOLDER)
+                with gr.Tab("💬 Q&A (Agent)", id=4):
+                    # Single bounded chat panel (intro + transcript +
+                    # composer) instead of loosely stacked components -
+                    # keeps the tab a fixed height with the transcript
+                    # scrolling internally like a normal chat app.
+                    with gr.Column(elem_id="chat-panel", elem_classes=["dash-card"]):
+                        gr.Markdown(
+                            "Ask a question about the tickets you just analyzed - e.g. "
+                            "*\"what's driving high-priority incidents?\"*, "
+                            "*\"which assignment group has the worst worklog quality?\"*, or "
+                            "*\"summarize the recurring issues on our database servers.\"* "
+                            "Answers are grounded only in the analyzed batch (Overview tab) - "
+                            "run an analysis first if you haven't yet.",
+                            elem_classes=["severity-note", "chat-intro"],
+                        )
+                        chatbot = gr.Chatbot(height=440, show_label=False, elem_id="chatbot")
+                        with gr.Row(elem_id="chat-input-row"):
+                            chat_input = gr.Textbox(
+                                placeholder="Ask a question about the analyzed tickets...",
+                                show_label=False, scale=5, container=False,
+                            )
+                            chat_send = gr.Button("Send", variant="primary", scale=1)
+                        chat_clear_btn = gr.Button("Clear conversation", size="sm", elem_id="chat-clear-btn")
 
-                        # Optional LLM layer: re-voices the cards above for
-                        # a management audience. Only the small aggregated
-                        # payload is sent (see _llm_recommendations_writeup);
-                        # the cards themselves never depend on it.
-                        with gr.Column(elem_classes=["dash-card"], elem_id="rec-writeup-card"):
-                            gr.Markdown("### 🧾 Management Write-Up", elem_classes=["section-heading"])
-                            rec_writeup_btn = gr.Button(
-                                "✨ Generate write-up", size="sm", elem_id="rec-writeup-btn",
-                            )
-                            rec_writeup_output = gr.Markdown(
-                                "Run an analysis, then click **Generate write-up** to turn the "
-                                "recommendations above into a management-ready briefing. The same "
-                                "numbers are used either way.",
-                                elem_id="rec-writeup-output",
-                            )
-
-                    with gr.Tab("Q&A (Agent)", id=4):
-                        # Single bounded chat panel (intro + transcript +
-                        # composer) instead of loosely stacked components -
-                        # keeps the tab a fixed height with the transcript
-                        # scrolling internally like a normal chat app.
-                        with gr.Column(elem_id="chat-panel", elem_classes=["dash-card"]):
-                            gr.Markdown(
-                                "Ask a question about the tickets you just analyzed - e.g. "
-                                "*\"what's driving high-priority incidents?\"*, "
-                                "*\"which assignment group has the worst worklog quality?\"*, or "
-                                "*\"summarize the recurring issues on our database servers.\"* "
-                                "Answers are grounded only in the analyzed batch (Overview tab) - "
-                                "run an analysis first if you haven't yet.",
-                                elem_classes=["severity-note", "chat-intro"],
-                            )
-                            chatbot = gr.Chatbot(height=440, show_label=False, elem_id="chatbot")
-                            with gr.Row(elem_id="chat-input-row"):
-                                chat_input = gr.Textbox(
-                                    placeholder="Ask a question about the analyzed tickets...",
-                                    show_label=False, scale=5, container=False,
-                                )
-                                chat_send = gr.Button("Send", variant="primary", scale=1)
-                            chat_clear_btn = gr.Button("Clear conversation", size="sm", elem_id="chat-clear-btn")
-
-                    with gr.Tab("Settings", id=5):
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### ⚙️ Settings", elem_classes=["section-heading"])
-                            gr.Markdown(
-                                "Nothing configurable here yet - this tab is a placeholder for "
-                                "future options (e.g. default page size, scoring thresholds).",
-                                elem_classes=["severity-note"],
-                            )
+                with gr.Tab("⚙️ Settings", id=5):
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### ⚙️ Settings", elem_classes=["section-heading"])
+                        gr.Markdown(
+                            "Nothing configurable here yet - this tab is a placeholder for "
+                            "future options (e.g. default page size, scoring thresholds).",
+                            elem_classes=["severity-note"],
+                        )
 
         full_results_state = gr.State(pd.DataFrame())
         filtered_results_state = gr.State(pd.DataFrame())
@@ -2476,33 +2423,26 @@ def build_ui() -> gr.Blocks:
         )
         chat_clear_btn.click(fn=_chat_clear, outputs=[chatbot, chat_history_state])
 
-        # Wire each sidebar nav button to (a) switch the visible tab and
-        # (b) move the "active" highlight to itself and off the rest.
+        # The sidebar is gone, so this just switches the active tab - the
+        # native gr.Tabs strip at the top now shows which one is active,
+        # no separate "active" class to move around anymore.
         def _make_nav_handler(selected_idx: int):
             def _handler():
-                updates = [gr.Tabs(selected=selected_idx)]
-                for i in range(len(NAV_ITEMS)):
-                    classes = ["nav-item", "active"] if i == selected_idx else ["nav-item"]
-                    updates.append(gr.update(elem_classes=classes))
-                return updates
+                return gr.Tabs(selected=selected_idx)
             return _handler
 
-        for i, btn in enumerate(nav_buttons):
-            btn.click(fn=_make_nav_handler(i), inputs=[], outputs=[main_tabs, *nav_buttons])
-
         # Overview quick-link cards and the Quick Export card's "Dedicated
-        # Export Page" button reuse the exact same nav-switching handler as
-        # the sidebar buttons, just wired from a second set of controls -
-        # tab ids per NAV_ITEMS: Categorization=1, Trends & Insights=2,
-        # Recommendations=3, Q&A (Agent)=4.
-        ql_categorization_btn.click(fn=_make_nav_handler(1), inputs=[], outputs=[main_tabs, *nav_buttons])
-        ql_trends_btn.click(fn=_make_nav_handler(2), inputs=[], outputs=[main_tabs, *nav_buttons])
-        ql_recommendations_btn.click(fn=_make_nav_handler(3), inputs=[], outputs=[main_tabs, *nav_buttons])
-        ql_qa_btn.click(fn=_make_nav_handler(4), inputs=[], outputs=[main_tabs, *nav_buttons])
+        # Export Page" button jump straight to another tab - tab ids per
+        # the gr.Tab(..., id=N) declarations above: Categorization=1,
+        # Trends & Insights=2, Recommendations=3, Q&A (Agent)=4.
+        ql_categorization_btn.click(fn=_make_nav_handler(1), inputs=[], outputs=[main_tabs])
+        ql_trends_btn.click(fn=_make_nav_handler(2), inputs=[], outputs=[main_tabs])
+        ql_recommendations_btn.click(fn=_make_nav_handler(3), inputs=[], outputs=[main_tabs])
+        ql_qa_btn.click(fn=_make_nav_handler(4), inputs=[], outputs=[main_tabs])
         # The dedicated export page is Categorization - the download
         # button + Recent Incidents table live there.
-        export_page_nav_btn.click(fn=_make_nav_handler(1), inputs=[], outputs=[main_tabs, *nav_buttons])
+        export_page_nav_btn.click(fn=_make_nav_handler(1), inputs=[], outputs=[main_tabs])
         # Same target for the Categorization Breakdown card's own link.
-        full_categorization_btn.click(fn=_make_nav_handler(1), inputs=[], outputs=[main_tabs, *nav_buttons])
+        full_categorization_btn.click(fn=_make_nav_handler(1), inputs=[], outputs=[main_tabs])
 
     return demo
