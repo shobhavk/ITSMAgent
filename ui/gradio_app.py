@@ -17,7 +17,7 @@ import gradio as gr
 import pandas as pd
 import plotly.graph_objects as go
 
-from app.services import overview_metrics, rag, recommendations, recurring_issues, trend_metrics
+from app.services import knowledge_base, overview_metrics, rag, recommendations, recurring_issues, trend_metrics
 from app.services.pipeline import run_pipeline_from_bytes, run_pipeline_from_text
 from app.services.persistence import compute_file_hash, get_cached_result, save_result
 
@@ -223,6 +223,8 @@ button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; 
 }
 #pagination-row button {border-radius: 8px !important; font-weight: 600 !important;}
 #page-indicator {text-align: center; font-size: 0.85rem; color: var(--dash-text-muted); padding-top: 8px; font-weight: 500;}
+#page-size-dropdown {min-width: 130px !important; max-width: 150px !important;}
+#page-size-dropdown label span {font-size: 0.72rem !important; color: var(--dash-text-muted) !important;}
 
 .plotly {border-radius: 10px;}
 
@@ -556,10 +558,18 @@ def _category_chart_df(category_counts: dict) -> pd.DataFrame:
     return pd.DataFrame(items, columns=["Category", "Count"])
 
 
-def _donut_figure(counts: dict, title: str, color_fn=None) -> go.Figure:
+def _donut_figure(counts: dict, title: str, color_fn=None, show_count_in_legend: bool = False) -> go.Figure:
     """Generic donut chart from a {label: count} dict. color_fn, if given,
     maps a label to a hex color so semantically meaningful groups (e.g.
-    priority tiers) get consistent colors instead of Plotly's defaults."""
+    priority tiers) get consistent colors instead of Plotly's defaults.
+
+    show_count_in_legend appends " (count)" to each legend entry, right
+    next to that entry's color swatch - Plotly ties legend text to the
+    slice `labels`, so this is the only hook available for that without
+    also changing the on-slice text. Off by default so the only current
+    caller that doesn't want it (_category_chart_figure) is unaffected;
+    the live priority-chart call site below passes True explicitly.
+    """
     chart_df = _category_chart_df(counts)
     if chart_df.empty:
         fig = go.Figure()
@@ -570,17 +580,23 @@ def _donut_figure(counts: dict, title: str, color_fn=None) -> go.Figure:
         )
         return fig
 
-    marker = dict(colors=[color_fn(c) for c in chart_df["Category"]]) if color_fn else {}
+    raw_labels = list(chart_df["Category"])
+    legend_labels = (
+        [f"{label} ({count})" for label, count in zip(raw_labels, chart_df["Count"])]
+        if show_count_in_legend else raw_labels
+    )
+    marker = dict(colors=[color_fn(c) for c in raw_labels]) if color_fn else {}
     fig = go.Figure(
         data=[
             go.Pie(
-                labels=chart_df["Category"],
+                labels=legend_labels,
                 values=chart_df["Count"],
+                customdata=raw_labels,
                 hole=0.55,
                 sort=False,
                 textinfo="percent",
                 marker=marker,
-                hovertemplate="%{label}: %{value} tickets (%{percent})<extra></extra>",
+                hovertemplate="%{customdata}: %{value} tickets (%{percent})<extra></extra>",
             )
         ]
     )
@@ -643,41 +659,6 @@ def _bar_list_html(items: list, max_items: int = 6, color: str = "#3b82f6") -> s
     rows = []
     for label, count in items:
         pct = max(4, round(count / max_count * 100))
-        rows.append(
-            '<div class="bar-row">'
-            f'<span class="bar-label" title="{label}">{label}</span>'
-            f'<div class="bar-track"><div class="bar-fill" style="width:{pct}%; background:{color};"></div></div>'
-            f'<span class="bar-count">{count}</span>'
-            "</div>"
-        )
-    return '<div class="bar-list">' + "".join(rows) + "</div>"
-
-
-def _overview_category_counts(full_df: pd.DataFrame) -> dict:
-    """Category counts derived straight from full_df, the same way
-    _priority_counts derives priority counts - lets the Overview copy of
-    the Incidents by Category card refresh from full_results_state alone,
-    without needing the pipeline's separately-aggregated category_counts."""
-    if full_df is None or len(full_df) == 0 or "Category" not in full_df.columns:
-        return {}
-    series = full_df["Category"].fillna("").astype(str).str.strip()
-    series = series.replace("", "Unspecified")
-    return series.value_counts().to_dict()
-
-
-def _priority_bar_list_html(priority_counts: dict) -> str:
-    """Same bar-list rendering as _bar_list_html, but colored per priority
-    tier (via _priority_color) instead of a single flat color, and shown
-    beneath the Incidents by Priority donut on Overview so each priority's
-    raw count is visible at a glance instead of only on hover."""
-    if not priority_counts:
-        return '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">No data to show yet - run an analysis first.</p>'
-    items = sorted(priority_counts.items(), key=lambda kv: kv[1], reverse=True)
-    max_count = max(c for _, c in items) or 1
-    rows = []
-    for label, count in items:
-        pct = max(4, round(count / max_count * 100))
-        color = _priority_color(label)
         rows.append(
             '<div class="bar-row">'
             f'<span class="bar-label" title="{label}">{label}</span>'
@@ -1026,32 +1007,6 @@ def _refresh_overview(full_df: pd.DataFrame, summary_stats: dict):
         )
     except Exception:
         return _OVERVIEW_KPI_PLACEHOLDER, _HEALTH_PLACEHOLDER, _ATTENTION_PLACEHOLDER, _overview_trend_figure(None)
-
-
-_OVERVIEW_BREAKDOWN_PLACEHOLDER = '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-
-
-def _refresh_overview_breakdown(full_df: pd.DataFrame):
-    """Feeds the Incidents by Category / Incidents by Priority cards that
-    now sit on Overview, copied from Categorization in place of the old
-    Attention Required card. Kept as its own function/.then() step - same
-    pattern as _refresh_overview and _refresh_recommendations - so the
-    existing _analyze/_refresh_overview output contracts stay untouched."""
-    try:
-        category_counts = _overview_category_counts(full_df)
-        priority_counts = _priority_counts(full_df)
-        bar_html = _bar_list_html(
-            sorted(category_counts.items(), key=lambda kv: kv[1], reverse=True), color="#3b82f6"
-        )
-        chart = _donut_figure(priority_counts, "Incidents by Priority", color_fn=_priority_color)
-        priority_counts_html = _priority_bar_list_html(priority_counts)
-        return bar_html, chart, priority_counts_html
-    except Exception:
-        return (
-            _OVERVIEW_BREAKDOWN_PLACEHOLDER,
-            _donut_figure({}, "Incidents by Priority", color_fn=_priority_color),
-            _OVERVIEW_BREAKDOWN_PLACEHOLDER,
-        )
 
 
 async def _llm_executive_summary(payload: dict) -> "tuple[str, bool]":
@@ -1442,7 +1397,7 @@ async def _analyze(file_obj, pasted_text):
     # Show the animated agent progress bar in its single fixed spot before
     # doing any work; other outputs are left untouched (gr.update()) so
     # nothing under them flickers or shows its own loading state.
-    yield (gr.update(visible=True),) + (gr.update(),) * 13
+    yield (gr.update(visible=True),) + (gr.update(),) * 15
 
     # Hash the raw input (file bytes, or the pasted text) so an identical
     # upload/paste can be served straight from the DB instead of hitting
@@ -1508,7 +1463,7 @@ async def _analyze(file_obj, pasted_text):
     # derived here from full_df - works the same for a fresh analysis and
     # a cached result, since both always carry a full_df.
     priority_counts = _priority_counts(full_df)
-    chart = _donut_figure(priority_counts, "Incidents by Priority", color_fn=_priority_color)
+    chart = _donut_figure(priority_counts, "Incidents by Priority", color_fn=_priority_color, show_count_in_legend=True)
 
     category_bar_html = _bar_list_html(
         sorted(category_counts.items(), key=lambda kv: kv[1], reverse=True), color="#3b82f6"
@@ -1539,6 +1494,9 @@ async def _analyze(file_obj, pasted_text):
         # summary_stats_state - feeds the Overview health/attention/exec
         # summary calculations without needing to re-run the pipeline.
         summary_stats,
+        # Overview-tab duplicates of the same category bar-list / priority
+        # donut shown on Categorization - identical values, not recomputed.
+        category_bar_html, chart,
     )
 
 
@@ -1636,6 +1594,14 @@ def _go_to_page(filtered_df, page, page_size, delta):
     return _select_columns(page_df), indicator, new_page
 
 
+def _change_page_size(filtered_df, new_page_size):
+    """Rows-per-page dropdown handler: re-paginates the already-filtered
+    table from page 1 at the newly chosen page size, and updates
+    page_size_state so prev_btn/next_btn keep using it afterward."""
+    page_df, indicator, page = _paginate(filtered_df, 1, new_page_size)
+    return _select_columns(page_df), indicator, page, new_page_size
+
+
 SIDEBAR_BRAND_HTML = """
 <div class="side-brand">
   <div class="side-brand-icon">🤖</div>
@@ -1667,11 +1633,120 @@ NAV_ITEMS = [
     # _make_nav_handler), so adding or removing an entry here means
     # renumbering every gr.Tab id after it in build_ui below.
     ("recommendations", "💡", "Recommendations"),
+    # Knowledge Base sits right before Q&A (Agent): it's the second source
+    # of knowledge the agent draws on (see rag.py's search_knowledge_base
+    # tool), so it belongs next to the tab that consumes it.
+    ("knowledge_base", "📚", "Knowledge Base"),
     ("qa", "💬", "Q&A (Agent)"),
     # The Export tab was removed; its download button now sits under the
     # Recent Incidents table in Categorization, next to the data it exports.
     ("settings", "⚙️", "Settings"),
 ]
+
+
+# --- Knowledge Base (Step 13) ------------------------------------------
+# Thin UI-layer wrappers around knowledge_base.py - no ingestion/retrieval
+# logic lives here, only building the table/dropdown Gradio renders and
+# turning a dropdown selection back into a document_id.
+
+def _kb_documents_dataframe() -> pd.DataFrame:
+    """Backs the Indexed Documents table. Uploaded At is reformatted to
+    match the rest of the dashboard's date display; Error is blank unless
+    that document's status is Failed."""
+    try:
+        docs = knowledge_base.list_documents()
+        if not docs:
+            return pd.DataFrame(columns=["Document Name", "Type", "Status", "Chunks", "Uploaded At", "Error"])
+        rows = []
+        for d in docs:
+            uploaded = d.get("uploaded_at") or ""
+            try:
+                uploaded = pd.to_datetime(uploaded).strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                pass
+            rows.append({
+                "Document Name": d["document_name"],
+                "Type": (d["document_type"] or "").upper(),
+                "Status": d["status"],
+                "Chunks": d.get("chunk_count", 0),
+                "Uploaded At": uploaded,
+                "Error": d.get("error_message") or "",
+            })
+        return pd.DataFrame(rows)
+    except Exception:
+        return pd.DataFrame(columns=["Document Name", "Type", "Status", "Chunks", "Uploaded At", "Error"])
+
+
+def _kb_document_choices() -> list[tuple[str, int]]:
+    """(display_label, document_id) pairs for the manage dropdown - the id
+    is the actual dropdown value so two documents with the same filename
+    (re-uploaded, or coincidentally identical names) never get confused
+    for each other, even though their labels look the same."""
+    try:
+        return [(f"{d['document_name']} ({d['status']})", d["id"]) for d in knowledge_base.list_documents()]
+    except Exception:
+        return []
+
+
+def _kb_refresh():
+    """Recomputes both the table and the manage-dropdown choices - called
+    after every upload/delete/reindex so they can never show stale data
+    relative to each other."""
+    return _kb_documents_dataframe(), gr.update(choices=_kb_document_choices(), value=None)
+
+
+async def _kb_upload(file_obj):
+    """Upload & Index button handler. Reads the uploaded file's bytes and
+    runs the full ingestion pipeline (knowledge_base.ingest_document) -
+    extraction, chunking, embedding, persistence - then refreshes the
+    table/dropdown and reports success/failure in plain language."""
+    if file_obj is None:
+        table, dropdown = _kb_refresh()
+        return table, dropdown, "Choose a file first."
+    try:
+        path = file_obj if isinstance(file_obj, str) else file_obj.name
+        filename = os.path.basename(path)
+        with open(path, "rb") as f:
+            file_bytes = f.read()
+        result = await knowledge_base.ingest_document(filename, file_bytes)
+        table, dropdown = _kb_refresh()
+        if result["success"]:
+            status_msg = f"✅ **{filename}** indexed successfully ({result['chunk_count']} chunks)."
+        else:
+            status_msg = f"❌ **{filename}** failed to index: {result.get('error', 'unknown error')}"
+        return table, dropdown, status_msg
+    except Exception as exc:
+        table, dropdown = _kb_refresh()
+        return table, dropdown, f"❌ Upload failed: {exc}"
+
+
+def _kb_delete(document_id):
+    if document_id is None:
+        table, dropdown = _kb_refresh()
+        return table, dropdown, "Select a document first."
+    try:
+        deleted = knowledge_base.delete_document(int(document_id))
+        table, dropdown = _kb_refresh()
+        msg = "🗑️ Document deleted." if deleted else "Document was already gone."
+        return table, dropdown, msg
+    except Exception as exc:
+        table, dropdown = _kb_refresh()
+        return table, dropdown, f"❌ Delete failed: {exc}"
+
+
+async def _kb_reindex(document_id):
+    if document_id is None:
+        table, dropdown = _kb_refresh()
+        return table, dropdown, "Select a document first."
+    try:
+        result = await knowledge_base.reindex_document(int(document_id))
+        table, dropdown = _kb_refresh()
+        if result["success"]:
+            return table, dropdown, f"🔁 Reindexed successfully ({result['chunk_count']} chunks)."
+        return table, dropdown, f"❌ Reindex failed: {result.get('error', 'unknown error')}"
+    except Exception as exc:
+        table, dropdown = _kb_refresh()
+        return table, dropdown, f"❌ Reindex failed: {exc}"
 
 
 def build_ui() -> gr.Blocks:
@@ -1722,6 +1797,25 @@ def build_ui() -> gr.Blocks:
                             with gr.Column(scale=2, min_width=180, elem_id="action-col"):
                                 analyze_btn = gr.Button("Analyze", variant="primary")
 
+                        # Incidents by Category / Priority - the same two
+                        # panels shown on the Categorization tab, copied
+                        # here so management sees the breakdown without
+                        # switching tabs. Separate component instances
+                        # (Gradio can't render one component in two
+                        # places), both populated from the exact same
+                        # values _analyze already computes for the
+                        # Categorization tab's copies - see category_bar_html /
+                        # category_chart in the outputs list below.
+                        with gr.Row(elem_id="overview-panel-row-1"):
+                            with gr.Column(scale=1, elem_classes=["dash-card"]):
+                                gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
+                                overview_category_bar_html = gr.HTML(
+                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+                                )
+                            with gr.Column(scale=1, elem_classes=["dash-card"]):
+                                gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
+                                overview_priority_chart = gr.Plot(show_label=False)
+
                         # Incident Health - four traffic-light indicators so
                         # management can scan overall status in a second.
                         with gr.Column(elem_classes=["dash-card"]):
@@ -1734,28 +1828,11 @@ def build_ui() -> gr.Blocks:
                             gr.Markdown("### 📈 Incident Volume Trend", elem_classes=["section-heading"])
                             overview_trend_chart = gr.Plot(show_label=False)
 
-                        # Attention Required - still computed every run
-                        # (compute_attention_items feeds the exec-summary
-                        # payload below) but no longer has its own visible
-                        # card; kept as a hidden component so
-                        # _refresh_overview's existing output contract is
-                        # untouched.
-                        attention_html = gr.HTML(_ATTENTION_PLACEHOLDER, visible=False)
-
-                        # Incidents by Category / Incidents by Priority -
-                        # copied here from the Categorization tab, in place
-                        # of the old Attention Required card, so the
-                        # category/priority mix is visible without leaving
-                        # Overview. Categorization's own cards (below) are
-                        # untouched.
-                        with gr.Row(elem_id="overview-panel-row"):
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
-                                overview_category_bar_html = gr.HTML(_OVERVIEW_BREAKDOWN_PLACEHOLDER)
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
-                                overview_priority_chart = gr.Plot(show_label=False)
-                                overview_priority_counts_html = gr.HTML(_OVERVIEW_BREAKDOWN_PLACEHOLDER)
+                        # Attention Required - a short, management-facing
+                        # roll-up of anything currently outside a healthy range.
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown("### 🚩 Attention Required", elem_classes=["section-heading"])
+                            attention_html = gr.HTML(_ATTENTION_PLACEHOLDER)
 
                         # Executive Summary - computes KPIs/trends with
                         # pandas first, then sends only that small
@@ -1826,16 +1903,12 @@ def build_ui() -> gr.Blocks:
                             with gr.Row(elem_id="pagination-row"):
                                 prev_btn = gr.Button("← Previous", size="sm")
                                 page_indicator = gr.Markdown("Page 1 of 1  ·  0 tickets", elem_id="page-indicator")
-                                next_btn = gr.Button("Next →", size="sm")
-                                page_size_selector = gr.Dropdown(
-                                    choices=[10, 25, 50, 100],
-                                    value=DEFAULT_PAGE_SIZE,
-                                    label="Rows/page",
-                                    show_label=True,
-                                    scale=0,
-                                    min_width=110,
-                                    elem_id="page-size-selector",
+                                page_size_dropdown = gr.Dropdown(
+                                    choices=[10, 25, 50, 100], value=DEFAULT_PAGE_SIZE,
+                                    label="Rows/page", show_label=True,
+                                    scale=0, min_width=130, elem_id="page-size-dropdown",
                                 )
+                                next_btn = gr.Button("Next →", size="sm")
 
                     with gr.Tab("Trends & Insights", id=2):
                         # KPI trend - ticket volume + worklog quality over
@@ -1934,7 +2007,43 @@ def build_ui() -> gr.Blocks:
                                 elem_id="rec-writeup-output",
                             )
 
-                    with gr.Tab("Q&A (Agent)", id=4):
+                    with gr.Tab("Knowledge Base", id=4):
+                        gr.Markdown(
+                            "Upload organizational documents (runbooks, SOPs, troubleshooting "
+                            "guides, known-error documents, escalation procedures) so the Agent "
+                            "can answer documentation questions - e.g. *\"what does the runbook "
+                            "recommend for database connection errors?\"* - separately from the "
+                            "incident-data questions on the Q&A tab. Only the relevant retrieved "
+                            "passages are ever sent to the model, never the whole document.",
+                            elem_classes=["severity-note"],
+                        )
+
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown("### 📤 Upload Document", elem_classes=["section-heading"])
+                            with gr.Row():
+                                kb_file_input = gr.File(
+                                    label="Supported: PDF, DOCX, TXT, MD",
+                                    file_types=[".pdf", ".docx", ".txt", ".md"],
+                                    scale=3,
+                                )
+                                kb_upload_btn = gr.Button("Upload & Index", variant="primary", scale=1)
+                            kb_upload_status = gr.Markdown("")
+
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown("### 📚 Indexed Documents", elem_classes=["section-heading"])
+                            kb_documents_table = gr.Dataframe(
+                                headers=["Document Name", "Type", "Status", "Chunks", "Uploaded At", "Error"],
+                                interactive=False, wrap=True, elem_id="kb-documents-table",
+                            )
+                            with gr.Row():
+                                kb_document_dropdown = gr.Dropdown(
+                                    label="Select a document to manage", choices=[], scale=3,
+                                )
+                                kb_reindex_btn = gr.Button("🔁 Reindex", scale=1)
+                                kb_delete_btn = gr.Button("🗑️ Delete", scale=1, variant="stop")
+                            kb_manage_status = gr.Markdown("")
+
+                    with gr.Tab("Q&A (Agent)", id=5):
                         # Single bounded chat panel (intro + transcript +
                         # composer) instead of loosely stacked components -
                         # keeps the tab a fixed height with the transcript
@@ -1946,7 +2055,9 @@ def build_ui() -> gr.Blocks:
                                 "*\"which assignment group has the worst worklog quality?\"*, or "
                                 "*\"summarize the recurring issues on our database servers.\"* "
                                 "Answers are grounded only in the analyzed batch (Overview tab) - "
-                                "run an analysis first if you haven't yet.",
+                                "run an analysis first if you haven't yet. You can also ask "
+                                "documentation questions, e.g. *\"what does the runbook recommend "
+                                "for connection errors?\"*, answered from the Knowledge Base tab.",
                                 elem_classes=["severity-note", "chat-intro"],
                             )
                             chatbot = gr.Chatbot(height=440, show_label=False, elem_id="chatbot")
@@ -1958,7 +2069,7 @@ def build_ui() -> gr.Blocks:
                                 chat_send = gr.Button("Send", variant="primary", scale=1)
                             chat_clear_btn = gr.Button("Clear conversation", size="sm", elem_id="chat-clear-btn")
 
-                    with gr.Tab("Settings", id=5):
+                    with gr.Tab("Settings", id=6):
                         with gr.Column(elem_classes=["dash-card"]):
                             gr.Markdown("### ⚙️ Settings", elem_classes=["section-heading"])
                             gr.Markdown(
@@ -1970,13 +2081,13 @@ def build_ui() -> gr.Blocks:
         full_results_state = gr.State(pd.DataFrame())
         filtered_results_state = gr.State(pd.DataFrame())
         page_state = gr.State(1)
-        # Category/score filters have been removed from the UI; these
-        # fixed states keep _apply_filters' existing behavior unchanged
-        # underneath. Rows-per-page now has its own control
-        # (page_size_selector, in the pagination row) instead of a fixed
-        # state.
+        # Category/score filters still have no UI control (category_state/
+        # min_score_state stay fixed at "All"/0, keeping _apply_filters'
+        # existing behavior unchanged). Rows-per-page now has one -
+        # page_size_dropdown above drives page_size_state directly.
         category_state = gr.State("All")
         min_score_state = gr.State(0)
+        page_size_state = gr.State(DEFAULT_PAGE_SIZE)
 
         # Chat/RAG state: the semantic index + aggregate stats are rebuilt
         # from the latest analysis; chat_history_state is the running
@@ -2006,10 +2117,16 @@ def build_ui() -> gr.Blocks:
                 chat_stats_state,
                 file_input, text_input,
                 summary_stats_state,
+                # Overview-tab duplicates of the Categorization tab's
+                # category bar-list / priority donut - _analyze yields the
+                # same two values twice (see its final yield) rather than
+                # this chaining a second .then() that reads them back out
+                # of category_chart/category_bar_html as inputs.
+                overview_category_bar_html, overview_priority_chart,
             ],
         ).then(
             fn=_refresh_view,
-            inputs=[full_results_state, category_state, min_score_state, page_size_selector],
+            inputs=[full_results_state, category_state, min_score_state, page_size_state],
             outputs=[results_table, page_indicator, filtered_results_state, page_state],
         ).then(
             fn=_build_chat_index,
@@ -2023,10 +2140,6 @@ def build_ui() -> gr.Blocks:
             fn=_refresh_overview,
             inputs=[full_results_state, summary_stats_state],
             outputs=[summary_md, health_html, attention_html, overview_trend_chart],
-        ).then(
-            fn=_refresh_overview_breakdown,
-            inputs=[full_results_state],
-            outputs=[overview_category_bar_html, overview_priority_chart, overview_priority_counts_html],
         ).then(
             # Recommendations refresh automatically with every new batch.
             # Chained as a separate .then() rather than folded into
@@ -2063,22 +2176,42 @@ def build_ui() -> gr.Blocks:
 
         prev_btn.click(
             fn=lambda filtered_df, page, page_size: _go_to_page(filtered_df, page, page_size, -1),
-            inputs=[filtered_results_state, page_state, page_size_selector],
+            inputs=[filtered_results_state, page_state, page_size_state],
             outputs=[results_table, page_indicator, page_state],
         )
         next_btn.click(
             fn=lambda filtered_df, page, page_size: _go_to_page(filtered_df, page, page_size, 1),
-            inputs=[filtered_results_state, page_state, page_size_selector],
+            inputs=[filtered_results_state, page_state, page_size_state],
             outputs=[results_table, page_indicator, page_state],
         )
-
-        # Changing rows-per-page re-paginates the current filtered set from
-        # page 1, same as a fresh analysis does - reuses _refresh_view as-is.
-        page_size_selector.change(
-            fn=_refresh_view,
-            inputs=[full_results_state, category_state, min_score_state, page_size_selector],
-            outputs=[results_table, page_indicator, filtered_results_state, page_state],
+        page_size_dropdown.change(
+            fn=_change_page_size,
+            inputs=[filtered_results_state, page_size_dropdown],
+            outputs=[results_table, page_indicator, page_state, page_size_state],
         )
+
+        kb_upload_btn.click(
+            fn=_kb_upload,
+            inputs=[kb_file_input],
+            outputs=[kb_documents_table, kb_document_dropdown, kb_upload_status],
+        ).then(
+            # Clear the file picker after a successful/attempted upload so
+            # a stale selection can't be mistaken for "not yet uploaded"
+            # and accidentally re-submitted.
+            fn=lambda: gr.update(value=None),
+            outputs=[kb_file_input],
+        )
+        kb_delete_btn.click(
+            fn=_kb_delete,
+            inputs=[kb_document_dropdown],
+            outputs=[kb_documents_table, kb_document_dropdown, kb_manage_status],
+        )
+        kb_reindex_btn.click(
+            fn=_kb_reindex,
+            inputs=[kb_document_dropdown],
+            outputs=[kb_documents_table, kb_document_dropdown, kb_manage_status],
+        )
+        demo.load(fn=_kb_refresh, outputs=[kb_documents_table, kb_document_dropdown])
 
         chat_send.click(
             fn=_chat_respond,
