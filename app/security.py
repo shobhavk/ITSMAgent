@@ -18,6 +18,12 @@ settings = get_settings()
 
 ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls", ".txt"}
 
+# Knowledge Base (Step 13) documents are a distinct upload path from
+# incident files above - kept as its own set/function rather than
+# extending ALLOWED_EXTENSIONS/validate_upload, since incident-file
+# validation must keep behaving exactly as it did before this feature.
+KB_ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md"}
+
 # Patterns commonly used to try to hijack an LLM via injected instructions
 # inside "user content" fields (ticket descriptions, worklogs, etc).
 _INJECTION_PATTERNS = [
@@ -58,6 +64,21 @@ def validate_upload(file: UploadFile) -> None:
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"File exceeds {settings.MAX_UPLOAD_MB}MB limit.",
         )
+
+
+def validate_kb_upload(filename: str, size_bytes: int | None) -> None:
+    """Same idea as validate_upload, for Knowledge Base document uploads
+    (Step 13) - separate extension allow-list and size cap since these are
+    a different kind of file (PDF/DOCX/TXT/MD, often larger) from the
+    incident CSV/XLSX uploads validate_upload guards. Raises ValueError
+    (not HTTPException) so this can be called from both the FastAPI router
+    and the Gradio upload handler without pulling in a FastAPI dependency
+    in the latter."""
+    name = (filename or "").lower()
+    if not any(name.endswith(ext) for ext in KB_ALLOWED_EXTENSIONS):
+        raise ValueError(f"Unsupported file type. Allowed: {sorted(KB_ALLOWED_EXTENSIONS)}")
+    if size_bytes and size_bytes > settings.KB_MAX_UPLOAD_MB * 1024 * 1024:
+        raise ValueError(f"File exceeds {settings.KB_MAX_UPLOAD_MB}MB limit.")
 
 
 def sanitize_for_llm(text: str, max_len: int = 4000) -> str:
