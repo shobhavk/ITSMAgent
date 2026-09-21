@@ -76,6 +76,25 @@ class Settings(BaseSettings):
     # on only if the heuristic score alone isn't good enough for your data.
     ENABLE_LLM_WORKLOG_SCORING: bool = False
 
+    # --- Knowledge Base / RAG (Step 13) ---
+    # Chunk size/overlap are in characters, not tokens - simple, fast,
+    # and doesn't need a tokenizer dependency just for chunking. Kept
+    # configurable here (not hard-coded in knowledge_base.py) per the
+    # spec: chunk size and overlap should be tunable without code changes.
+    KB_CHUNK_SIZE: int = 1000
+    KB_CHUNK_OVERLAP: int = 150
+    # Chunks retrieved per query by default - keeps what reaches the LLM
+    # small and relevant rather than dumping the whole knowledge base in
+    # (see knowledge_base.py's module docstring).
+    KB_TOP_K: int = 5
+    # Cosine-similarity floor below which a retrieved chunk is treated as
+    # not actually relevant - lets the tool say "nothing relevant found"
+    # instead of returning weak matches the LLM might present as an answer.
+    KB_MIN_RELEVANCE: float = 0.15
+    # Separate from MAX_UPLOAD_MB (incident files) - knowledge documents
+    # (PDFs especially) are often larger than incident export files.
+    KB_MAX_UPLOAD_MB: int = 25
+
 
 @lru_cache
 def get_settings() -> Settings:
