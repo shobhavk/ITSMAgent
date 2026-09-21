@@ -39,7 +39,7 @@ the running conversation.
 Degradation, consistent with the rest of the app: no chat model configured
 (LLM_PROVIDER=rule_based) -> no tool-calling loop is possible, so
 answer_question() falls back to a best-effort keyword-based dispatch
-across the same 7 tools (see _no_llm_fallback) rather than an LLM. Either
+across the same 8 tools (see _no_llm_fallback) rather than an LLM. Either
 way, a tool or the whole turn failing never raises - see the try/except in
 every chat_tools function and the outer try/except here.
 
@@ -56,7 +56,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import tool
 
 from app.security import sanitize_for_llm
-from app.services import chat_tools, recommendations
+from app.services import chat_tools, knowledge_base, recommendations
 from app.services.llm_client import (
     SYSTEM_GUARDRAIL,
     embeddings_retry,
@@ -73,9 +73,21 @@ MAX_TOOL_ROUNDS = 4
 
 AGENT_SYSTEM_PROMPT = (
     SYSTEM_GUARDRAIL + "\n\n"
-    "You are an agent answering a manager's question about a batch of IT incident tickets "
-    "that has already been analyzed and categorized. You do not have the data memorized - "
-    "you MUST call one or more of these tools to get real numbers:\n\n"
+    "You are an agent answering a manager's question using TWO separate sources of "
+    "knowledge, and you must pick the right one (or both):\n\n"
+    "SOURCE 1 - INCIDENT DATA: a batch of IT incident tickets that has already been "
+    "analyzed and categorized. You do not have this data memorized - you MUST call one "
+    "or more of the incident-data tools below to get real numbers. Use this for "
+    "questions about what happened in the ticket data (\"how many\", \"which server\", "
+    "\"what's recurring\", \"what should we do\").\n\n"
+    "SOURCE 2 - KNOWLEDGE BASE: uploaded organizational documents (runbooks, SOPs, "
+    "troubleshooting guides, known-error documents, escalation procedures) that are NOT "
+    "part of the incident data. Use search_knowledge_base for questions about documented "
+    "procedures, what a runbook recommends, or escalation/troubleshooting steps. If a "
+    "question needs both - e.g. \"we have recurring database incidents, what does our "
+    "runbook recommend?\" - call an incident-data tool AND search_knowledge_base, then "
+    "combine both results in your answer.\n\n"
+    "Incident-data tools:\n"
     "- get_incident_summary: total incidents, P1/P2 counts, average resolution time, average "
     "worklog score, percentage of tickets with a poor worklog. Use for \"give me an overall "
     "summary\" or general-health questions.\n"
@@ -97,12 +109,23 @@ AGENT_SYSTEM_PROMPT = (
     "- search_incidents: filter tickets by any combination of incident_id, server, category, "
     "priority, and/or a free-text keyword. Returns the true total match count plus a capped "
     "sample. Use for specific lookups like \"show me P1 incidents on server X\".\n\n"
+    "Knowledge Base tool:\n"
+    "- search_knowledge_base: semantic search over uploaded documents. Returns the most "
+    "relevant text passages with their source document, and page number or section title "
+    "where available. GROUNDING RULE: only state a procedure or documentation content that "
+    "actually appears in this tool's returned text - never invent, assume, or complete a "
+    "procedure from general knowledge. If it returns no chunks (empty list) or says nothing "
+    "relevant was found, tell the user plainly that you couldn't find a relevant procedure "
+    "in the current knowledge base - do not guess. When you do use a retrieved chunk, name "
+    "its source document (and page/section if given) so the user knows where the answer "
+    "came from.\n\n"
     "Call more than one tool if the question needs it (e.g. a question about both priority "
-    "and category). Never state a number, percentage, or fact you did not get from a tool "
-    "call - if a tool returns an error or says data is unavailable, say plainly that the "
-    "information is unavailable rather than guessing or estimating. Be concise and "
-    "management-friendly: lead with the direct answer, then one or two sentences of support. "
-    "Cite specific incident IDs in parentheses when a tool result includes them."
+    "and category, or a question needing both incident data and documentation). Never state "
+    "a number, fact, or procedure you did not get from a tool call - if a tool returns an "
+    "error or says information is unavailable, say plainly that it's unavailable rather than "
+    "guessing or estimating. Be concise and management-friendly: lead with the direct answer, "
+    "then one or two sentences of support. Cite specific incident IDs in parentheses when a "
+    "tool result includes them, and cite the source document for anything from the knowledge base."
 )
 
 
@@ -327,6 +350,28 @@ def _make_tools(full_df) -> list:
             return json.dumps({"error": str(exc)})
 
     @tool
+    async def search_knowledge_base(query: str) -> str:
+        """Searches uploaded organizational documents (runbooks, SOPs, troubleshooting guides,
+        known-error documents, escalation procedures) - a SEPARATE source from the incident
+        ticket data above. Use this for questions about documented procedures, what a runbook
+        recommends, or escalation/troubleshooting steps. Returns the most relevant text
+        passages with their source document name and page number or section title where
+        available. If it returns an empty chunk list, say plainly that no relevant procedure
+        was found in the current knowledge base - never invent or assume a procedure."""
+        try:
+            chunks = await knowledge_base.retrieve_relevant_chunks(query)
+            return json.dumps(
+                {
+                    "chunks": chunks,
+                    "count": len(chunks),
+                    "note": "" if chunks else "No relevant information was found in the knowledge base for this query.",
+                },
+                default=str,
+            )
+        except Exception as exc:
+            return json.dumps({"error": str(exc)})
+
+    @tool
     def search_incidents(
         incident_id: str = "", server: str = "", category: str = "",
         priority: str = "", keyword: str = "",
@@ -349,7 +394,8 @@ def _make_tools(full_df) -> list:
 
     return [
         get_incident_summary, get_category_analysis, get_priority_analysis,
-        get_server_analysis, get_recurring_issues, get_recommendations, search_incidents,
+        get_server_analysis, get_recurring_issues, get_recommendations,
+        search_knowledge_base, search_incidents,
     ]
 
 
@@ -359,9 +405,13 @@ def _make_tools(full_df) -> list:
 # (recurring, server, priority, category) are checked before the generic
 # "summary" catch-all.
 _NO_LLM_INTENT_KEYWORDS = [
-    # Checked before "recurring"/"summary": "what do you recommend about
-    # recurring issues" is a recommendation request, and the
-    # recommendations tool already covers recurrence as one of its areas.
+    # Checked first: a documentation/procedure question should hit the
+    # knowledge base even if it also mentions a word like "recommend" or
+    # "priority" in passing (e.g. "what does the runbook recommend for
+    # priority incidents" is still a KB lookup, not a priority-analysis one).
+    (("runbook", "documented procedure", "documentation", "sop", "knowledge base",
+      "troubleshooting guide", "troubleshooting steps", "known error", "escalation procedure",
+      "escalation steps", "what does the procedure", "how do we restart"), "kb"),
     (("recommend", "recommendation", "what should we do", "suggest", "improve", "action plan", "needs attention"), "recommend"),
     (("recurring", "repeat", "keeps happening", "again and again"), "recurring"),
     (("server", "host", "affected server", "which server"), "server"),
@@ -371,17 +421,25 @@ _NO_LLM_INTENT_KEYWORDS = [
 ]
 
 
-def _no_llm_fallback(question: str, full_df) -> str:
+async def _no_llm_fallback(question: str, full_df) -> str:
     """rule_based mode: no chat model, so no tool-calling loop is
-    possible. Dispatches to the same 6 tool functions directly via a
+    possible. Dispatches to the same tool functions directly via a
     simple keyword match on the question, so the app stays useful without
     an LLM - just without the natural-language routing/summary a real
-    model would add."""
+    model would add. async only because the "kb" intent awaits
+    knowledge_base.retrieve_relevant_chunks (an embedding call) - every
+    other intent below is a plain synchronous pandas call."""
     q = question.lower()
 
     for keywords, intent in _NO_LLM_INTENT_KEYWORDS:
         if any(kw in q for kw in keywords):
-            if intent == "recommend":
+            if intent == "kb":
+                chunks = await knowledge_base.retrieve_relevant_chunks(question)
+                result = {
+                    "chunks": chunks,
+                    "note": "" if chunks else "No relevant information was found in the knowledge base for this query.",
+                }
+            elif intent == "recommend":
                 result = recommendations.get_recommendations(full_df)
             elif intent == "recurring":
                 result = chat_tools.get_recurring_issues(full_df)
@@ -451,7 +509,7 @@ async def answer_question(
     raw_chat_model = get_raw_chat_model()
     if raw_chat_model is None:
         try:
-            return _no_llm_fallback(question, full_df)
+            return await _no_llm_fallback(question, full_df)
         except Exception:
             logger.exception("No-LLM fallback failed")
             return "I couldn't compute an answer right now - please try again."
@@ -493,6 +551,6 @@ async def answer_question(
     except Exception:
         logger.exception("Chat answer generation failed")
         try:
-            return "I couldn't reach the assistant model just now. Here's what the data shows directly:\n\n" + _no_llm_fallback(question, full_df)
+            return "I couldn't reach the assistant model just now. Here's what the data shows directly:\n\n" + await _no_llm_fallback(question, full_df)
         except Exception:
             return "I couldn't generate an answer right now - please try again."
