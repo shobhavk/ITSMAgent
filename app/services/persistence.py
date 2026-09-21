@@ -43,6 +43,7 @@ from sqlalchemy import (
     DateTime,
     Text,
     Float,
+    ForeignKey,
     UniqueConstraint,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -107,6 +108,50 @@ class TicketCache(Base):
     resolved_at = Column(DateTime, nullable=True)
     responded_at = Column(DateTime, nullable=True)
     detected_at = Column(DateTime, nullable=True)
+
+
+class KnowledgeDocument(Base):
+    """
+    Step 13 - Knowledge Base / RAG. One row per uploaded document (PDF,
+    DOCX, TXT, or MD) - metadata + ingestion status only; the actual
+    chunk text and embeddings live in KnowledgeChunk below, keyed by
+    document_id. Global to the app instance (like TicketCache above),
+    not scoped per API key - a runbook or SOP is organizational
+    knowledge, not something tied to one analysis session.
+    """
+    __tablename__ = "kb_documents"
+
+    id = Column(Integer, primary_key=True)
+    document_name = Column(String(512), nullable=False)
+    document_type = Column(String(16), nullable=False)  # pdf / docx / txt / md
+    # Processing -> Indexed, or Processing -> Failed (see error_message).
+    status = Column(String(32), nullable=False, default="Processing")
+    error_message = Column(Text, nullable=True)
+    chunk_count = Column(Integer, default=0)
+    # Extracted-and-cleaned text units (JSON list of {text, page_number,
+    # section_title}) BEFORE chunking - kept so "reindex" (re-chunk +
+    # re-embed, e.g. after a KB_CHUNK_SIZE change) doesn't require the
+    # user to re-upload the original file. The original binary is not
+    # kept - only its already-extracted text, which is all re-chunking
+    # needs and is far smaller than a PDF/DOCX.
+    source_units_json = Column(Text, nullable=True)
+    uploaded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class KnowledgeChunk(Base):
+    """One retrievable chunk of a KnowledgeDocument, with its embedding
+    vector stored as a JSON list of floats (None if no embeddings model
+    was configured at ingestion time - see knowledge_base.py's keyword
+    fallback for that case, mirroring rag.py's TicketIndex pattern)."""
+    __tablename__ = "kb_chunks"
+
+    id = Column(Integer, primary_key=True)
+    document_id = Column(Integer, ForeignKey("kb_documents.id"), nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)
+    text = Column(Text, nullable=False)
+    embedding_json = Column(Text, nullable=True)
+    page_number = Column(Integer, nullable=True)
+    section_title = Column(String(512), nullable=True)
 
 
 Base.metadata.create_all(engine)
@@ -345,5 +390,166 @@ def file_metadata(file_hash: str) -> Optional[dict]:
             "uploaded_at": record.uploaded_at.isoformat(),
             "ticket_count": record.ticket_count,
         }
+    finally:
+        session.close()
+
+
+# ==========================================================================
+# Step 13 - Knowledge Base / RAG persistence.
+#
+# Mirrors the UploadedFile/TicketCache pattern above: same engine, same
+# SessionLocal, same try/finally session handling - a second concern
+# living in the same DB file rather than a separate storage system.
+# knowledge_base.py is the only caller of these; it never touches the
+# SQLAlchemy session/model objects directly, so a store swap later only
+# has to change this section.
+# ==========================================================================
+
+def create_kb_document(document_name: str, document_type: str) -> int:
+    """Creates a document row in "Processing" status and returns its id,
+    before extraction/chunking/embedding even starts - so the UI can show
+    the document as soon as upload begins, not only once indexing finishes."""
+    session = SessionLocal()
+    try:
+        record = KnowledgeDocument(document_name=document_name, document_type=document_type, status="Processing")
+        session.add(record)
+        session.commit()
+        return record.id
+    finally:
+        session.close()
+
+
+def update_kb_document_status(
+    document_id: int,
+    status: str,
+    error_message: Optional[str] = None,
+    chunk_count: Optional[int] = None,
+    source_units_json: Optional[str] = None,
+) -> None:
+    """Moves a document to "Indexed" or "Failed" once ingestion finishes
+    (or fails) - see knowledge_base.ingest_document. Only the fields
+    passed are updated; the rest keep their current value."""
+    session = SessionLocal()
+    try:
+        record = session.query(KnowledgeDocument).filter_by(id=document_id).first()
+        if record is None:
+            return
+        record.status = status
+        if error_message is not None:
+            record.error_message = error_message
+        if chunk_count is not None:
+            record.chunk_count = chunk_count
+        if source_units_json is not None:
+            record.source_units_json = source_units_json
+        session.commit()
+    finally:
+        session.close()
+
+
+def save_kb_chunks(document_id: int, chunks: list[dict]) -> None:
+    """Persists the chunks produced for one document. Replaces any chunks
+    already stored for this document_id first (idempotent re-save - used
+    by both first-time ingestion and reindex_document)."""
+    session = SessionLocal()
+    try:
+        session.query(KnowledgeChunk).filter_by(document_id=document_id).delete()
+        for i, chunk in enumerate(chunks):
+            session.add(KnowledgeChunk(
+                document_id=document_id,
+                chunk_index=i,
+                text=chunk["text"],
+                embedding_json=json.dumps(chunk["embedding"]) if chunk.get("embedding") is not None else None,
+                page_number=chunk.get("page_number"),
+                section_title=chunk.get("section_title"),
+            ))
+        session.commit()
+    finally:
+        session.close()
+
+
+def list_kb_documents() -> list[dict]:
+    """All documents, newest first - backs the Knowledge Base tab's
+    status table (Document Name | Type | Status)."""
+    session = SessionLocal()
+    try:
+        records = session.query(KnowledgeDocument).order_by(KnowledgeDocument.uploaded_at.desc()).all()
+        return [
+            {
+                "id": r.id,
+                "document_name": r.document_name,
+                "document_type": r.document_type,
+                "status": r.status,
+                "error_message": r.error_message,
+                "chunk_count": r.chunk_count,
+                "uploaded_at": r.uploaded_at.isoformat() if r.uploaded_at else None,
+            }
+            for r in records
+        ]
+    finally:
+        session.close()
+
+
+def get_kb_document(document_id: int) -> Optional[dict]:
+    """Single document's metadata plus its stored source_units_json -
+    used by reindex_document, which re-chunks/re-embeds that text
+    without needing the original file again."""
+    session = SessionLocal()
+    try:
+        r = session.query(KnowledgeDocument).filter_by(id=document_id).first()
+        if r is None:
+            return None
+        return {
+            "id": r.id,
+            "document_name": r.document_name,
+            "document_type": r.document_type,
+            "status": r.status,
+            "source_units_json": r.source_units_json,
+        }
+    finally:
+        session.close()
+
+
+def delete_kb_document(document_id: int) -> bool:
+    """Removes a document and its chunks. Returns False if no such
+    document existed (caller can surface that as a no-op, not an error)."""
+    session = SessionLocal()
+    try:
+        record = session.query(KnowledgeDocument).filter_by(id=document_id).first()
+        if record is None:
+            return False
+        session.query(KnowledgeChunk).filter_by(document_id=document_id).delete()
+        session.delete(record)
+        session.commit()
+        return True
+    finally:
+        session.close()
+
+
+def get_all_kb_chunks() -> list[dict]:
+    """Every chunk across every Indexed document, joined with its parent
+    document's name/type - this is the full retrieval corpus. Loaded
+    fresh per query rather than kept in a long-lived in-memory index:
+    simplest possible correct implementation for a first version, and
+    fast enough at the chunk counts a first knowledge base will realistically
+    have (see knowledge_base.py's retrieval docstring for the tradeoff)."""
+    session = SessionLocal()
+    try:
+        rows = (
+            session.query(KnowledgeChunk, KnowledgeDocument)
+            .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
+            .filter(KnowledgeDocument.status == "Indexed")
+            .all()
+        )
+        return [
+            {
+                "text": chunk.text,
+                "embedding": json.loads(chunk.embedding_json) if chunk.embedding_json else None,
+                "page_number": chunk.page_number,
+                "section_title": chunk.section_title,
+                "document_name": doc.document_name,
+                "document_type": doc.document_type,
+            }
+            for chunk, doc in rows
+        ]
     finally:
         session.close()
