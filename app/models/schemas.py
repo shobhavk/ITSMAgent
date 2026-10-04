@@ -92,6 +92,11 @@ class AnalyzedTicket(BaseModel):
     short_description: str
     description: str
     worklog: str
+    # Carried through from TicketRecord (previously folded only into the
+    # scorer's input text and dropped here) - the per-incident timeline
+    # view (Trends & Insights tab) needs the raw text to look for
+    # assignment/reassignment mentions and timestamp trails.
+    external_info: str = ""
     priority: Optional[str]
     status: Optional[str]
     assignment_group: Optional[str]
