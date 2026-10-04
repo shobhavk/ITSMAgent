@@ -17,7 +17,9 @@ import gradio as gr
 import pandas as pd
 import plotly.graph_objects as go
 
-from app.services import knowledge_base, overview_metrics, rag, recommendations, recurring_issues, trend_metrics
+from app.services import (
+    incident_timeline, knowledge_base, overview_metrics, rag, recommendations, recurring_issues, trend_metrics,
+)
 from app.services.pipeline import run_pipeline_from_bytes, run_pipeline_from_text
 from app.services.persistence import compute_file_hash, get_cached_result, save_result
 
@@ -30,7 +32,7 @@ CUSTOM_CSS = """
     --dash-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 
-html, body {margin: 0 !important; padding: 0 !important; background: #0f1f33 !important;}
+html, body {margin: 0 !important; padding: 0 !important; background: var(--dash-bg) !important;}
 
 .gradio-container {
     max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important;
@@ -38,47 +40,45 @@ html, body {margin: 0 !important; padding: 0 !important; background: #0f1f33 !im
 }
 footer {display: none !important;}
 
-/* App shell: dark nav rail on the left, everything else scrolls in the
-   main column on the right - matches the reference management dashboard. */
-#app-shell {gap: 0 !important; align-items: stretch !important;}
-#sidebar-col {
-    background: #0f1f33 !important; padding: 22px 16px !important; min-height: 100vh;
-    border-radius: 0 !important;
+/* App shell (Step: sidebar removed) - a full-width dark header bar
+   (brand only, no nav - navigation lives in the tab bar below it) sits
+   above a single light content column. Simpler than the old
+   sidebar+main-column split, and the content area now gets the full
+   viewport width instead of losing ~210px to a nav rail. */
+#topbar-wrap {
+    background: #0f1f33 !important; padding: 18px 28px !important; margin: 0 !important;
+    border-radius: 0 !important; display: flex !important; align-items: center !important; gap: 12px !important;
 }
-#main-col {padding: 20px 28px 32px !important;}
+#main-col {padding: 20px 28px 32px !important; max-width: 1440px; margin: 0 auto !important;}
 
-.side-brand {display: flex; align-items: center; gap: 10px; padding: 0 6px 20px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);}
+.side-brand {display: flex; align-items: center; gap: 10px;}
 .side-brand-icon {
-    width: 34px; height: 34px; border-radius: 9px; background: #2563eb;
-    display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;
+    width: 36px; height: 36px; border-radius: 9px; background: #2563eb;
+    display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;
 }
-.side-brand-title {color: #fff; font-weight: 700; font-size: 0.92rem; line-height: 1.2;}
-.side-brand-sub {color: #8291a8; font-size: 0.72rem; line-height: 1.2;}
+.side-brand-title {color: #fff; font-weight: 700; font-size: 1rem; line-height: 1.25; letter-spacing: -0.01em;}
+.side-brand-sub {color: #8291a8; font-size: 0.75rem; line-height: 1.2; margin-top: 1px;}
 
-.nav-item {
-    display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px;
-    color: #aab6c7; font-size: 0.85rem; font-weight: 500; margin-bottom: 2px;
+/* Tab bar is now the ONLY navigation (native Gradio tabs, previously
+   hidden and driven by the sidebar buttons instead) - styled as a clean
+   horizontal, icon-led bar rather than Gradio's default pill tabs. */
+#main-tabs > .tab-nav {
+    display: flex !important; gap: 4px !important; background: transparent !important;
+    border: none !important; border-bottom: 1px solid var(--dash-border) !important;
+    margin-bottom: 20px !important; padding: 0 !important; overflow-x: auto !important;
 }
-.nav-item .nav-icon {font-size: 0.95rem; width: 18px; text-align: center;}
-.nav-item.active {background: #1d5fe0; color: #fff; font-weight: 600;}
-
-/* Nav items are now real Gradio buttons (so they can switch tabs), styled
-   to look like the plain divs they replaced instead of default buttons. */
-#sidebar-col {gap: 2px !important;}
-#nav-buttons {gap: 2px !important;}
-button.nav-item, button.nav-item:active, button.nav-item:focus {
-    all: unset; box-sizing: border-box; cursor: pointer;
-    display: flex; align-items: center; gap: 10px; width: 100%;
-    padding: 9px 12px; border-radius: 9px;
-    color: #aab6c7; font-size: 0.85rem; font-weight: 500; margin-bottom: 2px;
+#main-tabs > .tab-nav button {
+    border: none !important; background: transparent !important; border-radius: 8px 8px 0 0 !important;
+    padding: 10px 16px !important; font-size: 0.86rem !important; font-weight: 600 !important;
+    color: var(--dash-text-muted) !important; border-bottom: 2px solid transparent !important;
+    margin-bottom: -1px !important; white-space: nowrap !important; transition: color 0.15s, background 0.15s;
 }
-button.nav-item:hover {background: rgba(255, 255, 255, 0.08); color: #fff;}
-button.nav-item.active {background: #1d5fe0 !important; color: #fff !important; font-weight: 600 !important;}
-
-/* The sidebar now drives navigation, so hide Gradio's own tab strip -
-   otherwise there would be two competing sets of tab controls. */
-#main-tabs > .tab-nav {display: none !important;}
-#main-tabs > .tabitem, #main-tabs {border: none !important; padding: 0 !important; background: transparent !important;}
+#main-tabs > .tab-nav button:hover {color: var(--dash-text) !important; background: #eef1f6 !important;}
+#main-tabs > .tab-nav button.selected {
+    color: #1d5fe0 !important; border-bottom: 2px solid #1d5fe0 !important; background: transparent !important;
+}
+#main-tabs > .tabitem {border: none !important; padding: 0 !important; background: transparent !important;}
+#main-tabs {border: none !important; background: transparent !important;}
 
 /* Top bar - plain title/subtitle on the left, a status badge on the
    right, replacing the old solid-color banner to match the reference. */
@@ -515,6 +515,7 @@ def _results_to_full_dataframe(analysis) -> pd.DataFrame:
                 "Short Description": r.short_description,
                 "Description": r.description,
                 "Worklog Notes": r.worklog,
+                "External Info": r.external_info,
                 "Worklog Score": r.worklog_score,
                 "Worklog Rating": _score_badge(r.worklog_score),
                 "Worklog Flags": "; ".join(r.worklog_flags) if r.worklog_flags else "",
@@ -558,17 +559,24 @@ def _category_chart_df(category_counts: dict) -> pd.DataFrame:
     return pd.DataFrame(items, columns=["Category", "Count"])
 
 
-def _donut_figure(counts: dict, title: str, color_fn=None, show_count_in_legend: bool = False) -> go.Figure:
+def _donut_figure(
+    counts: dict, title: str, color_fn=None, show_count_in_legend: bool = False,
+    legend_style: str = "paren",
+) -> go.Figure:
     """Generic donut chart from a {label: count} dict. color_fn, if given,
     maps a label to a hex color so semantically meaningful groups (e.g.
     priority tiers) get consistent colors instead of Plotly's defaults.
 
-    show_count_in_legend appends " (count)" to each legend entry, right
+    show_count_in_legend appends the count to each legend entry, right
     next to that entry's color swatch - Plotly ties legend text to the
     slice `labels`, so this is the only hook available for that without
     also changing the on-slice text. Off by default so the only current
     caller that doesn't want it (_category_chart_figure) is unaffected;
     the live priority-chart call site below passes True explicitly.
+
+    legend_style controls the count's format when show_count_in_legend is
+    True: "paren" -> "Label (N)" (the original format), "dash_incidents"
+    -> "Label - N incidents" (used for the priority donut).
     """
     chart_df = _category_chart_df(counts)
     if chart_df.empty:
@@ -581,10 +589,13 @@ def _donut_figure(counts: dict, title: str, color_fn=None, show_count_in_legend:
         return fig
 
     raw_labels = list(chart_df["Category"])
-    legend_labels = (
-        [f"{label} ({count})" for label, count in zip(raw_labels, chart_df["Count"])]
-        if show_count_in_legend else raw_labels
-    )
+    if show_count_in_legend:
+        if legend_style == "dash_incidents":
+            legend_labels = [f"{label} - {count} incidents" for label, count in zip(raw_labels, chart_df["Count"])]
+        else:
+            legend_labels = [f"{label} ({count})" for label, count in zip(raw_labels, chart_df["Count"])]
+    else:
+        legend_labels = raw_labels
     marker = dict(colors=[color_fn(c) for c in raw_labels]) if color_fn else {}
     fig = go.Figure(
         data=[
@@ -617,15 +628,19 @@ def _category_chart_figure(category_counts: dict) -> go.Figure:
 
 def _priority_color(label: str) -> str:
     """Maps a priority label to a fixed color regardless of exact wording
-    ("P1 - Critical", "Critical", etc.) so the priority donut reads
-    consistently: red = critical, amber/orange = high/medium, green = low."""
+    ("P1 - Critical", "Very High", etc.) so the priority donut reads
+    consistently: red = critical, orange = very high, amber = high,
+    yellow = medium, green = low. "very high" is checked before the plain
+    "high" substring match, since "high" also occurs inside it."""
     l = (label or "").lower()
     if "critical" in l or "p1" in l:
         return "#ef4444"
-    if "high" in l or "p2" in l:
+    if "very high" in l:
         return "#f97316"
-    if "medium" in l or "p3" in l:
+    if "high" in l or "p2" in l:
         return "#f59e0b"
+    if "medium" in l or "p3" in l:
+        return "#eab308"
     if "low" in l or "p4" in l:
         return "#10b981"
     return "#94a3b8"
@@ -1283,9 +1298,22 @@ _RESOLUTION_METRICS_PLACEHOLDER = (
 )
 
 
+
+# Cycled across bars so each period gets a distinct color rather than one
+# flat fill - purely cosmetic, doesn't encode anything (unlike the
+# priority donut's color_fn, which does).
+_TREND_BAR_PALETTE = [
+    "#3b82f6", "#f97316", "#10b981", "#8b5cf6", "#ec4899",
+    "#06b6d4", "#f59e0b", "#84cc16", "#ef4444", "#6366f1",
+]
+
+
 def _trend_figure(full_df: pd.DataFrame, granularity: str) -> go.Figure:
-    """Dual-axis chart: ticket volume as bars (left axis), average worklog
-    score as a line (right axis), bucketed by day/week/month on Opened At."""
+    """Ticket volume as a colorful bar chart, bucketed by day/week/month
+    on Opened At, with the count labeled on top of each bar and the
+    overall total shown in the title. (Previously a dual-axis chart that
+    also plotted average worklog score as a line - removed per request;
+    that number is still available via the KPI cards elsewhere.)"""
     series = trend_metrics.compute_time_series(full_df, granularity)
     fig = go.Figure()
     if not series:
@@ -1302,21 +1330,21 @@ def _trend_figure(full_df: pd.DataFrame, granularity: str) -> go.Figure:
 
     periods = [p["period"] for p in series]
     counts = [p["ticket_count"] for p in series]
-    scores = [p["avg_worklog_score"] for p in series]
+    total = sum(counts)
+    colors = [_TREND_BAR_PALETTE[i % len(_TREND_BAR_PALETTE)] for i in range(len(periods))]
 
-    fig.add_trace(go.Bar(x=periods, y=counts, name="Ticket volume", marker_color="#3b82f6", yaxis="y1"))
-    fig.add_trace(go.Scatter(
-        x=periods, y=scores, name="Avg worklog score", mode="lines+markers",
-        line=dict(color="#f59e0b", width=2), marker=dict(size=6), yaxis="y2",
+    fig.add_trace(go.Bar(
+        x=periods, y=counts, name="Ticket volume",
+        marker_color=colors,
+        text=counts, textposition="outside",
     ))
     fig.update_layout(
-        title=f"Ticket volume & worklog quality - {granularity}",
+        title=f"Ticket volume - {granularity}  ·  Total incidents: {total}",
         height=340,
-        margin=dict(t=40, b=10, l=10, r=10),
+        margin=dict(t=50, b=10, l=10, r=10),
         xaxis=dict(title=""),
-        yaxis=dict(title="Tickets", side="left", rangemode="tozero"),
-        yaxis2=dict(title="Avg score", overlaying="y", side="right", range=[0, 100]),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        yaxis=dict(title="Tickets", rangemode="tozero"),
+        showlegend=False,
         bargap=0.25,
     )
     return fig
@@ -1356,6 +1384,149 @@ def _resolution_metrics_html(full_df: pd.DataFrame) -> str:
 
 def _refresh_trend(full_df: pd.DataFrame, granularity: str):
     return _trend_figure(full_df, granularity), _resolution_metrics_html(full_df)
+
+
+# --- Incident Timeline -------------------------------------------------
+# Per-incident audit table (Trends & Insights tab): when each incident
+# came in, how long it took to acknowledge, any reassignment detected in
+# External Info, and whether External Info carries a proper timestamp
+# trail. All numbers come from app/services/incident_timeline.py (pure
+# pandas + regex over the existing analytics) - nothing computed here.
+# The LLM write-up is the same optional, opt-in extra layer used by the
+# Overview tab's Executive Summary and the Recommendations write-up.
+
+_TIMELINE_PLACEHOLDER_MD = (
+    "Run an analysis on the Overview tab, then click **Generate summary** to turn the "
+    "table below into a management-ready briefing on acknowledgment times and External "
+    "Info audit-trail quality."
+)
+
+
+def _timeline_kpi_html(aggregate: dict) -> str:
+    if not aggregate or not aggregate.get("available"):
+        return (
+            '<div class="kpi-grid">'
+            + _kpi_card_v2("📨", "Avg time to acknowledge", "—", "#0ea5e9")
+            + _kpi_card_v2("🔁", "Reassignments detected", "—", "#8b5cf6")
+            + _kpi_card_v2("📝", "External Info missing", "—", "#94a3b8")
+            + "</div>"
+        )
+    ack = aggregate.get("avg_time_to_acknowledge_hours")
+    quality = aggregate.get("external_info_quality_breakdown") or {}
+    missing = quality.get("Missing", 0)
+    return (
+        '<div class="kpi-grid">'
+        + _kpi_card_v2(
+            "📨", "Avg time to acknowledge", f"{ack}h" if ack is not None else "N/A", "#0ea5e9",
+            note=f"{aggregate.get('acknowledgment_data_available_for', 0)} ticket(s) with data" if ack is not None
+            else "No acknowledgment timestamp in this data",
+        )
+        + _kpi_card_v2(
+            "🔁", "Reassignments detected", aggregate.get("incidents_with_reassignment_detected", 0), "#8b5cf6",
+            note="Detected in External Info text",
+        )
+        + _kpi_card_v2(
+            "📝", "External Info missing", missing, "#94a3b8",
+            note=f"of {aggregate.get('total_incidents', 0)} incident(s)",
+        )
+        + "</div>"
+    )
+
+
+def _refresh_incident_timeline(full_df: pd.DataFrame):
+    """Recomputes the Incident Timeline table + KPI cards from the latest
+    analysis. Deterministic and LLM-free, so it runs automatically at the
+    end of every analysis, same as Recommendations. Returns the timeline
+    dataframe too, cached as state, so the Generate Summary button reuses
+    exactly these numbers instead of recomputing them."""
+    try:
+        timeline_df = incident_timeline.compute_incident_timeline(full_df)
+        aggregate = incident_timeline.compute_timeline_aggregate(timeline_df)
+        return timeline_df, _timeline_kpi_html(aggregate), aggregate
+    except Exception:
+        return pd.DataFrame(), _timeline_kpi_html({}), {}
+
+
+async def _llm_timeline_summary(payload: dict) -> "tuple[str, bool]":
+    """Same three-tier approach as _llm_recommendations_writeup: the app's
+    configured provider, then the direct Anthropic path, then give up -
+    only the small aggregated payload (counts/percentages, no per-ticket
+    text) ever reaches the LLM."""
+    prompt = (
+        "You are an ITSM reporting assistant writing for a management audience. The JSON below "
+        "contains ALREADY-CALCULATED per-batch incident timeline metrics: acknowledgment times, "
+        "detected reassignments, and External Info audit-trail quality.\n\n"
+        "Write a short (4-6 sentence) management summary. Rules:\n"
+        "- Use ONLY the numbers present in the JSON - never invent, recalculate, or estimate.\n"
+        "- Call out anything that looks like a process gap (slow acknowledgment, missing or "
+        "untimed External Info, undetected reassignment trail).\n"
+        "- Name specific ticket IDs only if they appear in the JSON.\n\n"
+        f"Timeline metrics (JSON):\n{json.dumps(payload, default=str)}"
+    )
+
+    try:
+        from app.services.llm_client import get_chat_model
+
+        chat_model = get_chat_model()
+        if chat_model is not None:
+            response = await chat_model.ainvoke(prompt)
+            text = getattr(response, "content", "") or ""
+            if isinstance(text, list):
+                text = "".join(part.get("text", "") for part in text if isinstance(part, dict))
+            if text.strip():
+                return text.strip(), True
+    except Exception:
+        pass
+
+    try:
+        import anthropic  # local import - optional dependency for this feature only
+
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY not configured")
+
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        response = await client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=600,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = "".join(
+            block.text for block in response.content if getattr(block, "type", "") == "text"
+        ).strip()
+        if not text:
+            raise RuntimeError("empty LLM response")
+        return text, True
+    except Exception:
+        return "", False
+
+
+async def _generate_timeline_summary(full_df: pd.DataFrame, cached_aggregate: dict):
+    """Click handler for the Incident Timeline's "Generate summary"
+    button - mirrors _generate_recommendations_writeup exactly: reuse the
+    aggregate already computed when the analysis finished, send only that
+    to the LLM, and fall back to a deterministic rendering of the same
+    numbers if no LLM is available."""
+    try:
+        if full_df is None or len(full_df) == 0:
+            return gr.update(value="Run an analysis on the Overview tab first, then generate the summary.")
+
+        aggregate = cached_aggregate if (cached_aggregate or {}).get("available") else \
+            incident_timeline.compute_timeline_aggregate(incident_timeline.compute_incident_timeline(full_df))
+
+        if not aggregate.get("available"):
+            return gr.update(value=incident_timeline.fallback_summary_markdown(aggregate))
+
+        payload = incident_timeline.build_llm_payload(aggregate)
+        text, used_llm = await _llm_timeline_summary(payload)
+        if not used_llm:
+            return gr.update(
+                value=incident_timeline.fallback_summary_markdown(aggregate)
+                + "\n\n_(LLM unavailable right now - showing the rule-based summary of the same metrics.)_"
+            )
+        return gr.update(value=text)
+    except Exception as exc:
+        return gr.update(value=f"Could not generate the incident timeline summary right now ({exc}).")
 
 
 def _truncate_full_df(full_df: pd.DataFrame) -> pd.DataFrame:
@@ -1463,7 +1634,10 @@ async def _analyze(file_obj, pasted_text):
     # derived here from full_df - works the same for a fresh analysis and
     # a cached result, since both always carry a full_df.
     priority_counts = _priority_counts(full_df)
-    chart = _donut_figure(priority_counts, "Incidents by Priority", color_fn=_priority_color, show_count_in_legend=True)
+    chart = _donut_figure(
+        priority_counts, "Incidents by Priority", color_fn=_priority_color,
+        show_count_in_legend=True, legend_style="dash_incidents",
+    )
 
     category_bar_html = _bar_list_html(
         sorted(category_counts.items(), key=lambda kv: kv[1], reverse=True), color="#3b82f6"
@@ -1617,31 +1791,10 @@ TOPBAR_HTML = """
 <p>AI-powered insights for better service and faster resolution</p>
 """
 
-# Sidebar nav items -> the id of the gr.Tab each one opens. Order here
-# drives both the buttons drawn in the sidebar and the tabs built below.
-NAV_ITEMS = [
-    ("overview", "🏠", "Overview"),
-    # The Incident Analysis tab was removed; its Recent Incidents table now
-    # lives at the bottom of Categorization, below the category/priority
-    # breakdown it belongs with.
-    ("categorization", "🗂️", "Categorization"),
-    ("trends", "📊", "Trends & Insights"),
-    # Recommendations sits directly after Trends & Insights: it's the
-    # "so what do we do about it" reading of everything on that tab, so
-    # it belongs next to the analysis it's derived from. NOTE: this
-    # list's index is the gr.Tab id each button opens (see
-    # _make_nav_handler), so adding or removing an entry here means
-    # renumbering every gr.Tab id after it in build_ui below.
-    ("recommendations", "💡", "Recommendations"),
-    # Knowledge Base sits right before Q&A (Agent): it's the second source
-    # of knowledge the agent draws on (see rag.py's search_knowledge_base
-    # tool), so it belongs next to the tab that consumes it.
-    ("knowledge_base", "📚", "Knowledge Base"),
-    ("qa", "💬", "Q&A (Agent)"),
-    # The Export tab was removed; its download button now sits under the
-    # Recent Incidents table in Categorization, next to the data it exports.
-    ("settings", "⚙️", "Settings"),
-]
+# Tab order/icons (Overview, Categorization, Trends & Insights,
+# Recommendations, Knowledge Base, Q&A (Agent), Settings) now live
+# directly on each gr.Tab(...) label below - there's no sidebar anymore
+# to keep a separate icon/label list in sync with.
 
 
 # --- Knowledge Base (Step 13) ------------------------------------------
@@ -1751,332 +1904,352 @@ async def _kb_reindex(document_id):
 
 def build_ui() -> gr.Blocks:
     with gr.Blocks(title="ITSM Quality Analysis Agent", css=CUSTOM_CSS) as demo:
-        # App shell: dark nav rail on the left, everything else scrolls in
-        # the main column on the right. The nav items below are real
-        # buttons that switch between the gr.Tab sections built further
-        # down, so the sidebar is an actual working nav, not a static mock.
-        with gr.Row(elem_id="app-shell", equal_height=False):
-            with gr.Column(scale=0, min_width=210, elem_id="sidebar-col"):
-                gr.HTML(SIDEBAR_BRAND_HTML)
-                nav_buttons = []
-                with gr.Column(elem_id="nav-buttons"):
-                    for i, (key, icon, label) in enumerate(NAV_ITEMS):
-                        btn = gr.Button(
-                            f"{icon}  {label}",
-                            elem_classes=["nav-item", "active"] if i == 0 else ["nav-item"],
+        # App shell (sidebar removed): a slim dark brand bar spans the full
+        # width, followed by a single light content column - navigation is
+        # now the icon tab bar built into gr.Tabs below (native Gradio
+        # tabs, previously hidden and driven by sidebar buttons instead).
+        gr.HTML(SIDEBAR_BRAND_HTML, elem_id="topbar-wrap")
+
+        with gr.Column(elem_id="main-col"):
+            gr.HTML(TOPBAR_HTML, elem_id="topbar")
+            gr.Markdown(f"_{SEVERITY_NOTE}_", elem_classes=["severity-note"])
+
+            with gr.Tabs(elem_id="main-tabs") as main_tabs:
+                with gr.Tab("🏠 Overview", id=0):
+                    agent_progress = gr.HTML(AGENT_PROGRESS_HTML, elem_id="agent-progress", visible=False)
+                    cache_notice = gr.Markdown(visible=False, elem_id="cache-notice")
+
+                    # Executive Summary - moved to sit right below the page
+                    # heading (top bar above the tabs) rather than at the
+                    # bottom of the tab, so the management write-up is the
+                    # first thing seen. Computes KPIs/trends with pandas
+                    # first, then sends only that small aggregated dict to
+                    # the LLM for the write-up. The button is NOT inside a
+                    # gr.Row with the heading - Gradio gives Row children
+                    # negative side margins for edge-to-edge layout, which
+                    # was pushing the button past the card's own border.
+                    # Instead it's a normal sibling, pinned on top of the
+                    # card with CSS position:absolute, so it can never
+                    # escape the card's visible edges.
+                    with gr.Column(elem_classes=["dash-card"], elem_id="exec-summary-card"):
+                        gr.Markdown("### 🧾 Executive Summary", elem_classes=["section-heading"])
+                        exec_summary_btn = gr.Button(
+                            "✨ Generate summary", size="sm", elem_id="exec-summary-btn",
                         )
-                        nav_buttons.append(btn)
+                        exec_summary_output = gr.Markdown(
+                            "Run an analysis, then click **Generate summary** for a "
+                            "management-friendly write-up of the KPIs above.",
+                            elem_id="exec-summary-output",
+                        )
 
-            with gr.Column(scale=1, elem_id="main-col"):
-                gr.HTML(TOPBAR_HTML, elem_id="topbar")
-                gr.Markdown(f"_{SEVERITY_NOTE}_", elem_classes=["severity-note"])
+                    # KPI strip - headline numbers for management at a glance,
+                    # shown above the upload bar so totals are the first thing seen.
+                    with gr.Row(elem_id="metrics-row"):
+                        summary_md = gr.HTML(_OVERVIEW_KPI_PLACEHOLDER)
 
-                with gr.Tabs(elem_id="main-tabs") as main_tabs:
-                    with gr.Tab("Overview", id=0):
-                        agent_progress = gr.HTML(AGENT_PROGRESS_HTML, elem_id="agent-progress", visible=False)
-                        cache_notice = gr.Markdown(visible=False, elem_id="cache-notice")
-
-                        # KPI strip - headline numbers for management at a glance,
-                        # shown above the upload bar so totals are the first thing seen.
-                        with gr.Row(elem_id="metrics-row"):
-                            summary_md = gr.HTML(_OVERVIEW_KPI_PLACEHOLDER)
-
-                        # Single full-width input bar - upload, paste, and the
-                        # analyze action sit on one row (download lives under
-                        # the Recent Incidents table in Categorization).
-                        with gr.Row(elem_id="input-row", elem_classes=["dash-card"], equal_height=False):
-                            with gr.Column(scale=3, min_width=260):
-                                file_input = gr.File(
-                                    label="Upload incident file (.xlsx, .csv, .txt)",
-                                    file_types=[".xlsx", ".xls", ".csv", ".txt"],
-                                    elem_id="file-upload",
-                                )
-                            with gr.Column(scale=4, min_width=320):
-                                text_input = gr.Textbox(label="...or paste unstructured incident text", lines=2,
-                                                          placeholder="INC0012345\nShort description: ...\nWorklog: ...")
-                            with gr.Column(scale=2, min_width=180, elem_id="action-col"):
-                                analyze_btn = gr.Button("Analyze", variant="primary")
-
-                        # Incidents by Category / Priority - the same two
-                        # panels shown on the Categorization tab, copied
-                        # here so management sees the breakdown without
-                        # switching tabs. Separate component instances
-                        # (Gradio can't render one component in two
-                        # places), both populated from the exact same
-                        # values _analyze already computes for the
-                        # Categorization tab's copies - see category_bar_html /
-                        # category_chart in the outputs list below.
-                        with gr.Row(elem_id="overview-panel-row-1"):
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
-                                overview_category_bar_html = gr.HTML(
-                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                                )
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
-                                overview_priority_chart = gr.Plot(show_label=False)
-
-                        # Incident Health - four traffic-light indicators so
-                        # management can scan overall status in a second.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 🩺 Incident Health", elem_classes=["section-heading"])
-                            health_html = gr.HTML(_HEALTH_PLACEHOLDER)
-
-                        # Incident Volume Trend - a simple line chart, distinct
-                        # from the dual-axis chart on Trends & Insights.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 📈 Incident Volume Trend", elem_classes=["section-heading"])
-                            overview_trend_chart = gr.Plot(show_label=False)
-
-                        # Attention Required - a short, management-facing
-                        # roll-up of anything currently outside a healthy range.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 🚩 Attention Required", elem_classes=["section-heading"])
-                            attention_html = gr.HTML(_ATTENTION_PLACEHOLDER)
-
-                        # Executive Summary - computes KPIs/trends with
-                        # pandas first, then sends only that small
-                        # aggregated dict to the LLM for a short write-up.
-                        # The button is NOT inside a gr.Row with the
-                        # heading - Gradio gives Row children negative
-                        # side margins for edge-to-edge layout, which was
-                        # pushing the button past the card's own border.
-                        # Instead it's a normal sibling, pinned on top of
-                        # the card with CSS position:absolute, so it can
-                        # never escape the card's visible edges.
-                        with gr.Column(elem_classes=["dash-card"], elem_id="exec-summary-card"):
-                            gr.Markdown("### 🧾 Executive Summary", elem_classes=["section-heading"])
-                            exec_summary_btn = gr.Button(
-                                "✨ Generate summary", size="sm", elem_id="exec-summary-btn",
+                    # Single full-width input bar - upload, paste, and the
+                    # analyze action sit on one row (download lives under
+                    # the Recent Incidents table in Categorization).
+                    with gr.Row(elem_id="input-row", elem_classes=["dash-card"], equal_height=False):
+                        with gr.Column(scale=3, min_width=260):
+                            file_input = gr.File(
+                                label="Upload incident file (.xlsx, .csv, .txt)",
+                                file_types=[".xlsx", ".xls", ".csv", ".txt"],
+                                elem_id="file-upload",
                             )
-                            exec_summary_output = gr.Markdown(
-                                "Run an analysis, then click **Generate summary** for a "
-                                "management-friendly write-up of the KPIs above.",
-                                elem_id="exec-summary-output",
+                        with gr.Column(scale=4, min_width=320):
+                            text_input = gr.Textbox(label="...or paste unstructured incident text", lines=2,
+                                                      placeholder="INC0012345\nShort description: ...\nWorklog: ...")
+                        with gr.Column(scale=2, min_width=180, elem_id="action-col"):
+                            analyze_btn = gr.Button("Analyze", variant="primary")
+
+                    # Incidents by Category / Priority - the same two
+                    # panels shown on the Categorization tab, copied
+                    # here so management sees the breakdown without
+                    # switching tabs. Separate component instances
+                    # (Gradio can't render one component in two
+                    # places), both populated from the exact same
+                    # values _analyze already computes for the
+                    # Categorization tab's copies - see category_bar_html /
+                    # category_chart in the outputs list below.
+                    with gr.Row(elem_id="overview-panel-row-1"):
+                        with gr.Column(scale=1, elem_classes=["dash-card"]):
+                            gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
+                            overview_category_bar_html = gr.HTML(
+                                '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                             )
+                        with gr.Column(scale=1, elem_classes=["dash-card"]):
+                            gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
+                            overview_priority_chart = gr.Plot(show_label=False)
 
-                    with gr.Tab("Categorization", id=1):
-                        # Category breakdown + priority donut.
-                        with gr.Row(elem_id="panel-row-1"):
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
-                                category_bar_html = gr.HTML(
-                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                                )
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
-                                category_chart = gr.Plot(show_label=False)
+                    # Incident Health - four traffic-light indicators so
+                    # management can scan overall status in a second.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 🩺 Incident Health", elem_classes=["section-heading"])
+                        health_html = gr.HTML(_HEALTH_PLACEHOLDER)
 
-                        # Recent Incidents: relocated here verbatim from the
-                        # former Incident Analysis tab. The components and
-                        # their event wiring (_refresh_view / prev_btn /
-                        # next_btn) are untouched - only the parent tab
-                        # changed - so pagination and filtering behave
-                        # exactly as before.
-                        #
-                        # download_file: was a separate "Download Results"
-                        # card; now an icon-only gr.DownloadButton pinned
-                        # into this card's own heading, in the same
-                        # top-right corner where the table's built-in
-                        # copy/fullscreen icons sit (see #results-download-btn
-                        # in CUSTOM_CSS - it can't literally sit inside
-                        # Gradio's native table toolbar, which is compiled
-                        # frontend Gradio doesn't expose a hook into, but
-                        # pinning it to this card's corner puts it right
-                        # next to that toolbar). It still receives the same
-                        # full, untruncated CSV path from _analyze, by the
-                        # same variable, in the same outputs list - clicking
-                        # it downloads immediately, no intermediate file box.
-                        with gr.Column(elem_id="results-section", elem_classes=["dash-card"]):
-                            gr.Markdown("### 📋 Recent Incidents (Analyzed &amp; Categorized)", elem_classes=["section-heading"])
-                            download_file = gr.DownloadButton(
-                                "⬇", elem_id="results-download-btn", size="sm",
+                    # Incident Volume Trend - hidden per request, but the
+                    # component and _refresh_overview's wiring are left
+                    # completely untouched (still receives its value every
+                    # refresh) so nothing downstream has to change - only
+                    # its visibility here.
+                    with gr.Column(elem_classes=["dash-card"], visible=False):
+                        gr.Markdown("### 📈 Incident Volume Trend", elem_classes=["section-heading"])
+                        overview_trend_chart = gr.Plot(show_label=False)
+
+                    # Attention Required - hidden per request, same
+                    # approach as Incident Volume Trend above: the
+                    # component still exists and still updates, it's just
+                    # not shown.
+                    with gr.Column(elem_classes=["dash-card"], visible=False):
+                        gr.Markdown("### 🚩 Attention Required", elem_classes=["section-heading"])
+                        attention_html = gr.HTML(_ATTENTION_PLACEHOLDER)
+
+                with gr.Tab("🗂️ Categorization", id=1):
+                    # Category breakdown + priority donut.
+                    with gr.Row(elem_id="panel-row-1"):
+                        with gr.Column(scale=1, elem_classes=["dash-card"]):
+                            gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
+                            category_bar_html = gr.HTML(
+                                '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                             )
-                            results_table = gr.Dataframe(
-                                label=None,
-                                show_label=False,
-                                interactive=False,
-                                wrap=False,
-                                max_height=460,
-                                elem_id="results-table",
+                        with gr.Column(scale=1, elem_classes=["dash-card"]):
+                            gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
+                            category_chart = gr.Plot(show_label=False)
+
+                    # Recent Incidents: relocated here verbatim from the
+                    # former Incident Analysis tab. The components and
+                    # their event wiring (_refresh_view / prev_btn /
+                    # next_btn) are untouched - only the parent tab
+                    # changed - so pagination and filtering behave
+                    # exactly as before.
+                    #
+                    # download_file: was a separate "Download Results"
+                    # card; now an icon-only gr.DownloadButton pinned
+                    # into this card's own heading, in the same
+                    # top-right corner where the table's built-in
+                    # copy/fullscreen icons sit (see #results-download-btn
+                    # in CUSTOM_CSS - it can't literally sit inside
+                    # Gradio's native table toolbar, which is compiled
+                    # frontend Gradio doesn't expose a hook into, but
+                    # pinning it to this card's corner puts it right
+                    # next to that toolbar). It still receives the same
+                    # full, untruncated CSV path from _analyze, by the
+                    # same variable, in the same outputs list - clicking
+                    # it downloads immediately, no intermediate file box.
+                    with gr.Column(elem_id="results-section", elem_classes=["dash-card"]):
+                        gr.Markdown("### 📋 Recent Incidents (Analyzed &amp; Categorized)", elem_classes=["section-heading"])
+                        download_file = gr.DownloadButton(
+                            "⬇", elem_id="results-download-btn", size="sm",
+                        )
+                        results_table = gr.Dataframe(
+                            label=None,
+                            show_label=False,
+                            interactive=False,
+                            wrap=False,
+                            max_height=460,
+                            elem_id="results-table",
+                        )
+                        with gr.Row(elem_id="pagination-row"):
+                            prev_btn = gr.Button("← Previous", size="sm")
+                            page_indicator = gr.Markdown("Page 1 of 1  ·  0 tickets", elem_id="page-indicator")
+                            page_size_dropdown = gr.Dropdown(
+                                choices=[10, 25, 50, 100], value=DEFAULT_PAGE_SIZE,
+                                label="Rows/page", show_label=True,
+                                scale=0, min_width=130, elem_id="page-size-dropdown",
                             )
-                            with gr.Row(elem_id="pagination-row"):
-                                prev_btn = gr.Button("← Previous", size="sm")
-                                page_indicator = gr.Markdown("Page 1 of 1  ·  0 tickets", elem_id="page-indicator")
-                                page_size_dropdown = gr.Dropdown(
-                                    choices=[10, 25, 50, 100], value=DEFAULT_PAGE_SIZE,
-                                    label="Rows/page", show_label=True,
-                                    scale=0, min_width=130, elem_id="page-size-dropdown",
-                                )
-                                next_btn = gr.Button("Next →", size="sm")
+                            next_btn = gr.Button("Next →", size="sm")
 
-                    with gr.Tab("Trends & Insights", id=2):
-                        # KPI trend - ticket volume + worklog quality over
-                        # time, toggle between daily/weekly/monthly views.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 📈 Ticket Trend", elem_classes=["section-heading"])
-                            trend_granularity = gr.Radio(
-                                ["Daily", "Weekly", "Monthly"], value="Daily",
-                                show_label=False, elem_id="trend-granularity",
+                with gr.Tab("📊 Trends & Insights", id=2):
+                    # KPI trend - ticket volume + worklog quality over
+                    # time, toggle between daily/weekly/monthly views.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 📈 Ticket Trend", elem_classes=["section-heading"])
+                        trend_granularity = gr.Radio(
+                            ["Daily", "Weekly", "Monthly"], value="Daily",
+                            show_label=False, elem_id="trend-granularity",
+                        )
+                        trend_chart = gr.Plot(show_label=False)
+
+                    # Resolution metrics - MTTD/MTTA/MTTR/SLA. Hidden per
+                    # request; the component and its wiring are untouched
+                    # (still receives its value every refresh), only its
+                    # visibility here changed.
+                    with gr.Column(elem_classes=["dash-card"], visible=False):
+                        gr.Markdown("### ⏱️ Resolution Metrics", elem_classes=["section-heading"])
+                        resolution_metrics_html = gr.HTML(_RESOLUTION_METRICS_PLACEHOLDER)
+
+                    # Per-incident timeline audit: when each incident came
+                    # in, time-to-acknowledge, any reassignment detected
+                    # in External Info, and whether External Info carries
+                    # a proper timestamp trail. All numbers from
+                    # app/services/incident_timeline.py.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 🕒 Incident Timeline &amp; External Info Audit", elem_classes=["section-heading"])
+                        gr.Markdown(
+                            "For each incident: when it came in, how long it took to acknowledge, whether "
+                            "it was reassigned to someone else, and whether External Info was updated with "
+                            "a proper timestamp trail. Reassignment/timestamp detection is a best-effort "
+                            "read of the External Info text, not a guaranteed extraction.",
+                            elem_classes=["severity-note"],
+                        )
+                        timeline_kpi_html = gr.HTML(_timeline_kpi_html({}))
+                        timeline_table = gr.Dataframe(
+                            label=None, show_label=False, interactive=False,
+                            wrap=False, max_height=360, elem_id="timeline-table",
+                        )
+                        timeline_summary_btn = gr.Button("✨ Generate summary", size="sm")
+                        timeline_summary_output = gr.Markdown(_TIMELINE_PLACEHOLDER_MD)
+
+                    # Recurring issues, exact-match: (host, category)
+                    # combos meeting a recurrence threshold, with a
+                    # real time dimension (first/last seen, average
+                    # days between occurrences) - not just a raw count.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 🔁 Recurring Issues", elem_classes=["section-heading"])
+                        recurring_issues_html = gr.HTML(
+                            '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+                        )
+
+                    # Recurring issues, semantic: catches the same
+                    # underlying problem even when it's logged under
+                    # different categories or worded differently each
+                    # time. Opt-in (button) rather than automatic,
+                    # since clustering needs the whole batch embedded
+                    # first - one embedding call, same cost the chat
+                    # tab pays lazily on its first question. Reuses
+                    # chat_index_state so whichever feature runs first
+                    # makes the other free.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown(
+                            "### 🔬 Semantic Recurrence Detection",
+                            elem_classes=["section-heading"],
+                        )
+                        gr.Markdown(
+                            "Finds recurring issues that don't share an exact category or host - "
+                            "e.g. the same underlying problem logged inconsistently. Costs one "
+                            "embedding call for the batch the first time it (or the chat tab) runs.",
+                            elem_classes=["severity-note"],
+                        )
+                        semantic_recurrence_btn = gr.Button("Detect Similar Recurring Issues", size="sm")
+                        semantic_recurrence_html = gr.HTML(
+                            '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis, then click the button above.</p>'
+                        )
+
+                    # Top hosts, assignment group performance.
+                    with gr.Row(elem_id="panel-row-2"):
+                        with gr.Column(scale=1, elem_classes=["dash-card"]):
+                            gr.Markdown("### 🖥️ Top Affected Servers / Hosts", elem_classes=["section-heading"])
+                            host_bar_html = gr.HTML(
+                                '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                             )
-                            trend_chart = gr.Plot(show_label=False)
-
-                        # Resolution metrics - MTTD/MTTA/MTTR/SLA. Any
-                        # metric whose timestamp column isn't in the
-                        # uploaded data shows "N/A" with an explanation
-                        # rather than a fabricated number.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### ⏱️ Resolution Metrics", elem_classes=["section-heading"])
-                            resolution_metrics_html = gr.HTML(_RESOLUTION_METRICS_PLACEHOLDER)
-
-                        # Recurring issues, exact-match: (host, category)
-                        # combos meeting a recurrence threshold, with a
-                        # real time dimension (first/last seen, average
-                        # days between occurrences) - not just a raw count.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 🔁 Recurring Issues", elem_classes=["section-heading"])
-                            recurring_issues_html = gr.HTML(
+                        with gr.Column(scale=1, elem_classes=["dash-card"]):
+                            gr.Markdown("### 👥 Assignment Group Performance", elem_classes=["section-heading"])
+                            assignment_group_html = gr.HTML(
                                 '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                             )
 
-                        # Recurring issues, semantic: catches the same
-                        # underlying problem even when it's logged under
-                        # different categories or worded differently each
-                        # time. Opt-in (button) rather than automatic,
-                        # since clustering needs the whole batch embedded
-                        # first - one embedding call, same cost the chat
-                        # tab pays lazily on its first question. Reuses
-                        # chat_index_state so whichever feature runs first
-                        # makes the other free.
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown(
-                                "### 🔬 Semantic Recurrence Detection",
-                                elem_classes=["section-heading"],
-                            )
-                            gr.Markdown(
-                                "Finds recurring issues that don't share an exact category or host - "
-                                "e.g. the same underlying problem logged inconsistently. Costs one "
-                                "embedding call for the batch the first time it (or the chat tab) runs.",
-                                elem_classes=["severity-note"],
-                            )
-                            semantic_recurrence_btn = gr.Button("Detect Similar Recurring Issues", size="sm")
-                            semantic_recurrence_html = gr.HTML(
-                                '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis, then click the button above.</p>'
-                            )
+                with gr.Tab("💡 Recommendations", id=3):
+                    gr.Markdown(
+                        "Data-backed recommendations for this batch. Every figure below is "
+                        "calculated with pandas from the incidents you analyzed - recurrence, "
+                        "priority mix, SLA attainment, per-group resolution times, worklog "
+                        "quality, and volume concentration. Nothing here is generic advice, and "
+                        "an area that crosses no threshold simply isn't listed.",
+                        elem_classes=["severity-note"],
+                    )
 
-                        # Top hosts, assignment group performance.
-                        with gr.Row(elem_id="panel-row-2"):
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🖥️ Top Affected Servers / Hosts", elem_classes=["section-heading"])
-                                host_bar_html = gr.HTML(
-                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                                )
-                            with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 👥 Assignment Group Performance", elem_classes=["section-heading"])
-                                assignment_group_html = gr.HTML(
-                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                                )
-
-                    with gr.Tab("Recommendations", id=3):
-                        gr.Markdown(
-                            "Data-backed recommendations for this batch. Every figure below is "
-                            "calculated with pandas from the incidents you analyzed - recurrence, "
-                            "priority mix, SLA attainment, per-group resolution times, worklog "
-                            "quality, and volume concentration. Nothing here is generic advice, and "
-                            "an area that crosses no threshold simply isn't listed.",
-                            elem_classes=["severity-note"],
+                    # Optional LLM layer: re-voices the cards below for a
+                    # management audience. Only the small aggregated
+                    # payload is sent (see _llm_recommendations_writeup);
+                    # the cards themselves never depend on it. Placed
+                    # above Recommended Actions per request.
+                    with gr.Column(elem_classes=["dash-card"], elem_id="rec-writeup-card"):
+                        gr.Markdown("### 🧾 Management Write-Up", elem_classes=["section-heading"])
+                        rec_writeup_btn = gr.Button(
+                            "✨ Generate write-up", size="sm", elem_id="rec-writeup-btn",
+                        )
+                        rec_writeup_output = gr.Markdown(
+                            "Run an analysis, then click **Generate write-up** to turn the "
+                            "recommendations below into a management-ready briefing. The same "
+                            "numbers are used either way.",
+                            elem_id="rec-writeup-output",
                         )
 
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 💡 Recommended Actions", elem_classes=["section-heading"])
-                            recommendations_html = gr.HTML(_RECOMMENDATIONS_PLACEHOLDER)
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 💡 Recommended Actions", elem_classes=["section-heading"])
+                        recommendations_html = gr.HTML(_RECOMMENDATIONS_PLACEHOLDER)
 
-                        # Optional LLM layer: re-voices the cards above for
-                        # a management audience. Only the small aggregated
-                        # payload is sent (see _llm_recommendations_writeup);
-                        # the cards themselves never depend on it.
-                        with gr.Column(elem_classes=["dash-card"], elem_id="rec-writeup-card"):
-                            gr.Markdown("### 🧾 Management Write-Up", elem_classes=["section-heading"])
-                            rec_writeup_btn = gr.Button(
-                                "✨ Generate write-up", size="sm", elem_id="rec-writeup-btn",
-                            )
-                            rec_writeup_output = gr.Markdown(
-                                "Run an analysis, then click **Generate write-up** to turn the "
-                                "recommendations above into a management-ready briefing. The same "
-                                "numbers are used either way.",
-                                elem_id="rec-writeup-output",
-                            )
+                with gr.Tab("📚 Knowledge Base", id=4):
+                    gr.Markdown(
+                        "Upload organizational documents (runbooks, SOPs, troubleshooting "
+                        "guides, known-error documents, escalation procedures) so the Agent "
+                        "can answer documentation questions - e.g. *\"what does the runbook "
+                        "recommend for database connection errors?\"* - separately from the "
+                        "incident-data questions on the Q&A tab. Only the relevant retrieved "
+                        "passages are ever sent to the model, never the whole document.",
+                        elem_classes=["severity-note"],
+                    )
 
-                    with gr.Tab("Knowledge Base", id=4):
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 📤 Upload Document", elem_classes=["section-heading"])
+                        with gr.Row():
+                            kb_file_input = gr.File(
+                                label="Supported: PDF, DOCX, TXT, MD",
+                                file_types=[".pdf", ".docx", ".txt", ".md"],
+                                scale=3,
+                            )
+                            kb_upload_btn = gr.Button("Upload & Index", variant="primary", scale=1)
+                        kb_upload_status = gr.Markdown("")
+
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 📚 Indexed Documents", elem_classes=["section-heading"])
+                        kb_documents_table = gr.Dataframe(
+                            headers=["Document Name", "Type", "Status", "Chunks", "Uploaded At", "Error"],
+                            interactive=False, wrap=True, elem_id="kb-documents-table",
+                        )
+                        with gr.Row():
+                            kb_document_dropdown = gr.Dropdown(
+                                label="Select a document to manage", choices=[], scale=3,
+                            )
+                            kb_reindex_btn = gr.Button("🔁 Reindex", scale=1)
+                            kb_delete_btn = gr.Button("🗑️ Delete", scale=1, variant="stop")
+                        kb_manage_status = gr.Markdown("")
+
+                with gr.Tab("💬 Q&A (Agent)", id=5):
+                    # Single bounded chat panel (intro + transcript +
+                    # composer) instead of loosely stacked components -
+                    # keeps the tab a fixed height with the transcript
+                    # scrolling internally like a normal chat app.
+                    with gr.Column(elem_id="chat-panel", elem_classes=["dash-card"]):
                         gr.Markdown(
-                            "Upload organizational documents (runbooks, SOPs, troubleshooting "
-                            "guides, known-error documents, escalation procedures) so the Agent "
-                            "can answer documentation questions - e.g. *\"what does the runbook "
-                            "recommend for database connection errors?\"* - separately from the "
-                            "incident-data questions on the Q&A tab. Only the relevant retrieved "
-                            "passages are ever sent to the model, never the whole document.",
+                            "Ask a question about the tickets you just analyzed - e.g. "
+                            "*\"what's driving high-priority incidents?\"*, "
+                            "*\"which assignment group has the worst worklog quality?\"*, or "
+                            "*\"summarize the recurring issues on our database servers.\"* "
+                            "Answers are grounded only in the analyzed batch (Overview tab) - "
+                            "run an analysis first if you haven't yet. You can also ask "
+                            "documentation questions, e.g. *\"what does the runbook recommend "
+                            "for connection errors?\"*, answered from the Knowledge Base tab.",
+                            elem_classes=["severity-note", "chat-intro"],
+                        )
+                        chatbot = gr.Chatbot(height=440, show_label=False, elem_id="chatbot")
+                        with gr.Row(elem_id="chat-input-row"):
+                            chat_input = gr.Textbox(
+                                placeholder="Ask a question about the analyzed tickets...",
+                                show_label=False, scale=5, container=False,
+                            )
+                            chat_send = gr.Button("Send", variant="primary", scale=1)
+                        chat_clear_btn = gr.Button("Clear conversation", size="sm", elem_id="chat-clear-btn")
+
+                with gr.Tab("⚙️ Settings", id=6):
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### ⚙️ Settings", elem_classes=["section-heading"])
+                        gr.Markdown(
+                            "Nothing configurable here yet - this tab is a placeholder for "
+                            "future options (e.g. default page size, scoring thresholds).",
                             elem_classes=["severity-note"],
                         )
-
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 📤 Upload Document", elem_classes=["section-heading"])
-                            with gr.Row():
-                                kb_file_input = gr.File(
-                                    label="Supported: PDF, DOCX, TXT, MD",
-                                    file_types=[".pdf", ".docx", ".txt", ".md"],
-                                    scale=3,
-                                )
-                                kb_upload_btn = gr.Button("Upload & Index", variant="primary", scale=1)
-                            kb_upload_status = gr.Markdown("")
-
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 📚 Indexed Documents", elem_classes=["section-heading"])
-                            kb_documents_table = gr.Dataframe(
-                                headers=["Document Name", "Type", "Status", "Chunks", "Uploaded At", "Error"],
-                                interactive=False, wrap=True, elem_id="kb-documents-table",
-                            )
-                            with gr.Row():
-                                kb_document_dropdown = gr.Dropdown(
-                                    label="Select a document to manage", choices=[], scale=3,
-                                )
-                                kb_reindex_btn = gr.Button("🔁 Reindex", scale=1)
-                                kb_delete_btn = gr.Button("🗑️ Delete", scale=1, variant="stop")
-                            kb_manage_status = gr.Markdown("")
-
-                    with gr.Tab("Q&A (Agent)", id=5):
-                        # Single bounded chat panel (intro + transcript +
-                        # composer) instead of loosely stacked components -
-                        # keeps the tab a fixed height with the transcript
-                        # scrolling internally like a normal chat app.
-                        with gr.Column(elem_id="chat-panel", elem_classes=["dash-card"]):
-                            gr.Markdown(
-                                "Ask a question about the tickets you just analyzed - e.g. "
-                                "*\"what's driving high-priority incidents?\"*, "
-                                "*\"which assignment group has the worst worklog quality?\"*, or "
-                                "*\"summarize the recurring issues on our database servers.\"* "
-                                "Answers are grounded only in the analyzed batch (Overview tab) - "
-                                "run an analysis first if you haven't yet. You can also ask "
-                                "documentation questions, e.g. *\"what does the runbook recommend "
-                                "for connection errors?\"*, answered from the Knowledge Base tab.",
-                                elem_classes=["severity-note", "chat-intro"],
-                            )
-                            chatbot = gr.Chatbot(height=440, show_label=False, elem_id="chatbot")
-                            with gr.Row(elem_id="chat-input-row"):
-                                chat_input = gr.Textbox(
-                                    placeholder="Ask a question about the analyzed tickets...",
-                                    show_label=False, scale=5, container=False,
-                                )
-                                chat_send = gr.Button("Send", variant="primary", scale=1)
-                            chat_clear_btn = gr.Button("Clear conversation", size="sm", elem_id="chat-clear-btn")
-
-                    with gr.Tab("Settings", id=6):
-                        with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### ⚙️ Settings", elem_classes=["section-heading"])
-                            gr.Markdown(
-                                "Nothing configurable here yet - this tab is a placeholder for "
-                                "future options (e.g. default page size, scoring thresholds).",
-                                elem_classes=["severity-note"],
-                            )
 
         full_results_state = gr.State(pd.DataFrame())
         filtered_results_state = gr.State(pd.DataFrame())
@@ -2106,6 +2279,11 @@ def build_ui() -> gr.Blocks:
         # so the Management Write-Up button re-voices exactly those rather
         # than recomputing (and possibly drifting from) the cards on screen.
         recommendations_state = gr.State({})
+        # Holds the timeline aggregate computed at the end of each
+        # analysis, so the "Generate summary" button re-voices exactly
+        # those numbers rather than recomputing (and possibly drifting
+        # from) the table/KPI cards on screen.
+        timeline_aggregate_state = gr.State({})
 
         analyze_btn.click(
             fn=_analyze,
@@ -2148,6 +2326,18 @@ def build_ui() -> gr.Blocks:
             fn=_refresh_recommendations,
             inputs=[full_results_state],
             outputs=[recommendations_html, recommendations_state],
+        ).then(
+            # Incident Timeline table/KPIs refresh automatically with
+            # every new batch, same as Recommendations.
+            fn=_refresh_incident_timeline,
+            inputs=[full_results_state],
+            outputs=[timeline_table, timeline_kpi_html, timeline_aggregate_state],
+        )
+
+        timeline_summary_btn.click(
+            fn=_generate_timeline_summary,
+            inputs=[full_results_state, timeline_aggregate_state],
+            outputs=[timeline_summary_output],
         )
 
         rec_writeup_btn.click(
@@ -2224,19 +2414,5 @@ def build_ui() -> gr.Blocks:
             outputs=[chatbot, chat_history_state, chat_input],
         )
         chat_clear_btn.click(fn=_chat_clear, outputs=[chatbot, chat_history_state])
-
-        # Wire each sidebar nav button to (a) switch the visible tab and
-        # (b) move the "active" highlight to itself and off the rest.
-        def _make_nav_handler(selected_idx: int):
-            def _handler():
-                updates = [gr.Tabs(selected=selected_idx)]
-                for i in range(len(NAV_ITEMS)):
-                    classes = ["nav-item", "active"] if i == selected_idx else ["nav-item"]
-                    updates.append(gr.update(elem_classes=classes))
-                return updates
-            return _handler
-
-        for i, btn in enumerate(nav_buttons):
-            btn.click(fn=_make_nav_handler(i), inputs=[], outputs=[main_tabs, *nav_buttons])
 
     return demo
