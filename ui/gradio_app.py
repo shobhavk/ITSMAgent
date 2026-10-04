@@ -491,6 +491,186 @@ footer {display: none !important;}
 #exec-summary-card {margin-top: 0 !important;}
 #exec-summary-btn {background: #2563eb !important; color: #ffffff !important; border-color: #2563eb !important;}
 #exec-summary-btn:hover {background: #1d4ed8 !important; border-color: #1d4ed8 !important;}
+
+/* =====================================================================
+   Visual refresh - layered on top of the base styles above so nothing
+   structural changes (same ids/classes, same layout, same wiring).
+   ===================================================================== */
+:root {
+    --brand-1: #2563eb;
+    --brand-2: #7c3aed;
+    --dash-bg: #f3f5fb;
+    --dash-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 6px 18px rgba(30, 41, 90, 0.06);
+    --dash-shadow-hover: 0 2px 4px rgba(15, 23, 42, 0.06), 0 14px 30px rgba(30, 41, 90, 0.12);
+}
+html, body, .gradio-container {
+    background:
+        radial-gradient(900px 380px at 12% -80px, rgba(37, 99, 235, 0.10), transparent 70%),
+        radial-gradient(800px 340px at 92% -60px, rgba(124, 58, 237, 0.09), transparent 70%),
+        var(--dash-bg) !important;
+    background-attachment: fixed !important;
+}
+
+/* Header bar: deep gradient + soft glow */
+#topbar-wrap {
+    background: linear-gradient(110deg, #0b1626 0%, #13294b 55%, #2a2f7a 100%) !important;
+    position: relative; overflow: hidden;
+    box-shadow: 0 4px 22px rgba(11, 22, 38, 0.35) !important;
+}
+#topbar-wrap::after {
+    content: ""; position: absolute; right: -60px; top: -80px; width: 280px; height: 280px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(124, 58, 237, 0.45), transparent 65%); pointer-events: none;
+}
+.side-brand-icon {
+    background: linear-gradient(135deg, var(--brand-1), var(--brand-2)) !important;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.55); width: 40px !important; height: 40px !important; font-size: 1.25rem !important;
+}
+.side-brand-title {font-size: 1.08rem !important;}
+.side-brand-sub {color: #a9b8d4 !important;}
+
+/* Page title with gradient text */
+#topbar h1 {
+    font-size: 1.55rem !important; font-weight: 800 !important;
+    background: linear-gradient(90deg, #0f172a 0%, #1d4ed8 55%, #7c3aed 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+#topbar p {font-size: 0.9rem !important;}
+
+/* Tabs: floating pill bar */
+#main-tabs > .tab-nav {
+    background: #ffffff !important; border: 1px solid var(--dash-border) !important; border-radius: 14px !important;
+    padding: 6px !important; gap: 4px !important; box-shadow: var(--dash-shadow); margin-bottom: 22px !important;
+}
+#main-tabs > .tab-nav button {
+    border-radius: 10px !important; border-bottom: none !important; margin-bottom: 0 !important;
+    padding: 9px 16px !important;
+}
+#main-tabs > .tab-nav button:hover {background: #eef2ff !important; color: #1d4ed8 !important;}
+#main-tabs > .tab-nav button.selected {
+    color: #ffffff !important; border-bottom: none !important;
+    background: linear-gradient(135deg, var(--brand-1), var(--brand-2)) !important;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+}
+
+/* Cards: softer, lift on hover, subtle entrance */
+.dash-card {
+    border-radius: 18px !important; border: 1px solid rgba(226, 232, 240, 0.9) !important;
+    box-shadow: var(--dash-shadow) !important; transition: box-shadow 0.2s ease, transform 0.2s ease;
+    animation: card-in 0.35s ease both;
+}
+.dash-card:hover {box-shadow: var(--dash-shadow-hover) !important;}
+@keyframes card-in {from {opacity: 0; transform: translateY(6px);} to {opacity: 1; transform: none;}}
+
+/* Section headings with a gradient accent tick */
+.section-heading {border-bottom: 1px solid #eef1f6 !important;}
+.section-heading h3 {
+    display: flex; align-items: center; gap: 10px; margin: 0 !important; font-size: 1rem !important; font-weight: 700 !important;
+}
+.section-heading h3::before {
+    content: ""; width: 4px; height: 18px; border-radius: 4px; flex-shrink: 0;
+    background: linear-gradient(180deg, var(--brand-1), var(--brand-2));
+}
+
+/* KPI cards */
+.kpi-card {
+    border-radius: 16px !important; border: 1px solid #e8ecf5 !important;
+    background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%) !important;
+    box-shadow: var(--dash-shadow) !important; transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.kpi-card:hover {transform: translateY(-2px); box-shadow: var(--dash-shadow-hover) !important;}
+.kpi-icon {width: 46px !important; height: 46px !important; border-radius: 14px !important; font-size: 1.3rem !important;}
+.kpi-value {font-size: 1.9rem !important; font-weight: 800 !important; letter-spacing: -0.02em;}
+.kpi-label {letter-spacing: 0.06em !important;}
+
+/* Health + attention */
+.health-card {border-radius: 16px !important; transition: transform 0.18s ease, box-shadow 0.18s ease;}
+.health-card:hover {transform: translateY(-2px); box-shadow: var(--dash-shadow-hover);}
+.health-dot {box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, #94a3b8) 22%, transparent);}
+.attention-item {border-radius: 12px !important;}
+
+/* Buttons */
+button.primary, .gr-button.primary {
+    background: linear-gradient(135deg, var(--brand-1), var(--brand-2)) !important; border: none !important;
+    color: #ffffff !important; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+button.primary:hover {transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 8px 20px rgba(79, 70, 229, 0.42) !important;}
+button.secondary {border-radius: 10px !important; font-weight: 600 !important; transition: all 0.15s ease;}
+button.secondary:hover {border-color: #a5b4fc !important; color: #4338ca !important; background: #eef2ff !important;}
+
+/* "Generate summary / write-up" pills share one look */
+#exec-summary-btn, #rec-writeup-btn {
+    background: linear-gradient(135deg, var(--brand-1), var(--brand-2)) !important; color: #ffffff !important;
+    border: none !important; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35) !important;
+}
+#exec-summary-btn:hover, #rec-writeup-btn:hover {
+    background: linear-gradient(135deg, #1d4ed8, #6d28d9) !important; filter: brightness(1.05);
+}
+#exec-summary-output, #rec-writeup-output {
+    background: linear-gradient(180deg, #f8faff, #ffffff); border: 1px dashed #c7d2fe; border-radius: 12px;
+    padding: 12px 16px !important;
+}
+
+/* Hero */
+.hero-card {
+    position: relative; overflow: hidden; border-radius: 20px !important; padding: 32px 34px !important;
+    background: linear-gradient(120deg, #0b1626 0%, #16345c 55%, #4338ca 100%) !important;
+    box-shadow: 0 14px 40px rgba(30, 41, 120, 0.28) !important;
+}
+.hero-card::before {
+    content: ""; position: absolute; right: -70px; top: -90px; width: 320px; height: 320px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(167, 139, 250, 0.55), transparent 65%);
+}
+.hero-card::after {
+    content: ""; position: absolute; left: 35%; bottom: -120px; width: 300px; height: 300px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(56, 189, 248, 0.28), transparent 65%);
+}
+.hero-card > * {position: relative; z-index: 1;}
+.hero-title {font-size: 1.7rem !important; font-weight: 800 !important;}
+.hero-step {backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.12) !important;}
+.hero-step-num {background: linear-gradient(135deg, #38bdf8, #6366f1) !important;}
+
+/* Loaded strip + upload row */
+#loaded-strip {border-left: 4px solid #22c55e !important;}
+#input-row {border-radius: 18px !important;}
+#file-upload .wrap {border-radius: 12px !important; border: 1.5px dashed #a5b4fc !important; background: #f8faff !important;}
+
+/* Recent Incidents table */
+#results-table table th {
+    background: linear-gradient(180deg, #f1f4fb, #e9eef9) !important; color: #475569 !important;
+    border-bottom: 2px solid #dbe3f3 !important; padding: 9px 12px !important;
+}
+#results-table table td {padding: 6px 12px !important; height: 34px !important; max-height: 34px !important;}
+#results-table table tbody tr:hover td {background: #eef2ff !important;}
+#results-download-btn {background: linear-gradient(135deg, var(--brand-1), var(--brand-2)) !important; color: #fff !important; border: none !important;}
+
+/* Recommendation cards */
+.rec-card {border-radius: 14px !important; transition: transform 0.18s ease, box-shadow 0.18s ease;}
+.rec-card:hover {transform: translateY(-2px); box-shadow: var(--dash-shadow-hover);}
+.rec-chip {background: #ffffff !important; box-shadow: var(--dash-shadow);}
+.mini-table tbody tr:hover td {background: #f5f7ff;}
+.bar-fill {background-image: linear-gradient(90deg, rgba(255,255,255,0.0), rgba(255,255,255,0.28)); }
+
+/* Chat */
+#chatbot .message.user, #chatbot [class*="user-row"] .bubble, #chatbot .role-user {
+    background: linear-gradient(135deg, var(--brand-1), var(--brand-2)) !important;
+}
+#chat-panel {border-radius: 20px !important;}
+
+/* Progress bar */
+.agent-progress {border-radius: 16px !important; box-shadow: var(--dash-shadow-hover) !important;}
+.agent-progress-fill {background: linear-gradient(90deg, #2563eb, #7c3aed, #2563eb) !important;}
+
+/* Scrollbars */
+* {scrollbar-width: thin; scrollbar-color: #c7d2fe transparent;}
+*::-webkit-scrollbar {width: 8px; height: 8px;}
+*::-webkit-scrollbar-thumb {background: #c7d2fe; border-radius: 8px;}
+*::-webkit-scrollbar-thumb:hover {background: #a5b4fc;}
+
+@media (max-width: 900px) {
+    .kpi-grid, .kpi-grid-5, .health-grid {grid-template-columns: repeat(2, 1fr) !important;}
+    #main-col {padding: 14px 12px 24px !important;}
+}
 """
 
 def _agent_progress_html(stage: str = "Agent analyzing tickets", step: int | None = None, total: int | None = None) -> str:
@@ -576,6 +756,18 @@ ALL_COLUMNS = [
 DEFAULT_VISIBLE_COLUMNS = [
     "Ticket ID", "Category", "Priority", "Host / CI", "Assignment Group",
     "Worklog Score", "Status", "Category Confidence",
+]
+
+# Incident-timeline columns (from app/services/incident_timeline.py) merged
+# into the Recent Incidents table, replacing the standalone timeline table
+# that used to live on the Trends & Insights tab. They are attached on the
+# fly by _attach_timeline() and never stored in full_results_state, so the
+# CSV export, chat index and every other consumer of that dataframe are
+# unchanged.
+TIMELINE_COLUMNS = [
+    "Opened/Created At", "Acknowledged At", "Time to Acknowledge (h)",
+    "Reassignment Detected", "Reassigned To", "Reassigned At",
+    "External Info Quality", "Resolved At",
 ]
 
 
@@ -1299,16 +1491,32 @@ def _refresh_overview(full_df: pd.DataFrame, summary_stats: dict):
         return _OVERVIEW_KPI_PLACEHOLDER, _HEALTH_PLACEHOLDER, _ATTENTION_PLACEHOLDER, _overview_trend_figure(None)
 
 
-async def _llm_executive_summary(payload: dict) -> "tuple[str, bool]":
-    """Sends ONLY the small aggregated `payload` dict (KPIs/health/
-    attention/trend direction - no ticket rows, descriptions, or worklog
-    text) to the LLM and asks for a short management-friendly summary.
-    Falls back to a deterministic, rule-based summary (same underlying
-    numbers, no LLM) if the API key/package isn't available or the call
-    fails for any reason, so the button never errors out for the user.
+async def _call_llm(prompt: str, max_tokens: int = 800) -> "tuple[str, bool]":
+    """Shared three-tier LLM call used by every "Generate summary / write-up"
+    button (Executive Summary, Recommendations write-up, ...):
 
-    Returns (summary_text, used_llm).
-    """
+      1. the app's own configured provider (llm_client / LLM_PROVIDER),
+      2. the direct Anthropic API (ANTHROPIC_API_KEY),
+      3. give up -> ("", False) so the caller renders its deterministic,
+         rule-based fallback built from the identical numbers.
+
+    Returns (text, used_llm). Never raises."""
+    # 1. The app's configured provider (SAP GenAI Hub / OpenAI-compatible).
+    try:
+        from app.services.llm_client import get_chat_model
+
+        chat_model = get_chat_model()
+        if chat_model is not None:
+            response = await chat_model.ainvoke(prompt)
+            text = getattr(response, "content", "") or ""
+            if isinstance(text, list):  # some providers return content blocks
+                text = "".join(part.get("text", "") for part in text if isinstance(part, dict))
+            if text.strip():
+                return text.strip(), True
+    except Exception:
+        pass
+
+    # 2. Direct Anthropic path.
     try:
         import anthropic  # local import - optional dependency for this feature only
 
@@ -1317,27 +1525,50 @@ async def _llm_executive_summary(payload: dict) -> "tuple[str, bool]":
             raise RuntimeError("ANTHROPIC_API_KEY not configured")
 
         client = anthropic.AsyncAnthropic(api_key=api_key)
-        prompt = (
-            "You are an ITSM reporting assistant writing for a management audience. "
-            "Using ONLY the aggregated incident metrics in the JSON below, write a short "
-            "(4-6 sentence) executive summary in plain English. Do not invent any numbers "
-            "that aren't present in the data, and do not mention individual tickets - these "
-            "are already-aggregated figures.\n\n"
-            f"Aggregated metrics (JSON):\n{json.dumps(payload, default=str)}"
-        )
         response = await client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=400,
+            max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
-        summary = "".join(
+        text = "".join(
             block.text for block in response.content if getattr(block, "type", "") == "text"
         ).strip()
-        if not summary:
+        if not text:
             raise RuntimeError("empty LLM response")
-        return summary, True
+        return text, True
     except Exception:
-        return overview_metrics.fallback_summary_text(payload), False
+        return "", False
+
+
+async def _llm_executive_summary(payload: dict) -> "tuple[str, bool]":
+    """Sends ONLY the small aggregated `payload` dict (KPIs/health/
+    attention/trend direction - no ticket rows, descriptions, or worklog
+    text) to the LLM and asks for a short management-friendly summary.
+
+    Now goes through the same provider chain as the Recommendations
+    write-up (see _call_llm), so the button works whenever the app's
+    configured LLM works - not only when ANTHROPIC_API_KEY is set. Falls
+    back to the deterministic rule-based summary of the same numbers if no
+    LLM is reachable, so the button never errors out.
+
+    Returns (summary_text, used_llm).
+    """
+    prompt = (
+        "You are an ITSM reporting assistant writing for a management audience. The JSON below "
+        "contains ALREADY-CALCULATED, aggregated incident metrics (KPIs, health indicators, items "
+        "needing attention, and volume trend).\n\n"
+        "Write a short executive summary. Rules:\n"
+        "- 4-6 sentences of plain English.\n"
+        "- Use ONLY the numbers present in the JSON. Never introduce, round differently, "
+        "recalculate, or estimate any figure.\n"
+        "- Do not mention individual tickets - these are aggregated figures.\n"
+        "- Lead with the overall picture, then call out what needs attention.\n\n"
+        f"Aggregated metrics (JSON):\n{json.dumps(payload, default=str)}"
+    )
+    text, used_llm = await _call_llm(prompt, max_tokens=600)
+    if used_llm:
+        return text, True
+    return overview_metrics.fallback_summary_text(payload), False
 
 
 async def _generate_executive_summary(full_df: pd.DataFrame, summary_stats: dict):
@@ -1356,7 +1587,7 @@ async def _generate_executive_summary(full_df: pd.DataFrame, summary_stats: dict
         payload = overview_metrics.build_aggregated_payload(kpis, health, attention, volume_trend)
 
         summary_text, used_llm = await _llm_executive_summary(payload)
-        note = "" if used_llm else "\n\n_(LLM unavailable right now - showing a rule-based summary of the same metrics.)_"
+        note = "" if used_llm else "\n\n_(LLM unavailable right now - showing the rule-based summary of the same metrics.)_"
         return gr.update(value=f"{summary_text}{note}")
     except Exception as exc:
         return gr.update(value=f"Could not generate the executive summary right now ({exc}).")
@@ -1487,43 +1718,7 @@ async def _llm_recommendations_writeup(payload: dict) -> "tuple[str, bool]":
         f"Recommendations (JSON):\n{json.dumps(payload, default=str)}"
     )
 
-    # 1. The app's own configured provider (SAP GenAI Hub / OpenAI-compatible).
-    try:
-        from app.services.llm_client import get_chat_model
-
-        chat_model = get_chat_model()
-        if chat_model is not None:
-            response = await chat_model.ainvoke(prompt)
-            text = getattr(response, "content", "") or ""
-            if isinstance(text, list):  # some providers return content blocks
-                text = "".join(part.get("text", "") for part in text if isinstance(part, dict))
-            if text.strip():
-                return text.strip(), True
-    except Exception:
-        pass
-
-    # 2. Same direct Anthropic path the Executive Summary already uses.
-    try:
-        import anthropic  # local import - optional dependency for this feature only
-
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY not configured")
-
-        client = anthropic.AsyncAnthropic(api_key=api_key)
-        response = await client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1200,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = "".join(
-            block.text for block in response.content if getattr(block, "type", "") == "text"
-        ).strip()
-        if not text:
-            raise RuntimeError("empty LLM response")
-        return text, True
-    except Exception:
-        return "", False
+    return await _call_llm(prompt, max_tokens=1200)
 
 
 async def _generate_recommendations_writeup(full_df: pd.DataFrame, cached_result: dict):
@@ -1739,41 +1934,7 @@ async def _llm_timeline_summary(payload: dict) -> "tuple[str, bool]":
         f"Timeline metrics (JSON):\n{json.dumps(payload, default=str)}"
     )
 
-    try:
-        from app.services.llm_client import get_chat_model
-
-        chat_model = get_chat_model()
-        if chat_model is not None:
-            response = await chat_model.ainvoke(prompt)
-            text = getattr(response, "content", "") or ""
-            if isinstance(text, list):
-                text = "".join(part.get("text", "") for part in text if isinstance(part, dict))
-            if text.strip():
-                return text.strip(), True
-    except Exception:
-        pass
-
-    try:
-        import anthropic  # local import - optional dependency for this feature only
-
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY not configured")
-
-        client = anthropic.AsyncAnthropic(api_key=api_key)
-        response = await client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=600,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = "".join(
-            block.text for block in response.content if getattr(block, "type", "") == "text"
-        ).strip()
-        if not text:
-            raise RuntimeError("empty LLM response")
-        return text, True
-    except Exception:
-        return "", False
+    return await _call_llm(prompt, max_tokens=600)
 
 
 async def _generate_timeline_summary(full_df: pd.DataFrame, cached_aggregate: dict):
@@ -2052,13 +2213,57 @@ def _select_columns(df: pd.DataFrame) -> pd.DataFrame:
     display, in ALL_COLUMNS order. Filtering/pagination/CSV export always
     operate on the full, un-reduced dataframe - only this final display
     step drops columns."""
-    cols = [c for c in ALL_COLUMNS if c in DEFAULT_VISIBLE_COLUMNS]
+    cols = [c for c in ALL_COLUMNS if c in DEFAULT_VISIBLE_COLUMNS] + TIMELINE_COLUMNS
     if df is None or len(df) == 0:
         return pd.DataFrame(columns=cols or ["Ticket ID"])
     cols = [c for c in cols if c in df.columns]
     if not cols:
         cols = ["Ticket ID"]  # never render a fully empty table
     return df[cols]
+
+
+def _fmt_ts(value) -> str:
+    """Timestamp -> short, table-friendly string ('' when missing)."""
+    if value is None or (not isinstance(value, str) and pd.isna(value)):
+        return ""
+    if isinstance(value, str):
+        return value
+    try:
+        return pd.Timestamp(value).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return str(value)
+
+
+def _attach_timeline(full_df: pd.DataFrame) -> pd.DataFrame:
+    """Returns a copy of full_df with the incident-timeline columns
+    (acknowledgment time, reassignment, External Info quality, ...) added,
+    so they show up in the Recent Incidents table. compute_incident_timeline
+    emits exactly one row per ticket in full_df's own order, so the join is
+    positional. Any failure just returns full_df unchanged - the table
+    then simply shows its normal columns."""
+    if full_df is None or len(full_df) == 0:
+        return full_df
+    try:
+        tl = incident_timeline.compute_incident_timeline(full_df)
+        if len(tl) != len(full_df):
+            return full_df
+        out = full_df.copy()
+        for col in TIMELINE_COLUMNS:
+            if col not in tl.columns:
+                continue
+            values = tl[col].tolist()
+            if col in ("Opened/Created At", "Acknowledged At", "Resolved At"):
+                values = [_fmt_ts(v) for v in values]
+            elif col == "Reassignment Detected":
+                values = ["Yes" if v else "No" for v in values]
+            elif col == "Time to Acknowledge (h)":
+                values = ["" if (v is None or pd.isna(v)) else v for v in values]
+            else:
+                values = ["" if v is None else v for v in values]
+            out[col] = values
+        return out
+    except Exception:
+        return full_df
 
 
 def _apply_filters(full_df: pd.DataFrame, category: str, min_score: int) -> pd.DataFrame:
@@ -2087,7 +2292,7 @@ def _refresh_view(full_df, category, min_score, page_size):
     """Re-applies filters, resets to page 1, and returns everything the
     table/pagination controls need. Used after a new analysis runs or
     whenever a filter/page-size control changes."""
-    filtered = _apply_filters(full_df, category, min_score)
+    filtered = _apply_filters(_attach_timeline(full_df), category, min_score)
     page_df, indicator, page = _paginate(filtered, 1, page_size)
     return _select_columns(page_df), indicator, filtered, page
 
@@ -2404,6 +2609,12 @@ def build_ui() -> gr.Blocks:
                     # it downloads immediately, no intermediate file box.
                     with gr.Column(elem_id="results-section", elem_classes=["dash-card"]):
                         gr.Markdown("### 📋 Recent Incidents (Analyzed &amp; Categorized)", elem_classes=["section-heading"])
+                        gr.Markdown(
+                            "Includes each incident's timeline: when it came in, time to acknowledge, any "
+                            "reassignment found in External Info, and whether External Info carries a "
+                            "timestamp trail (best-effort read of the text). Scroll right for all columns.",
+                            elem_classes=["severity-note"],
+                        )
                         download_file = gr.DownloadButton(
                             "⬇", elem_id="results-download-btn", size="sm",
                         )
@@ -2444,20 +2655,13 @@ def build_ui() -> gr.Blocks:
                         gr.Markdown("### ⏱️ Resolution Metrics", elem_classes=["section-heading"])
                         resolution_metrics_html = gr.HTML(_RESOLUTION_METRICS_PLACEHOLDER)
 
-                    # Per-incident timeline audit: when each incident came
-                    # in, time-to-acknowledge, any reassignment detected
-                    # in External Info, and whether External Info carries
-                    # a proper timestamp trail. All numbers from
-                    # app/services/incident_timeline.py.
-                    with gr.Column(elem_classes=["dash-card"]):
-                        gr.Markdown("### 🕒 Incident Timeline &amp; External Info Audit", elem_classes=["section-heading"])
-                        gr.Markdown(
-                            "For each incident: when it came in, how long it took to acknowledge, whether "
-                            "it was reassigned to someone else, and whether External Info was updated with "
-                            "a proper timestamp trail. Reassignment/timestamp detection is a best-effort "
-                            "read of the External Info text, not a guaranteed extraction.",
-                            elem_classes=["severity-note"],
-                        )
+                    # The standalone "Incident Timeline & External Info Audit"
+                    # card was removed from this tab - its per-incident data
+                    # now lives in the Recent Incidents table (Categorization
+                    # tab). These components stay in a hidden column only so
+                    # the existing wiring (_refresh_incident_timeline etc.)
+                    # keeps working untouched.
+                    with gr.Column(visible=False):
                         timeline_kpi_html = gr.HTML(_timeline_kpi_html({}))
                         timeline_table = gr.Dataframe(
                             label=None, show_label=False, interactive=False,
