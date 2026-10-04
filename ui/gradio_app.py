@@ -19,7 +19,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from app.services import (
-    incident_timeline, knowledge_base, overview_metrics, rag, recommendations, recurring_issues, trend_metrics,
+    chat_tools, incident_timeline, knowledge_base, overview_metrics, rag, recommendations, recurring_issues, trend_metrics,
 )
 from app.services.pipeline import run_pipeline_from_bytes, run_pipeline_from_text
 from app.services.persistence import compute_file_hash, get_cached_result, save_result
@@ -477,6 +477,20 @@ footer {display: none !important;}
 .agent-progress-step {
     font-size: 0.72rem; font-weight: 600; color: var(--dash-text-muted); white-space: nowrap; flex-shrink: 0;
 }
+
+/* Overview polish: KPI deltas / sparkline / clickable cards, bolder
+   Executive Summary button now that the card sits right under the KPIs. */
+.kpi-delta {display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 5px; font-size: 0.72rem; font-weight: 700; line-height: 1.3;}
+.kpi-delta-good {color: #059669;}
+.kpi-delta-bad {color: #dc2626;}
+.kpi-delta-flat {color: var(--dash-text-muted);}
+.kpi-delta-sub {font-weight: 500; color: var(--dash-text-muted);}
+.kpi-spark {margin-left: auto; flex-shrink: 0;}
+.kpi-link {cursor: pointer;}
+.kpi-link:hover {border-color: #bfdbfe; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.12);}
+#exec-summary-card {margin-top: 0 !important;}
+#exec-summary-btn {background: #2563eb !important; color: #ffffff !important; border-color: #2563eb !important;}
+#exec-summary-btn:hover {background: #1d4ed8 !important; border-color: #1d4ed8 !important;}
 """
 
 def _agent_progress_html(stage: str = "Agent analyzing tickets", step: int | None = None, total: int | None = None) -> str:
@@ -514,6 +528,10 @@ HERO_HTML = """
 # by default), so a missing file never produces a dead button.
 _SAMPLE_DATA_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sample_data", "sample_incidents.csv"
+)
+
+_EXEC_SUMMARY_PLACEHOLDER = (
+    "Click **Generate summary** for a management-friendly write-up of the KPIs above."
 )
 
 SEVERITY_NOTE = (
@@ -679,6 +697,71 @@ def _donut_figure(
         legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=1.02),
     )
     return fig
+
+
+def _priority_sort_key(label: str) -> tuple:
+    """Orders priority columns most-severe first, using the same wording rules
+    as _priority_color; unknown labels go last, alphabetically."""
+    l = (label or "").lower()
+    if "critical" in l or "p1" in l:
+        rank = 0
+    elif "very high" in l:
+        rank = 1
+    elif "high" in l or "p2" in l:
+        rank = 2
+    elif "medium" in l or "p3" in l:
+        rank = 3
+    elif "low" in l or "p4" in l:
+        rank = 4
+    else:
+        rank = 5
+    return (rank, l)
+
+
+def _category_priority_heatmap(full_df: pd.DataFrame) -> go.Figure:
+    """Category x Priority count matrix for the Categorization tab: rows are
+    categories (busiest first), columns are priorities (most severe first)."""
+    if (
+        full_df is None or len(full_df) == 0
+        or "Category" not in full_df.columns or "Priority" not in full_df.columns
+    ):
+        fig = go.Figure()
+        fig.update_layout(
+            annotations=[dict(text="No data yet", showarrow=False, font=dict(size=14))],
+            height=260, margin=dict(t=30, b=10, l=10, r=10),
+        )
+        return fig
+
+    category = full_df["Category"].fillna("").astype(str).str.strip().replace("", "Uncategorized")
+    priority = full_df["Priority"].fillna("").astype(str).str.strip().replace("", "Unspecified")
+    table = pd.crosstab(category, priority)
+    table = table.loc[table.sum(axis=1).sort_values(ascending=False).index]
+    table = table[sorted(table.columns, key=_priority_sort_key)]
+
+    z = table.values
+    text = [["" if v == 0 else str(int(v)) for v in row] for row in z]
+    fig = go.Figure(
+        data=[
+            go.Heatmap(
+                z=z, x=list(table.columns), y=list(table.index),
+                text=text, texttemplate="%{text}",
+                colorscale=[[0.0, "#f1f5f9"], [1.0, "#2563eb"]],
+                xgap=3, ygap=3, showscale=False,
+                hovertemplate="%{y} · %{x}: %{z} tickets<extra></extra>",
+            )
+        ]
+    )
+    fig.update_layout(
+        height=max(260, 44 * len(table.index) + 90),
+        margin=dict(t=10, b=10, l=10, r=10),
+        xaxis=dict(side="top", showgrid=False),
+        yaxis=dict(autorange="reversed", showgrid=False),
+    )
+    return fig
+
+
+def _refresh_category_heatmap(full_df: pd.DataFrame):
+    return _category_priority_heatmap(full_df)
 
 
 def _category_chart_figure(category_counts: dict) -> go.Figure:
@@ -878,14 +961,130 @@ def _summary_kpi_html(stats: dict) -> str:
     )
 
 
-def _kpi_card_v2(icon: str, label: str, value, accent: str, note: str = "") -> str:
+def _kpi_card_v2(
+    icon: str, label: str, value, accent: str, note: str = "",
+    delta_html: str = "", spark_html: str = "", link_tab: str = "",
+) -> str:
+    """KPI card. The last three arguments are optional: a trend delta line, a
+    small sparkline, and `link_tab` (a tab-label fragment such as
+    "Categorization") that makes the whole card click through to that tab."""
     note_html = f'<div class="kpi-note">{note}</div>' if note else ""
+    link_cls, link_attrs = "", ""
+    if link_tab:
+        js = (
+            "var t=[...document.querySelectorAll('#main-tabs button')]"
+            f".find(function(b){{return b.textContent.indexOf('{link_tab}')!==-1}});"
+            "if(t){t.click();}"
+        )
+        link_cls = " kpi-link"
+        link_attrs = f' role="button" tabindex="0" title="Open {link_tab}" onclick="{js}"'
     return (
-        f'<div class="kpi-card kpi-card-v2" style="--accent:{accent}">'
+        f'<div class="kpi-card kpi-card-v2{link_cls}" style="--accent:{accent}"{link_attrs}>'
         f'<div class="kpi-icon" style="background:{accent}1a; color:{accent};">{icon}</div>'
-        f'<div><div class="kpi-label">{label}</div><div class="kpi-value">{value}</div>{note_html}</div>'
+        f'<div><div class="kpi-label">{label}</div><div class="kpi-value">{value}</div>{note_html}{delta_html}</div>'
+        f"{spark_html}"
         "</div>"
     )
+
+
+# --- Overview KPI context: trend deltas + sparkline ----------------------
+# "Previous period" for a single uploaded batch means: split the batch's own
+# date range (effective open date, same source as the Trends tab) in half and
+# compare the later half with the earlier half. Each half is summarized with
+# chat_tools.get_incident_summary - the same numbers the KPI cards and the chat
+# agent use - so a delta can never disagree with the cards. Nothing is shown
+# when the batch has too few dated tickets for the comparison to mean anything.
+_DELTA_MIN_DATED = 8
+_DELTA_MIN_PER_HALF = 3
+
+
+def _kpi_deltas(full_df: pd.DataFrame) -> dict:
+    """{kpi_key: (change, unit, higher_is_worse)} for the later vs earlier half
+    of the batch's date range, or {} when it can't be computed reliably."""
+    try:
+        if full_df is None or len(full_df) == 0:
+            return {}
+        start = trend_metrics.effective_open_resolve_times(full_df)["start"]
+        dated = start.notna()
+        if int(dated.sum()) < _DELTA_MIN_DATED:
+            return {}
+        lo, hi = start[dated].min(), start[dated].max()
+        if (hi - lo) < pd.Timedelta(days=1):
+            return {}
+        mid = lo + (hi - lo) / 2
+        earlier = full_df[dated & (start < mid)]
+        later = full_df[dated & (start >= mid)]
+        if len(earlier) < _DELTA_MIN_PER_HALF or len(later) < _DELTA_MIN_PER_HALF:
+            return {}
+        e = chat_tools.get_incident_summary(earlier)
+        l = chat_tools.get_incident_summary(later)
+        if "error" in e or "error" in l:
+            return {}
+
+        def pct(old, new):
+            if old in (None, 0) or new is None:
+                return None
+            return round(100.0 * (new - old) / old, 1)
+
+        def diff(old, new):
+            if old is None or new is None:
+                return None
+            return round(new - old, 1)
+
+        e_hp = e["p1_incidents"] + e["p2_incidents"]
+        l_hp = l["p1_incidents"] + l["p2_incidents"]
+        return {
+            "total_incidents": (pct(e["total_incidents"], l["total_incidents"]), "%", True),
+            "high_priority_count": (pct(e_hp, l_hp), "%", True),
+            "avg_resolution_hours": (
+                pct(e.get("average_resolution_time_hours"), l.get("average_resolution_time_hours")), "%", True,
+            ),
+            "avg_worklog_score": (
+                diff(e.get("average_worklog_score"), l.get("average_worklog_score")), " pts", False,
+            ),
+            "poor_worklog_pct": (
+                diff(e.get("poor_worklog_percentage"), l.get("poor_worklog_percentage")), " pts", True,
+            ),
+        }
+    except Exception:
+        return {}
+
+
+def _delta_html(deltas: dict, key: str) -> str:
+    entry = (deltas or {}).get(key)
+    if not entry or entry[0] is None:
+        return ""
+    change, unit, higher_is_worse = entry
+    sub = '<span class="kpi-delta-sub">vs earlier half</span>'
+    if abs(change) < 0.5:
+        return f'<div class="kpi-delta"><span class="kpi-delta-flat">▬ no change</span>{sub}</div>'
+    going_up = change > 0
+    cls = "kpi-delta-bad" if going_up == higher_is_worse else "kpi-delta-good"
+    arrow = "▲" if going_up else "▼"
+    return f'<div class="kpi-delta"><span class="{cls}">{arrow} {abs(change):g}{unit}</span>{sub}</div>'
+
+
+def _volume_sparkline_html(full_df: pd.DataFrame, color: str = "#3b82f6") -> str:
+    """Tiny inline-SVG daily-volume sparkline for the Total Incidents card.
+    Empty string when there aren't enough dated days to draw a line."""
+    try:
+        series = trend_metrics.compute_time_series(full_df, "Daily")
+        counts = [pt["ticket_count"] for pt in series]
+        if len(counts) < 3:
+            return ""
+        w, h, pad = 84, 30, 3
+        top = max(counts) or 1
+        step = (w - 2 * pad) / (len(counts) - 1)
+        points = " ".join(
+            f"{pad + i * step:.1f},{h - pad - (c / top) * (h - 2 * pad):.1f}" for i, c in enumerate(counts)
+        )
+        return (
+            f'<svg class="kpi-spark" width="{w}" height="{h}" viewBox="0 0 {w} {h}" aria-hidden="true">'
+            f'<polyline fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" '
+            f'stroke-linejoin="round" points="{points}"/></svg>'
+        )
+    except Exception:
+        return ""
 
 
 _KPI_PLACEHOLDER_V2 = (
@@ -926,26 +1125,41 @@ _OVERVIEW_KPI_PLACEHOLDER = (
 )
 
 
-def _overview_kpi_html(kpis: dict) -> str:
+def _overview_kpi_html(kpis: dict, deltas: dict | None = None, spark_html: str = "") -> str:
     """Renders the five executive KPI cards from overview_metrics'
     aggregated kpis dict. Pure presentation - all the numbers are already
-    computed by overview_metrics.compute_overview_kpis."""
+    computed by overview_metrics.compute_overview_kpis. `deltas` / `spark_html`
+    (optional) add the trend context from _kpi_deltas / _volume_sparkline_html;
+    each card links to the tab where that number is explored further."""
+    deltas = deltas or {}
     try:
         resolution_value = (
             f'{kpis["avg_resolution_hours"]}h' if kpis.get("avg_resolution_hours") is not None else "N/A"
         )
         return (
             '<div class="kpi-grid kpi-grid-5">'
-            + _kpi_card_v2("🎫", "Total Incidents", kpis.get("total_incidents", 0), "#3b82f6")
+            + _kpi_card_v2(
+                "🎫", "Total Incidents", kpis.get("total_incidents", 0), "#3b82f6",
+                delta_html=_delta_html(deltas, "total_incidents"), spark_html=spark_html,
+                link_tab="Categorization",
+            )
             + _kpi_card_v2(
                 "🔴", "P1/P2 Incidents", kpis.get("high_priority_count", 0), "#ef4444",
                 note=f'{kpis.get("high_priority_pct", 0)}% of total',
+                delta_html=_delta_html(deltas, "high_priority_count"), link_tab="Categorization",
             )
-            + _kpi_card_v2("⏱️", "Avg Resolution Time", resolution_value, "#0ea5e9")
-            + _kpi_card_v2("📝", "Avg Worklog Score", f'{kpis.get("avg_worklog_score", 0)} / 100', "#f59e0b")
+            + _kpi_card_v2(
+                "⏱️", "Avg Resolution Time", resolution_value, "#0ea5e9",
+                delta_html=_delta_html(deltas, "avg_resolution_hours"), link_tab="Trends",
+            )
+            + _kpi_card_v2(
+                "📝", "Avg Worklog Score", f'{kpis.get("avg_worklog_score", 0)} / 100', "#f59e0b",
+                delta_html=_delta_html(deltas, "avg_worklog_score"), link_tab="Trends",
+            )
             + _kpi_card_v2(
                 "⚠️", "Poor Worklog %", f'{kpis.get("poor_worklog_pct", 0)}%', "#f97316",
                 note=f'{kpis.get("poor_worklog_count", 0)} incident(s)',
+                delta_html=_delta_html(deltas, "poor_worklog_pct"), link_tab="Recommendations",
             )
             + "</div>"
         )
@@ -1076,7 +1290,7 @@ def _refresh_overview(full_df: pd.DataFrame, summary_stats: dict):
         health = overview_metrics.compute_health_indicators(full_df, kpis)
         attention = overview_metrics.compute_attention_items(health)
         return (
-            _overview_kpi_html(kpis),
+            _overview_kpi_html(kpis, _kpi_deltas(full_df), _volume_sparkline_html(full_df)),
             _health_indicators_html(health),
             _attention_html(attention),
             _overview_trend_figure(full_df),
@@ -1697,7 +1911,7 @@ async def _analyze(file_obj, pasted_text):
 
     df = _truncate_full_df(full_df)
     overview_kpis = overview_metrics.compute_overview_kpis(full_df, summary_stats)
-    summary = _overview_kpi_html(overview_kpis)
+    summary = _overview_kpi_html(overview_kpis, _kpi_deltas(full_df), _volume_sparkline_html(full_df))
 
     # Prepare CSV for download - always the FULL untruncated result set,
     # independent of whatever filter/page/truncation the on-screen table
@@ -1785,6 +1999,7 @@ def _reveal_after_analysis(full_df, source_label):
         _loaded_strip_html(source_label, n),                        # loaded_strip_html
         gr.update(visible=True),                                    # overview_results
         tab_update, tab_update, tab_update, tab_update,             # Categorization, Trends, Recommendations, Q&A
+        _EXEC_SUMMARY_PLACEHOLDER,                                  # exec_summary_output (drop a stale summary)
     )
 
 
@@ -2074,6 +2289,14 @@ def build_ui() -> gr.Blocks:
                     # (revealed by _reveal_after_analysis). The component
                     # wiring inside is unchanged.
                     with gr.Column(visible=False, elem_id="overview-results") as overview_results:
+                        # KPI strip - headline numbers for management at a glance,
+                        # shown once an analysis has run (hidden before that - see
+                        # overview_results).
+                        with gr.Row(elem_id="metrics-row"):
+                            summary_md = gr.HTML(_OVERVIEW_KPI_PLACEHOLDER)
+
+                        # (Now sits directly below the KPI strip, so the write-up reads against
+                        # the numbers it summarizes.)
                         # Executive Summary - moved to sit right below the page
                         # heading (top bar above the tabs) rather than at the
                         # bottom of the tab, so the management write-up is the
@@ -2092,16 +2315,9 @@ def build_ui() -> gr.Blocks:
                                 "✨ Generate summary", size="sm", elem_id="exec-summary-btn",
                             )
                             exec_summary_output = gr.Markdown(
-                                "Run an analysis, then click **Generate summary** for a "
-                                "management-friendly write-up of the KPIs above.",
+                                _EXEC_SUMMARY_PLACEHOLDER,
                                 elem_id="exec-summary-output",
                             )
-
-                        # KPI strip - headline numbers for management at a glance,
-                        # shown once an analysis has run (hidden before that - see
-                        # overview_results).
-                        with gr.Row(elem_id="metrics-row"):
-                            summary_md = gr.HTML(_OVERVIEW_KPI_PLACEHOLDER)
 
                         # Incidents by Category / Priority - the same two
                         # panels shown on the Categorization tab, copied
@@ -2146,8 +2362,17 @@ def build_ui() -> gr.Blocks:
                         attention_html = gr.HTML(_ATTENTION_PLACEHOLDER)
 
                 with gr.Tab("🗂️ Categorization", id=1, interactive=False) as tab_categorization:
-                    # Category breakdown + priority donut.
-                    with gr.Row(elem_id="panel-row-1"):
+                    # Category x Priority heatmap: replaces the category bar-list +
+                    # priority donut that this tab used to repeat from Overview
+                    # (Overview keeps those two). The old row is kept below but
+                    # hidden, same approach as the other hidden Overview cards,
+                    # so _analyze's outputs (category_bar_html / category_chart)
+                    # stay untouched.
+                    with gr.Column(elem_classes=["dash-card"]):
+                        gr.Markdown("### 🔥 Category × Priority", elem_classes=["section-heading"])
+                        category_heatmap = gr.Plot(show_label=False)
+
+                    with gr.Row(elem_id="panel-row-1", visible=False):
                         with gr.Column(scale=1, elem_classes=["dash-card"]):
                             gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
                             category_bar_html = gr.HTML(
@@ -2447,6 +2672,7 @@ def build_ui() -> gr.Blocks:
         _reveal_outputs = [
             hero_html, input_panel, loaded_strip, loaded_strip_html, overview_results,
             tab_categorization, tab_trends, tab_recommendations, tab_qa,
+            exec_summary_output,
         ]
 
         def _wire_post_analysis(event):
@@ -2490,6 +2716,10 @@ def build_ui() -> gr.Blocks:
                 fn=_refresh_incident_timeline,
                 inputs=[full_results_state],
                 outputs=[timeline_table, timeline_kpi_html, timeline_aggregate_state],
+            ).then(
+                fn=_refresh_category_heatmap,
+                inputs=[full_results_state],
+                outputs=[category_heatmap],
             )
 
         _wire_post_analysis(analyze_btn.click(
