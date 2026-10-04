@@ -12,6 +12,7 @@ import json
 import os
 import re
 from datetime import datetime
+from html import escape as _html_escape
 
 import gradio as gr
 import pandas as pd
@@ -232,7 +233,7 @@ footer {display: none !important;}
    spot (a compact card, not a full-width strip) while an analysis is
    running, instead of Gradio's default per-component loading overlays
    scattered across the summary/donut chart section. */
-#agent-progress {margin: 0 auto 16px; max-width: 480px;}
+#agent-progress {margin: 0 auto 16px; max-width: 600px;}
 .agent-progress {
     display: flex; align-items: center; gap: 14px;
     background: #ffffff; border: 1px solid var(--dash-border); border-radius: 14px;
@@ -445,15 +446,75 @@ footer {display: none !important;}
 #rec-writeup-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
 #rec-writeup-output {margin-top: 4px; font-size: 0.88rem; color: var(--dash-text); line-height: 1.55;}
 #rec-writeup-output p {margin: 0 0 8px 0;}
+
+/* First-run experience (Overview). Hero card shown before any analysis,
+   slim "Loaded" strip shown after, and dimmed result tabs until data exists. */
+#hero {margin-bottom: 14px;}
+.hero-card {
+    background: linear-gradient(135deg, #0f1f33 0%, #16345c 100%); border-radius: 16px;
+    padding: 26px 28px; box-shadow: var(--dash-shadow);
+}
+.hero-title {color: #ffffff; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px;}
+.hero-sub {color: #b6c2d4; font-size: 0.9rem; line-height: 1.5; max-width: 760px;}
+.hero-steps {display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px;}
+.hero-step {
+    display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px;
+    background: rgba(255,255,255,0.10); color: #e2e8f0; font-size: 0.8rem; font-weight: 600;
+}
+.hero-step-num {
+    width: 20px; height: 20px; border-radius: 999px; background: #2563eb; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem;
+}
+.hero-note {color: #8291a8; font-size: 0.78rem; margin-top: 14px;}
+
+#loaded-strip {gap: 14px !important; margin-bottom: 14px; align-items: center !important; padding: 10px 20px !important;}
+.loaded-strip-text {font-size: 0.88rem; color: var(--dash-text); line-height: 1.4;}
+.loaded-strip-text .loaded-meta {color: var(--dash-text-muted); font-size: 0.8rem;}
+#sample-btn {border-radius: 10px !important; font-weight: 600 !important;}
+
+#main-tabs > .tab-nav button:disabled,
+#main-tabs > .tab-nav button[disabled] {opacity: 0.4 !important; cursor: not-allowed !important;}
+.agent-progress-step {
+    font-size: 0.72rem; font-weight: 600; color: var(--dash-text-muted); white-space: nowrap; flex-shrink: 0;
+}
 """
 
-AGENT_PROGRESS_HTML = """
+def _agent_progress_html(stage: str = "Agent analyzing tickets", step: int | None = None, total: int | None = None) -> str:
+    """Animated progress card. `stage` is the current stage label; `step`/`total`
+    (optional) add a "Step N of M" tag so the bar says what is actually happening."""
+    step_html = f'<span class="agent-progress-step">Step {step} of {total}</span>' if step and total else ""
+    return f"""
 <div class="agent-progress">
   <span class="agent-progress-icon">🤖</span>
   <div class="agent-progress-track"><div class="agent-progress-fill"></div></div>
-  <span class="agent-progress-text">Agent analyzing tickets<span class="dots"><span>.</span><span>.</span><span>.</span></span></span>
+  <span class="agent-progress-text">{stage}<span class="dots"><span>.</span><span>.</span><span>.</span></span></span>
+  {step_html}
 </div>
 """
+
+
+AGENT_PROGRESS_HTML = _agent_progress_html()
+
+HERO_HTML = """
+<div class="hero-card">
+  <div class="hero-title">Analyze your incident data</div>
+  <div class="hero-sub">Upload an incident export or paste ticket text. The agent validates, categorizes and
+  scores every ticket, then builds the dashboard, trends, recommendations and Q&amp;A from it.</div>
+  <div class="hero-steps">
+    <span class="hero-step"><span class="hero-step-num">1</span>Upload or paste</span>
+    <span class="hero-step"><span class="hero-step-num">2</span>Click Analyze</span>
+    <span class="hero-step"><span class="hero-step-num">3</span>Explore the results</span>
+  </div>
+  <div class="hero-note">Categorization, Trends &amp; Insights, Recommendations and Q&amp;A unlock after your first analysis.</div>
+</div>
+"""
+
+# Bundled sample file for the "Try sample data" button. The button is only
+# shown when this file actually exists (it is not copied into the Docker image
+# by default), so a missing file never produces a dead button.
+_SAMPLE_DATA_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sample_data", "sample_incidents.csv"
+)
 
 SEVERITY_NOTE = (
     "Free-text fields (description/worklog) are treated as untrusted data end-to-end - "
@@ -1546,6 +1607,17 @@ def _truncate_full_df(full_df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+# _analyze yields this many values, in the order of `_analyze_outputs` in
+# build_ui(). The last one is the display label of the input (file name /
+# "pasted text") used by the "Loaded" strip.
+_ANALYZE_N_OUTPUTS = 17
+_ANALYZE_STEPS = 3
+
+
+def _progress_update(step: int, stage: str):
+    return gr.update(value=_agent_progress_html(stage, step, _ANALYZE_STEPS), visible=True)
+
+
 async def _analyze(file_obj, pasted_text):
     has_file = file_obj is not None
     has_text = bool(pasted_text and pasted_text.strip())
@@ -1568,7 +1640,7 @@ async def _analyze(file_obj, pasted_text):
     # Show the animated agent progress bar in its single fixed spot before
     # doing any work; other outputs are left untouched (gr.update()) so
     # nothing under them flickers or shows its own loading state.
-    yield (gr.update(visible=True),) + (gr.update(),) * 15
+    yield (_progress_update(1, "Reading input"),) + (gr.update(),) * (_ANALYZE_N_OUTPUTS - 1)
 
     # Hash the raw input (file bytes, or the pasted text) so an identical
     # upload/paste can be served straight from the DB instead of hitting
@@ -1577,15 +1649,18 @@ async def _analyze(file_obj, pasted_text):
         with open(file_obj.name, "rb") as f:
             content = f.read()
         input_label = file_obj.name
+        display_label = os.path.basename(file_obj.name)
     else:
         content = pasted_text.strip().encode("utf-8")
         input_label = "pasted_text"
+        display_label = "pasted text"
 
     file_hash = compute_file_hash(content)
     llm_worklog_scoring_enabled = os.environ.get("ENABLE_LLM_WORKLOG_SCORING", "false").lower() == "true"
     cached = get_cached_result(file_hash, current_llm_worklog_scoring_enabled=llm_worklog_scoring_enabled)
 
     if cached is not None:
+        yield (_progress_update(2, "Loading cached results"),) + (gr.update(),) * (_ANALYZE_N_OUTPUTS - 1)
         full_df = cached["full_df"]
         summary_stats = cached["summary_stats"]
         category_counts = cached["category_counts"]
@@ -1596,6 +1671,7 @@ async def _analyze(file_obj, pasted_text):
             visible=True,
         )
     else:
+        yield (_progress_update(2, "Validating, categorizing & scoring tickets"),) + (gr.update(),) * (_ANALYZE_N_OUTPUTS - 1)
         if has_file:
             analysis = await run_pipeline_from_bytes(file_obj.name, content)
         else:
@@ -1616,6 +1692,8 @@ async def _analyze(file_obj, pasted_text):
             llm_worklog_scoring_enabled=llm_worklog_scoring_enabled,
         )
         cache_notice = gr.update(value="", visible=False)
+
+    yield (_progress_update(3, "Building dashboards"),) + (gr.update(),) * (_ANALYZE_N_OUTPUTS - 1)
 
     df = _truncate_full_df(full_df)
     overview_kpis = overview_metrics.compute_overview_kpis(full_df, summary_stats)
@@ -1671,6 +1749,42 @@ async def _analyze(file_obj, pasted_text):
         # Overview-tab duplicates of the same category bar-list / priority
         # donut shown on Categorization - identical values, not recomputed.
         category_bar_html, chart,
+        # source_label_state - shown in the "Loaded" strip.
+        display_label,
+    )
+
+
+async def _analyze_sample():
+    """Runs the normal _analyze flow on the bundled sample file (the "Try
+    sample data" button). Same outputs/behavior as clicking Analyze."""
+    class _SampleFile:
+        name = _SAMPLE_DATA_PATH
+
+    async for update in _analyze(_SampleFile(), ""):
+        yield update
+
+
+def _loaded_strip_html(label: str, n_tickets: int) -> str:
+    return (
+        '<div class="loaded-strip-text">✅ Loaded <b>' + _html_escape(label or "input") + "</b>"
+        f' <span class="loaded-meta">· {n_tickets:,} ticket{"" if n_tickets == 1 else "s"}'
+        f' · {datetime.now().strftime("%H:%M")}</span></div>'
+    )
+
+
+def _reveal_after_analysis(full_df, source_label):
+    """Runs right after _analyze: swaps the first-run hero/upload UI for the
+    slim "Loaded" strip, shows the Overview result cards, and unlocks the tabs
+    that need analyzed data. Output order matches `_reveal_outputs` in build_ui()."""
+    n = 0 if full_df is None else len(full_df)
+    tab_update = gr.update(interactive=True) if n > 0 else gr.update()
+    return (
+        gr.update(visible=False),                                   # hero_html
+        gr.update(visible=False),                                   # input_panel
+        gr.update(visible=True),                                    # loaded_strip
+        _loaded_strip_html(source_label, n),                        # loaded_strip_html
+        gr.update(visible=True),                                    # overview_results
+        tab_update, tab_update, tab_update, tab_update,             # Categorization, Trends, Recommendations, Q&A
     )
 
 
@@ -1919,74 +2033,100 @@ def build_ui() -> gr.Blocks:
                     agent_progress = gr.HTML(AGENT_PROGRESS_HTML, elem_id="agent-progress", visible=False)
                     cache_notice = gr.Markdown(visible=False, elem_id="cache-notice")
 
-                    # Executive Summary - moved to sit right below the page
-                    # heading (top bar above the tabs) rather than at the
-                    # bottom of the tab, so the management write-up is the
-                    # first thing seen. Computes KPIs/trends with pandas
-                    # first, then sends only that small aggregated dict to
-                    # the LLM for the write-up. The button is NOT inside a
-                    # gr.Row with the heading - Gradio gives Row children
-                    # negative side margins for edge-to-edge layout, which
-                    # was pushing the button past the card's own border.
-                    # Instead it's a normal sibling, pinned on top of the
-                    # card with CSS position:absolute, so it can never
-                    # escape the card's visible edges.
-                    with gr.Column(elem_classes=["dash-card"], elem_id="exec-summary-card"):
-                        gr.Markdown("### 🧾 Executive Summary", elem_classes=["section-heading"])
-                        exec_summary_btn = gr.Button(
-                            "✨ Generate summary", size="sm", elem_id="exec-summary-btn",
-                        )
-                        exec_summary_output = gr.Markdown(
-                            "Run an analysis, then click **Generate summary** for a "
-                            "management-friendly write-up of the KPIs above.",
-                            elem_id="exec-summary-output",
-                        )
+                    # First-run hero: shown until the first analysis completes.
+                    hero_html = gr.HTML(HERO_HTML, elem_id="hero")
 
-                    # KPI strip - headline numbers for management at a glance,
-                    # shown above the upload bar so totals are the first thing seen.
-                    with gr.Row(elem_id="metrics-row"):
-                        summary_md = gr.HTML(_OVERVIEW_KPI_PLACEHOLDER)
+                    # Upload / paste / Analyze bar, now the first thing on the
+                    # tab. Wrapped in a Column so it can be collapsed as one
+                    # unit after an analysis and re-opened with the button in
+                    # the "Loaded" strip below.
+                    with gr.Column(elem_id="input-panel") as input_panel:
+                        # Single full-width input bar - upload, paste, and the
+                        # analyze action sit on one row (download lives under
+                        # the Recent Incidents table in Categorization). Now at
+                        # the top of the tab; collapses into the "Loaded" strip
+                        # after an analysis (see _reveal_after_analysis).
+                        with gr.Row(elem_id="input-row", elem_classes=["dash-card"], equal_height=False):
+                            with gr.Column(scale=3, min_width=260):
+                                file_input = gr.File(
+                                    label="Upload incident file (.xlsx, .csv, .txt)",
+                                    file_types=[".xlsx", ".xls", ".csv", ".txt"],
+                                    elem_id="file-upload",
+                                )
+                            with gr.Column(scale=4, min_width=320):
+                                text_input = gr.Textbox(label="...or paste unstructured incident text", lines=2,
+                                                          placeholder="INC0012345\nShort description: ...\nWorklog: ...")
+                            with gr.Column(scale=2, min_width=180, elem_id="action-col"):
+                                analyze_btn = gr.Button("Analyze", variant="primary")
+                                sample_btn = gr.Button(
+                                    "✨ Try sample data", size="sm", elem_id="sample-btn",
+                                    visible=os.path.exists(_SAMPLE_DATA_PATH),
+                                )
 
-                    # Single full-width input bar - upload, paste, and the
-                    # analyze action sit on one row (download lives under
-                    # the Recent Incidents table in Categorization).
-                    with gr.Row(elem_id="input-row", elem_classes=["dash-card"], equal_height=False):
-                        with gr.Column(scale=3, min_width=260):
-                            file_input = gr.File(
-                                label="Upload incident file (.xlsx, .csv, .txt)",
-                                file_types=[".xlsx", ".xls", ".csv", ".txt"],
-                                elem_id="file-upload",
+                    # Slim status strip shown after an analysis in place of the
+                    # hero + input bar.
+                    with gr.Row(elem_id="loaded-strip", elem_classes=["dash-card"], visible=False, equal_height=False) as loaded_strip:
+                        loaded_strip_html = gr.HTML("")
+                        new_analysis_btn = gr.Button("＋ Analyze new data", size="sm", scale=0, min_width=170)
+
+                    # Everything that is empty before the first analysis lives
+                    # in this wrapper, which stays hidden until results exist
+                    # (revealed by _reveal_after_analysis). The component
+                    # wiring inside is unchanged.
+                    with gr.Column(visible=False, elem_id="overview-results") as overview_results:
+                        # Executive Summary - moved to sit right below the page
+                        # heading (top bar above the tabs) rather than at the
+                        # bottom of the tab, so the management write-up is the
+                        # first thing seen. Computes KPIs/trends with pandas
+                        # first, then sends only that small aggregated dict to
+                        # the LLM for the write-up. The button is NOT inside a
+                        # gr.Row with the heading - Gradio gives Row children
+                        # negative side margins for edge-to-edge layout, which
+                        # was pushing the button past the card's own border.
+                        # Instead it's a normal sibling, pinned on top of the
+                        # card with CSS position:absolute, so it can never
+                        # escape the card's visible edges.
+                        with gr.Column(elem_classes=["dash-card"], elem_id="exec-summary-card"):
+                            gr.Markdown("### 🧾 Executive Summary", elem_classes=["section-heading"])
+                            exec_summary_btn = gr.Button(
+                                "✨ Generate summary", size="sm", elem_id="exec-summary-btn",
                             )
-                        with gr.Column(scale=4, min_width=320):
-                            text_input = gr.Textbox(label="...or paste unstructured incident text", lines=2,
-                                                      placeholder="INC0012345\nShort description: ...\nWorklog: ...")
-                        with gr.Column(scale=2, min_width=180, elem_id="action-col"):
-                            analyze_btn = gr.Button("Analyze", variant="primary")
-
-                    # Incidents by Category / Priority - the same two
-                    # panels shown on the Categorization tab, copied
-                    # here so management sees the breakdown without
-                    # switching tabs. Separate component instances
-                    # (Gradio can't render one component in two
-                    # places), both populated from the exact same
-                    # values _analyze already computes for the
-                    # Categorization tab's copies - see category_bar_html /
-                    # category_chart in the outputs list below.
-                    with gr.Row(elem_id="overview-panel-row-1"):
-                        with gr.Column(scale=1, elem_classes=["dash-card"]):
-                            gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
-                            overview_category_bar_html = gr.HTML(
-                                '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+                            exec_summary_output = gr.Markdown(
+                                "Run an analysis, then click **Generate summary** for a "
+                                "management-friendly write-up of the KPIs above.",
+                                elem_id="exec-summary-output",
                             )
-                        with gr.Column(scale=1, elem_classes=["dash-card"]):
-                            gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
-                            overview_priority_chart = gr.Plot(show_label=False)
 
-                    # Incident Health - four traffic-light indicators so
-                    # management can scan overall status in a second.
-                    with gr.Column(elem_classes=["dash-card"]):
-                        gr.Markdown("### 🩺 Incident Health", elem_classes=["section-heading"])
-                        health_html = gr.HTML(_HEALTH_PLACEHOLDER)
+                        # KPI strip - headline numbers for management at a glance,
+                        # shown once an analysis has run (hidden before that - see
+                        # overview_results).
+                        with gr.Row(elem_id="metrics-row"):
+                            summary_md = gr.HTML(_OVERVIEW_KPI_PLACEHOLDER)
+
+                        # Incidents by Category / Priority - the same two
+                        # panels shown on the Categorization tab, copied
+                        # here so management sees the breakdown without
+                        # switching tabs. Separate component instances
+                        # (Gradio can't render one component in two
+                        # places), both populated from the exact same
+                        # values _analyze already computes for the
+                        # Categorization tab's copies - see category_bar_html /
+                        # category_chart in the outputs list below.
+                        with gr.Row(elem_id="overview-panel-row-1"):
+                            with gr.Column(scale=1, elem_classes=["dash-card"]):
+                                gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
+                                overview_category_bar_html = gr.HTML(
+                                    '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+                                )
+                            with gr.Column(scale=1, elem_classes=["dash-card"]):
+                                gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
+                                overview_priority_chart = gr.Plot(show_label=False)
+
+                        # Incident Health - four traffic-light indicators so
+                        # management can scan overall status in a second.
+                        with gr.Column(elem_classes=["dash-card"]):
+                            gr.Markdown("### 🩺 Incident Health", elem_classes=["section-heading"])
+                            health_html = gr.HTML(_HEALTH_PLACEHOLDER)
 
                     # Incident Volume Trend - hidden per request, but the
                     # component and _refresh_overview's wiring are left
@@ -2005,7 +2145,7 @@ def build_ui() -> gr.Blocks:
                         gr.Markdown("### 🚩 Attention Required", elem_classes=["section-heading"])
                         attention_html = gr.HTML(_ATTENTION_PLACEHOLDER)
 
-                with gr.Tab("🗂️ Categorization", id=1):
+                with gr.Tab("🗂️ Categorization", id=1, interactive=False) as tab_categorization:
                     # Category breakdown + priority donut.
                     with gr.Row(elem_id="panel-row-1"):
                         with gr.Column(scale=1, elem_classes=["dash-card"]):
@@ -2060,7 +2200,7 @@ def build_ui() -> gr.Blocks:
                             )
                             next_btn = gr.Button("Next →", size="sm")
 
-                with gr.Tab("📊 Trends & Insights", id=2):
+                with gr.Tab("📊 Trends & Insights", id=2, interactive=False) as tab_trends:
                     # KPI trend - ticket volume + worklog quality over
                     # time, toggle between daily/weekly/monthly views.
                     with gr.Column(elem_classes=["dash-card"]):
@@ -2149,7 +2289,7 @@ def build_ui() -> gr.Blocks:
                                 '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                             )
 
-                with gr.Tab("💡 Recommendations", id=3):
+                with gr.Tab("💡 Recommendations", id=3, interactive=False) as tab_recommendations:
                     gr.Markdown(
                         "Data-backed recommendations for this batch. Every figure below is "
                         "calculated with pandas from the incidents you analyzed - recurrence, "
@@ -2216,7 +2356,7 @@ def build_ui() -> gr.Blocks:
                             kb_delete_btn = gr.Button("🗑️ Delete", scale=1, variant="stop")
                         kb_manage_status = gr.Markdown("")
 
-                with gr.Tab("💬 Q&A (Agent)", id=5):
+                with gr.Tab("💬 Q&A (Agent)", id=5, interactive=False) as tab_qa:
                     # Single bounded chat panel (intro + transcript +
                     # composer) instead of loosely stacked components -
                     # keeps the tab a fixed height with the transcript
@@ -2252,6 +2392,9 @@ def build_ui() -> gr.Blocks:
                         )
 
         full_results_state = gr.State(pd.DataFrame())
+        # Display label of the last analyzed input (file name / "pasted text"),
+        # shown in the "Loaded" strip.
+        source_label_state = gr.State("")
         filtered_results_state = gr.State(pd.DataFrame())
         page_state = gr.State(1)
         # Category/score filters still have no UI control (category_state/
@@ -2285,53 +2428,83 @@ def build_ui() -> gr.Blocks:
         # from) the table/KPI cards on screen.
         timeline_aggregate_state = gr.State({})
 
-        analyze_btn.click(
+        _analyze_outputs = [
+            agent_progress, summary_md, category_chart, download_file,
+            full_results_state, cache_notice,
+            category_bar_html, host_bar_html, recurring_issues_html, assignment_group_html,
+            chat_stats_state,
+            file_input, text_input,
+            summary_stats_state,
+            # Overview-tab duplicates of the Categorization tab's
+            # category bar-list / priority donut - _analyze yields the
+            # same two values twice (see its final yield) rather than
+            # this chaining a second .then() that reads them back out
+            # of category_chart/category_bar_html as inputs.
+            overview_category_bar_html, overview_priority_chart,
+            source_label_state,
+        ]
+
+        _reveal_outputs = [
+            hero_html, input_panel, loaded_strip, loaded_strip_html, overview_results,
+            tab_categorization, tab_trends, tab_recommendations, tab_qa,
+        ]
+
+        def _wire_post_analysis(event):
+            """Everything that runs after _analyze, shared by the Analyze and
+            Try-sample-data buttons so both refresh exactly the same views."""
+            return event.then(
+                # Swap hero/upload for the Loaded strip, show the Overview
+                # cards and unlock the result tabs as soon as _analyze is
+                # done, so a later refresh step failing can't leave the page
+                # looking empty.
+                fn=_reveal_after_analysis,
+                inputs=[full_results_state, source_label_state],
+                outputs=_reveal_outputs,
+            ).then(
+                fn=_refresh_view,
+                inputs=[full_results_state, category_state, min_score_state, page_size_state],
+                outputs=[results_table, page_indicator, filtered_results_state, page_state],
+            ).then(
+                fn=_build_chat_index,
+                inputs=[full_results_state],
+                outputs=[chat_index_state],
+            ).then(
+                fn=_refresh_trend,
+                inputs=[full_results_state, trend_granularity],
+                outputs=[trend_chart, resolution_metrics_html],
+            ).then(
+                fn=_refresh_overview,
+                inputs=[full_results_state, summary_stats_state],
+                outputs=[summary_md, health_html, attention_html, overview_trend_chart],
+            ).then(
+                # Recommendations refresh automatically with every new batch.
+                # Chained as a separate .then() rather than folded into
+                # _analyze's yield so that function's output
+                # contract (see _ANALYZE_N_OUTPUTS) is untouched.
+                fn=_refresh_recommendations,
+                inputs=[full_results_state],
+                outputs=[recommendations_html, recommendations_state],
+            ).then(
+                # Incident Timeline table/KPIs refresh automatically with
+                # every new batch, same as Recommendations.
+                fn=_refresh_incident_timeline,
+                inputs=[full_results_state],
+                outputs=[timeline_table, timeline_kpi_html, timeline_aggregate_state],
+            )
+
+        _wire_post_analysis(analyze_btn.click(
             fn=_analyze,
             inputs=[file_input, text_input],
-            outputs=[
-                agent_progress, summary_md, category_chart, download_file,
-                full_results_state, cache_notice,
-                category_bar_html, host_bar_html, recurring_issues_html, assignment_group_html,
-                chat_stats_state,
-                file_input, text_input,
-                summary_stats_state,
-                # Overview-tab duplicates of the Categorization tab's
-                # category bar-list / priority donut - _analyze yields the
-                # same two values twice (see its final yield) rather than
-                # this chaining a second .then() that reads them back out
-                # of category_chart/category_bar_html as inputs.
-                overview_category_bar_html, overview_priority_chart,
-            ],
-        ).then(
-            fn=_refresh_view,
-            inputs=[full_results_state, category_state, min_score_state, page_size_state],
-            outputs=[results_table, page_indicator, filtered_results_state, page_state],
-        ).then(
-            fn=_build_chat_index,
-            inputs=[full_results_state],
-            outputs=[chat_index_state],
-        ).then(
-            fn=_refresh_trend,
-            inputs=[full_results_state, trend_granularity],
-            outputs=[trend_chart, resolution_metrics_html],
-        ).then(
-            fn=_refresh_overview,
-            inputs=[full_results_state, summary_stats_state],
-            outputs=[summary_md, health_html, attention_html, overview_trend_chart],
-        ).then(
-            # Recommendations refresh automatically with every new batch.
-            # Chained as a separate .then() rather than folded into
-            # _analyze's yield so that function's existing 14-output
-            # contract is untouched.
-            fn=_refresh_recommendations,
-            inputs=[full_results_state],
-            outputs=[recommendations_html, recommendations_state],
-        ).then(
-            # Incident Timeline table/KPIs refresh automatically with
-            # every new batch, same as Recommendations.
-            fn=_refresh_incident_timeline,
-            inputs=[full_results_state],
-            outputs=[timeline_table, timeline_kpi_html, timeline_aggregate_state],
+            outputs=_analyze_outputs,
+        ))
+        _wire_post_analysis(sample_btn.click(
+            fn=_analyze_sample,
+            inputs=None,
+            outputs=_analyze_outputs,
+        ))
+        new_analysis_btn.click(
+            fn=lambda: gr.update(visible=True),
+            outputs=[input_panel],
         )
 
         timeline_summary_btn.click(
