@@ -1,0 +1,813 @@
+diff -ruN a/app/main.py b/app/main.py
+--- a/app/main.py	2026-10-04 08:30:54.000000000 +0000
++++ b/app/main.py	2026-10-06 04:16:18.183435091 +0000
+@@ -63,7 +63,7 @@
+ # (which reference absolute "/assets/..." paths) resolve correctly. The
+ # REST API lives under /api/v1/... and /health, both registered above and
+ # therefore matched before this catch-all mount. ---
+-from ui.gradio_app import CUSTOM_CSS, build_ui  # noqa: E402  (import after app creation intentional)
++from ui.gradio_app import CUSTOM_CSS, ITSM_THEME, build_ui  # noqa: E402  (import after app creation intentional)
+ import gradio as gr  # noqa: E402
+ 
+-gr.mount_gradio_app(app, build_ui(), path="/", theme=gr.themes.Soft(primary_hue="blue"), css=CUSTOM_CSS)
++gr.mount_gradio_app(app, build_ui(), path="/", theme=ITSM_THEME, css=CUSTOM_CSS)
+diff -ruN a/ui/analysis.py b/ui/analysis.py
+--- a/ui/analysis.py	2026-10-04 08:30:54.000000000 +0000
++++ b/ui/analysis.py	2026-10-06 04:16:10.228031721 +0000
+@@ -135,7 +135,7 @@
+         sorted(category_counts.items(), key=lambda kv: kv[1], reverse=True), multicolor=True
+     )
+     host_bar_html = _bar_list_html(
+-        sorted(host_counts.items(), key=lambda kv: kv[1], reverse=True), color="#3b82f6"
++        sorted(host_counts.items(), key=lambda kv: kv[1], reverse=True), color="#0f6e7a"
+     )
+     recurring_issues_html = _recurring_issues_table_html(recurring_issues.detect_exact_recurrence(full_df))
+     assignment_group_html = _assignment_group_table_html(_assignment_group_performance(full_df))
+diff -ruN a/ui/charts.py b/ui/charts.py
+--- a/ui/charts.py	2026-10-04 08:30:54.000000000 +0000
++++ b/ui/charts.py	2026-10-06 04:16:10.223851364 +0000
+@@ -81,7 +81,7 @@
+         height=230,
+         margin=dict(t=8, b=8, l=8, r=8),
+         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+-        font=dict(family="Inter, Segoe UI, sans-serif", size=12, color="#334155"),
++        font=dict(family="Public Sans, Inter, Segoe UI, sans-serif", size=12, color="#14202b"),
+         legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=1.0, font=dict(size=12)),
+         annotations=[
+             dict(text=f"<b style='font-size:22px'>{total}</b><br><span style='color:#64748b'>incidents</span>",
+@@ -138,7 +138,7 @@
+             go.Heatmap(
+                 z=z, x=list(table.columns), y=list(table.index),
+                 text=text, texttemplate="%{text}",
+-                colorscale=[[0.0, "#f1f5f9"], [0.35, "#c7d2fe"], [0.7, "#6366f1"], [1.0, "#3730a3"]],
++                colorscale=[[0.0, "#eef4f6"], [0.35, "#a3cbd1"], [0.7, "#0f6e7a"], [1.0, "#08434b"]],
+                 xgap=3, ygap=3, showscale=False,
+                 hovertemplate="%{y} · %{x}: %{z} tickets<extra></extra>",
+             )
+@@ -171,15 +171,15 @@
+     "high" substring match, since "high" also occurs inside it."""
+     l = (label or "").lower()
+     if "critical" in l or "p1" in l:
+-        return "#dc2626"
++        return "#b3261e"
+     if "very high" in l:
+-        return "#ea580c"
++        return "#c05621"
+     if "high" in l or "p2" in l:
+-        return "#f59e0b"
++        return "#b7791f"
+     if "medium" in l or "p3" in l:
+-        return "#3b82f6"
++        return "#2b7a9b"
+     if "low" in l or "p4" in l:
+-        return "#10b981"
++        return "#2e7d5b"
+     return "#94a3b8"
+ 
+ 
+@@ -223,7 +223,7 @@
+         counts = [p["count"] for p in series]
+         fig.add_trace(go.Scatter(
+             x=periods, y=counts, mode="lines+markers", name="Incidents",
+-            line=dict(color="#2563eb", width=2), marker=dict(size=5),
++            line=dict(color="#0f6e7a", width=2), marker=dict(size=5),
+             fill="tozeroy", fillcolor="rgba(37, 99, 235, 0.08)",
+         ))
+         fig.update_layout(
+diff -ruN a/ui/components.py b/ui/components.py
+--- a/ui/components.py	2026-10-04 08:30:54.000000000 +0000
++++ b/ui/components.py	2026-10-06 04:16:10.227107360 +0000
+@@ -38,7 +38,7 @@
+ AGENT_PROGRESS_HTML = _agent_progress_html()
+ 
+ 
+-def _bar_list_html(items: list, max_items: int = 6, color: str = "#3b82f6", multicolor: bool = False) -> str:
++def _bar_list_html(items: list, max_items: int = 6, color: str = "#0f6e7a", multicolor: bool = False) -> str:
+     """Renders a sorted list of (label, count) tuples as a horizontal
+     bar-list panel, matching the "Incidents by Category" / "Top Affected
+     Servers" style in the reference dashboard."""
+@@ -161,10 +161,10 @@
+ 
+ _KPI_PLACEHOLDER = (
+     '<div class="kpi-grid">'
+-    + _kpi_card("Total Records Seen", "—", "#3b82f6")
+-    + _kpi_card("Valid Records Analyzed", "—", "#10b981")
+-    + _kpi_card("Rejected Records", "—", "#ef4444")
+-    + _kpi_card("Average Worklog Score", "—", "#f59e0b")
++    + _kpi_card("Total Records Seen", "—", "#0f6e7a")
++    + _kpi_card("Valid Records Analyzed", "—", "#2e7d5b")
++    + _kpi_card("Rejected Records", "—", "#b3261e")
++    + _kpi_card("Average Worklog Score", "—", "#b7791f")
+     + "</div>"
+ )
+ 
+@@ -175,10 +175,10 @@
+     a management-dashboard-style presentation."""
+     return (
+         '<div class="kpi-grid">'
+-        + _kpi_card("Total Records Seen", stats["total_records"], "#3b82f6")
+-        + _kpi_card("Valid Records Analyzed", stats["valid_records"], "#10b981")
+-        + _kpi_card("Rejected Records", stats["rejected_records"], "#ef4444")
+-        + _kpi_card("Average Worklog Score", f'{stats["average_worklog_score"]} / 100', "#f59e0b")
++        + _kpi_card("Total Records Seen", stats["total_records"], "#0f6e7a")
++        + _kpi_card("Valid Records Analyzed", stats["valid_records"], "#2e7d5b")
++        + _kpi_card("Rejected Records", stats["rejected_records"], "#b3261e")
++        + _kpi_card("Average Worklog Score", f'{stats["average_worklog_score"]} / 100', "#b7791f")
+         + "</div>"
+     )
+ 
+@@ -275,7 +275,7 @@
+     return f'<div class="kpi-delta"><span class="{cls}">{arrow} {abs(change):g}{unit}</span>{sub}</div>'
+ 
+ 
+-def _volume_sparkline_html(full_df: pd.DataFrame, color: str = "#3b82f6") -> str:
++def _volume_sparkline_html(full_df: pd.DataFrame, color: str = "#0f6e7a") -> str:
+     """Tiny inline-SVG daily-volume sparkline for the Total Incidents card.
+     Empty string when there aren't enough dated days to draw a line."""
+     try:
+@@ -300,11 +300,11 @@
+ 
+ _KPI_PLACEHOLDER_V2 = (
+     '<div class="kpi-grid kpi-grid-5">'
+-    + _kpi_card_v2("🎫", "Total Records Seen", "—", "#3b82f6")
+-    + _kpi_card_v2("✅", "Valid Records Analyzed", "—", "#10b981")
+-    + _kpi_card_v2("⚠️", "Rejected Records", "—", "#ef4444")
+-    + _kpi_card_v2("📝", "Average Worklog Score", "—", "#f59e0b")
+-    + _kpi_card_v2("🔴", "High Priority Tickets", "—", "#f97316")
++    + _kpi_card_v2("🎫", "Total Records Seen", "—", "#0f6e7a")
++    + _kpi_card_v2("✅", "Valid Records Analyzed", "—", "#2e7d5b")
++    + _kpi_card_v2("⚠️", "Rejected Records", "—", "#b3261e")
++    + _kpi_card_v2("📝", "Average Worklog Score", "—", "#b7791f")
++    + _kpi_card_v2("🔴", "High Priority Tickets", "—", "#c05621")
+     + "</div>"
+ )
+ 
+@@ -316,22 +316,22 @@
+     high_priority = _high_priority_count(full_df)
+     return (
+         '<div class="kpi-grid kpi-grid-5">'
+-        + _kpi_card_v2("🎫", "Total Records Seen", stats["total_records"], "#3b82f6")
+-        + _kpi_card_v2("✅", "Valid Records Analyzed", stats["valid_records"], "#10b981")
+-        + _kpi_card_v2("⚠️", "Rejected Records", stats["rejected_records"], "#ef4444")
+-        + _kpi_card_v2("📝", "Average Worklog Score", f'{stats["average_worklog_score"]} / 100', "#f59e0b")
+-        + _kpi_card_v2("🔴", "High Priority Tickets", high_priority, "#f97316")
++        + _kpi_card_v2("🎫", "Total Records Seen", stats["total_records"], "#0f6e7a")
++        + _kpi_card_v2("✅", "Valid Records Analyzed", stats["valid_records"], "#2e7d5b")
++        + _kpi_card_v2("⚠️", "Rejected Records", stats["rejected_records"], "#b3261e")
++        + _kpi_card_v2("📝", "Average Worklog Score", f'{stats["average_worklog_score"]} / 100', "#b7791f")
++        + _kpi_card_v2("🔴", "High Priority Tickets", high_priority, "#c05621")
+         + "</div>"
+     )
+ 
+ 
+ _OVERVIEW_KPI_PLACEHOLDER = (
+     '<div class="kpi-grid kpi-grid-5">'
+-    + _kpi_card_v2("🎫", "Total Incidents", "—", "#3b82f6")
+-    + _kpi_card_v2("🔴", "P1/P2 Incidents", "—", "#ef4444")
+-    + _kpi_card_v2("⏱️", "Avg Resolution Time", "—", "#0ea5e9")
+-    + _kpi_card_v2("📝", "Avg Worklog Score", "—", "#f59e0b")
+-    + _kpi_card_v2("⚠️", "Poor Worklog %", "—", "#f97316")
++    + _kpi_card_v2("🎫", "Total Incidents", "—", "#0f6e7a")
++    + _kpi_card_v2("🔴", "P1/P2 Incidents", "—", "#b3261e")
++    + _kpi_card_v2("⏱️", "Avg Resolution Time", "—", "#2b7a9b")
++    + _kpi_card_v2("📝", "Avg Worklog Score", "—", "#b7791f")
++    + _kpi_card_v2("⚠️", "Poor Worklog %", "—", "#c05621")
+     + "</div>"
+ )
+ 
+@@ -350,25 +350,25 @@
+         return (
+             '<div class="kpi-grid kpi-grid-5">'
+             + _kpi_card_v2(
+-                "🎫", "Total Incidents", kpis.get("total_incidents", 0), "#3b82f6",
++                "🎫", "Total Incidents", kpis.get("total_incidents", 0), "#0f6e7a",
+                 delta_html=_delta_html(deltas, "total_incidents"), spark_html=spark_html,
+                 link_tab="Categorization",
+             )
+             + _kpi_card_v2(
+-                "🔴", "P1/P2 Incidents", kpis.get("high_priority_count", 0), "#ef4444",
++                "🔴", "P1/P2 Incidents", kpis.get("high_priority_count", 0), "#b3261e",
+                 note=f'{kpis.get("high_priority_pct", 0)}% of total',
+                 delta_html=_delta_html(deltas, "high_priority_count"), link_tab="Categorization",
+             )
+             + _kpi_card_v2(
+-                "⏱️", "Avg Resolution Time", resolution_value, "#0ea5e9",
++                "⏱️", "Avg Resolution Time", resolution_value, "#2b7a9b",
+                 delta_html=_delta_html(deltas, "avg_resolution_hours"), link_tab="Trends",
+             )
+             + _kpi_card_v2(
+-                "📝", "Avg Worklog Score", f'{kpis.get("avg_worklog_score", 0)} / 100', "#f59e0b",
++                "📝", "Avg Worklog Score", f'{kpis.get("avg_worklog_score", 0)} / 100', "#b7791f",
+                 delta_html=_delta_html(deltas, "avg_worklog_score"), link_tab="Trends",
+             )
+             + _kpi_card_v2(
+-                "⚠️", "Poor Worklog %", f'{kpis.get("poor_worklog_pct", 0)}%', "#f97316",
++                "⚠️", "Poor Worklog %", f'{kpis.get("poor_worklog_pct", 0)}%', "#c05621",
+                 note=f'{kpis.get("poor_worklog_count", 0)} incident(s)',
+                 delta_html=_delta_html(deltas, "poor_worklog_pct"), link_tab="Recommendations",
+             )
+@@ -411,7 +411,7 @@
+     try:
+         if not items:
+             return '<div class="attention-ok">✅ No urgent issues - all monitored metrics are within healthy ranges.</div>'
+-        accents = {"critical": "#ef4444", "warning": "#f59e0b"}
++        accents = {"critical": "#b3261e", "warning": "#b7791f"}
+         rows = []
+         for item in items:
+             accent = accents.get(item.get("severity"), "#94a3b8")
+@@ -488,10 +488,10 @@
+ 
+ _RESOLUTION_METRICS_PLACEHOLDER = (
+     '<div class="kpi-grid">'
+-    + _kpi_card_v2("🔍", "MTTD (Detect)", "—", "#6366f1")
+-    + _kpi_card_v2("📨", "MTTA (Acknowledge)", "—", "#0ea5e9")
+-    + _kpi_card_v2("🛠️", "MTTR (Resolve)", "—", "#10b981")
+-    + _kpi_card_v2("🎯", "SLA Compliance", "—", "#f59e0b")
++    + _kpi_card_v2("🔍", "MTTD (Detect)", "—", "#4c6a92")
++    + _kpi_card_v2("📨", "MTTA (Acknowledge)", "—", "#2b7a9b")
++    + _kpi_card_v2("🛠️", "MTTR (Resolve)", "—", "#2e7d5b")
++    + _kpi_card_v2("🎯", "SLA Compliance", "—", "#b7791f")
+     + "</div>"
+ )
+ 
+@@ -514,15 +514,15 @@
+         sla_card = _kpi_card_v2("🎯", "SLA Compliance", "N/A", "#94a3b8", note=sla["note"])
+     else:
+         sla_card = _kpi_card_v2(
+-            "🎯", "SLA Compliance", f'{sla["compliance_pct"]}%', "#f59e0b",
++            "🎯", "SLA Compliance", f'{sla["compliance_pct"]}%', "#b7791f",
+             note=f'{sla["sample_size"]} resolved ticket(s), target by priority',
+         )
+ 
+     return (
+         '<div class="kpi-grid">'
+-        + _duration_card("🔍", "MTTD (Detect)", "#6366f1", metrics["mttd"])
+-        + _duration_card("📨", "MTTA (Acknowledge)", "#0ea5e9", metrics["mtta"])
+-        + _duration_card("🛠️", "MTTR (Resolve)", "#10b981", metrics["mttr"])
++        + _duration_card("🔍", "MTTD (Detect)", "#4c6a92", metrics["mttd"])
++        + _duration_card("📨", "MTTA (Acknowledge)", "#2b7a9b", metrics["mtta"])
++        + _duration_card("🛠️", "MTTR (Resolve)", "#2e7d5b", metrics["mttr"])
+         + sla_card
+         + "</div>"
+     )
+@@ -532,8 +532,8 @@
+     if not aggregate or not aggregate.get("available"):
+         return (
+             '<div class="kpi-grid">'
+-            + _kpi_card_v2("📨", "Avg time to acknowledge", "—", "#0ea5e9")
+-            + _kpi_card_v2("🔁", "Reassignments detected", "—", "#8b5cf6")
++            + _kpi_card_v2("📨", "Avg time to acknowledge", "—", "#2b7a9b")
++            + _kpi_card_v2("🔁", "Reassignments detected", "—", "#7a5c99")
+             + _kpi_card_v2("📝", "External Info missing", "—", "#94a3b8")
+             + "</div>"
+         )
+@@ -543,12 +543,12 @@
+     return (
+         '<div class="kpi-grid">'
+         + _kpi_card_v2(
+-            "📨", "Avg time to acknowledge", f"{ack}h" if ack is not None else "N/A", "#0ea5e9",
++            "📨", "Avg time to acknowledge", f"{ack}h" if ack is not None else "N/A", "#2b7a9b",
+             note=f"{aggregate.get('acknowledgment_data_available_for', 0)} ticket(s) with data" if ack is not None
+             else "No acknowledgment timestamp in this data",
+         )
+         + _kpi_card_v2(
+-            "🔁", "Reassignments detected", aggregate.get("incidents_with_reassignment_detected", 0), "#8b5cf6",
++            "🔁", "Reassignments detected", aggregate.get("incidents_with_reassignment_detected", 0), "#7a5c99",
+             note="Detected in External Info text",
+         )
+         + _kpi_card_v2(
+diff -ruN a/ui/constants.py b/ui/constants.py
+--- a/ui/constants.py	2026-10-04 08:30:54.000000000 +0000
++++ b/ui/constants.py	2026-10-06 04:16:10.223237784 +0000
+@@ -65,8 +65,8 @@
+ 
+ 
+ _CATEGORY_PALETTE = [
+-    "#6366f1", "#14b8a6", "#f59e0b", "#f43f5e",
+-    "#0ea5e9", "#a855f7", "#22c55e", "#64748b",
++    "#0f6e7a", "#3b6ea5", "#b7791f", "#b3261e",
++    "#2e7d5b", "#7a5c99", "#c05621", "#64748b",
+ ]
+ 
+ 
+@@ -80,9 +80,9 @@
+ 
+ 
+ _HEALTH_STATUS_STYLE = {
+-    "good": ("#10b981", "Good"),
+-    "warning": ("#f59e0b", "Needs Attention"),
+-    "critical": ("#ef4444", "Critical"),
++    "good": ("#2e7d5b", "Good"),
++    "warning": ("#b7791f", "Needs Attention"),
++    "critical": ("#b3261e", "Critical"),
+     "unknown": ("#94a3b8", "No Data"),
+ }
+ 
+@@ -120,16 +120,16 @@
+ 
+ 
+ _REC_ATTENTION_STYLE = {
+-    "Critical": ("#ef4444", "#fef2f2", "🔴 Critical"),
+-    "High": ("#f59e0b", "#fffbeb", "🟠 High"),
+-    "Medium": ("#3b82f6", "#eff6ff", "🔵 Medium"),
+-    "Low": ("#94a3b8", "#f8fafc", "⚪ Low"),
++    "Critical": ("#b3261e", "#b3261e1f", "🔴 Critical"),
++    "High": ("#b7791f", "#b7791f1f", "🟠 High"),
++    "Medium": ("#2b7a9b", "#2b7a9b1f", "🔵 Medium"),
++    "Low": ("#94a3b8", "#94a3b81f", "⚪ Low"),
+ }
+ 
+ 
+ _TREND_BAR_PALETTE = [
+-    "#3b82f6", "#f97316", "#10b981", "#8b5cf6", "#ec4899",
+-    "#06b6d4", "#f59e0b", "#84cc16", "#ef4444", "#6366f1",
++    "#0f6e7a", "#c05621", "#2e7d5b", "#7a5c99", "#c0587a",
++    "#3b6ea5", "#b7791f", "#6b8e23", "#b3261e", "#4c6a92",
+ ]
+ 
+ 
+diff -ruN a/ui/gradio_app.py b/ui/gradio_app.py
+--- a/ui/gradio_app.py	2026-10-04 08:30:54.000000000 +0000
++++ b/ui/gradio_app.py	2026-10-06 04:16:18.182479192 +0000
+@@ -17,9 +17,9 @@
+     tab_*.py                 per-tab refresh/generate handlers
+     layout.py                build_ui(): layout and event wiring
+ 
+-main.py keeps importing `CUSTOM_CSS` and `build_ui` from here, unchanged.
++main.py imports `CUSTOM_CSS`, `ITSM_THEME` and `build_ui` from here.
+ """
+ from ui.layout import build_ui
+-from ui.styles import CUSTOM_CSS
++from ui.styles import CUSTOM_CSS, ITSM_THEME
+ 
+-__all__ = ["CUSTOM_CSS", "build_ui"]
++__all__ = ["CUSTOM_CSS", "ITSM_THEME", "build_ui"]
+diff -ruN a/ui/styles.css b/ui/styles.css
+--- a/ui/styles.css	2026-10-04 08:30:54.000000000 +0000
++++ b/ui/styles.css	2026-10-06 04:18:49.118712191 +0000
+@@ -1,10 +1,21 @@
+ 
++@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap");
++
++/* Design tokens (light). Dark values are defined at the bottom of this file. */
+ :root {
+-    --dash-bg: #f5f6fa;
+-    --dash-border: #e5e9f0;
+-    --dash-text-muted: #64748b;
+-    --dash-text: #0f172a;
+-    --dash-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
++    --dash-bg: #f4f6f8;
++    --dash-card: #ffffff;
++    --dash-soft: #e8f1f3;
++    --dash-border: #dde3e9;
++    --dash-text-muted: #5d6b78;
++    --dash-text: #14202b;
++    --dash-primary: #0f6e7a;
++    --dash-primary-hover: #0b5862;
++    --dash-good: #2e7d5b;
++    --dash-fair: #b7791f;
++    --dash-poor: #b3261e;
++    --dash-shadow: 0 1px 2px rgba(20, 32, 43, 0.04);
++    --dash-radius: 10px;
+ }
+ 
+ html, body {margin: 0 !important; padding: 0 !important; background: var(--dash-bg) !important;}
+@@ -28,7 +39,7 @@
+ 
+ .side-brand {display: flex; align-items: center; gap: 10px;}
+ .side-brand-icon {
+-    width: 36px; height: 36px; border-radius: 9px; background: #2563eb;
++    width: 36px; height: 36px; border-radius: 9px; background: var(--dash-primary);
+     display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;
+ }
+ .side-brand-title {color: #fff; font-weight: 700; font-size: 1rem; line-height: 1.25; letter-spacing: -0.01em;}
+@@ -164,7 +175,7 @@
+     position: absolute !important; top: 16px !important; right: 20px !important;
+     z-index: 5 !important; display: inline-flex !important; align-items: center !important;
+     justify-content: center !important;
+-    background: #ffffff !important; color: #2563eb !important;
++    background: #ffffff !important; color: var(--dash-primary) !important;
+     border: 1px solid #bfdbfe !important; border-radius: 999px !important;
+     font-size: 0.95rem !important; line-height: 1 !important;
+     padding: 0 !important; height: 32px !important; width: 32px !important; min-width: 0 !important;
+@@ -274,7 +285,7 @@
+     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important; border: none !important;
+ }
+ #chatbot .message.user, #chatbot [class*="user-row"] .bubble, #chatbot .role-user {
+-    background: #2563eb !important; color: #ffffff !important;
++    background: var(--dash-primary) !important; color: #ffffff !important;
+ }
+ #chatbot .message.bot, #chatbot [class*="bot-row"] .bubble, #chatbot .role-assistant {
+     background: #ffffff !important; color: var(--dash-text) !important;
+@@ -293,7 +304,7 @@
+     border-radius: 22px !important; padding: 10px 18px !important; font-size: 0.88rem !important;
+     border: 1px solid var(--dash-border) !important; background: #f8fafc !important;
+ }
+-#chat-input-row textarea:focus {border-color: #2563eb !important; background: #ffffff !important;}
++#chat-input-row textarea:focus {border-color: var(--dash-primary) !important; background: #ffffff !important;}
+ #chat-input-row button.primary {
+     border-radius: 22px !important; font-weight: 600 !important; height: 42px !important; padding: 0 22px !important;
+ }
+@@ -346,7 +357,7 @@
+ #exec-summary-btn {
+     position: absolute !important; top: 18px !important; right: 20px !important;
+     z-index: 5 !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
+-    background: #ffffff !important; color: #2563eb !important;
++    background: #ffffff !important; color: var(--dash-primary) !important;
+     border: 1px solid #bfdbfe !important; border-radius: 999px !important;
+     font-size: 0.78rem !important; font-weight: 600 !important; line-height: 1 !important;
+     padding: 7px 16px !important; height: auto !important; min-width: 0 !important;
+@@ -411,7 +422,7 @@
+ #rec-writeup-btn {
+     position: absolute !important; top: 18px !important; right: 20px !important;
+     z-index: 5 !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
+-    background: #ffffff !important; color: #2563eb !important;
++    background: #ffffff !important; color: var(--dash-primary) !important;
+     border: 1px solid #bfdbfe !important; border-radius: 999px !important;
+     font-size: 0.78rem !important; font-weight: 600 !important; line-height: 1 !important;
+     padding: 7px 16px !important; height: auto !important; min-width: 0 !important;
+@@ -436,7 +447,7 @@
+     background: rgba(255,255,255,0.10); color: #e2e8f0; font-size: 0.8rem; font-weight: 600;
+ }
+ .hero-step-num {
+-    width: 20px; height: 20px; border-radius: 999px; background: #2563eb; color: #fff;
++    width: 20px; height: 20px; border-radius: 999px; background: var(--dash-primary); color: #fff;
+     display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem;
+ }
+ .hero-note {color: #8291a8; font-size: 0.78rem; margin-top: 14px;}
+@@ -455,191 +466,164 @@
+ /* Overview polish: KPI deltas / sparkline / clickable cards, bolder
+    Executive Summary button now that the card sits right under the KPIs. */
+ .kpi-delta {display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 5px; font-size: 0.72rem; font-weight: 700; line-height: 1.3;}
+-.kpi-delta-good {color: #059669;}
+-.kpi-delta-bad {color: #dc2626;}
++.kpi-delta-good {color: var(--dash-good);}
++.kpi-delta-bad {color: var(--dash-poor);}
+ .kpi-delta-flat {color: var(--dash-text-muted);}
+ .kpi-delta-sub {font-weight: 500; color: var(--dash-text-muted);}
+ .kpi-spark {margin-left: auto; flex-shrink: 0;}
+ .kpi-link {cursor: pointer;}
+ .kpi-link:hover {border-color: #bfdbfe; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.12);}
+ #exec-summary-card {margin-top: 0 !important;}
+-#exec-summary-btn {background: #2563eb !important; color: #ffffff !important; border-color: #2563eb !important;}
+-#exec-summary-btn:hover {background: #1d4ed8 !important; border-color: #1d4ed8 !important;}
++#exec-summary-btn {background: var(--dash-primary) !important; color: #ffffff !important; border-color: var(--dash-primary) !important;}
++#exec-summary-btn:hover {background: var(--dash-primary-hover) !important; border-color: var(--dash-primary-hover) !important;}
+ 
+ /* =====================================================================
+-   Visual refresh - layered on top of the base styles above so nothing
+-   structural changes (same ids/classes, same layout, same wiring).
++   Look & feel v3 - "Incident Quality Analyzer" design language.
++   Flat white cards on a cool grey page, teal primary, 10px radii,
++   sentence-case labels, Public Sans. Layered over the base styles with
++   the same ids/classes, so layout and wiring are untouched. All colors
++   come from the tokens at the top of this file (dark mode redefines
++   them at the bottom).
+    ===================================================================== */
+-:root {
+-    --brand-1: #2563eb;
+-    --brand-2: #7c3aed;
+-    --dash-bg: #f3f5fb;
+-    --dash-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 6px 18px rgba(30, 41, 90, 0.06);
+-    --dash-shadow-hover: 0 2px 4px rgba(15, 23, 42, 0.06), 0 14px 30px rgba(30, 41, 90, 0.12);
+-}
+ html, body, .gradio-container {
+-    background:
+-        radial-gradient(900px 380px at 12% -80px, rgba(37, 99, 235, 0.10), transparent 70%),
+-        radial-gradient(800px 340px at 92% -60px, rgba(124, 58, 237, 0.09), transparent 70%),
+-        var(--dash-bg) !important;
+-    background-attachment: fixed !important;
++    background: var(--dash-bg) !important; color: var(--dash-text);
++    font-family: "Public Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif !important;
+ }
++button, input, textarea, select {font-family: inherit !important;}
+ 
+-/* Header bar: deep gradient + soft glow */
++/* Header: light bar with a bottom rule instead of the dark gradient */
+ #topbar-wrap {
+-    background: linear-gradient(110deg, #0b1626 0%, #13294b 55%, #2a2f7a 100%) !important;
+-    position: relative; overflow: hidden;
+-    box-shadow: 0 4px 22px rgba(11, 22, 38, 0.35) !important;
+-}
+-#topbar-wrap::after {
+-    content: ""; position: absolute; right: -60px; top: -80px; width: 280px; height: 280px; border-radius: 50%;
+-    background: radial-gradient(circle, rgba(124, 58, 237, 0.45), transparent 65%); pointer-events: none;
++    background: var(--dash-card) !important; box-shadow: none !important;
++    border-bottom: 1px solid var(--dash-border) !important; overflow: visible;
+ }
+-.side-brand-icon {
+-    background: linear-gradient(135deg, var(--brand-1), var(--brand-2)) !important;
+-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.55); width: 40px !important; height: 40px !important; font-size: 1.25rem !important;
+-}
+-.side-brand-title {font-size: 1.08rem !important;}
+-.side-brand-sub {color: #a9b8d4 !important;}
++#topbar-wrap::after {display: none !important;}
++.side-brand-icon {background: var(--dash-primary) !important; box-shadow: none !important; border-radius: 10px !important;}
++.side-brand-title {color: var(--dash-text) !important; font-weight: 700 !important;}
++.side-brand-sub {color: var(--dash-text-muted) !important;}
+ 
+-/* Page title with gradient text */
++/* Page title: plain ink, no gradient text */
+ #topbar h1 {
+-    font-size: 1.55rem !important; font-weight: 800 !important;
+-    background: linear-gradient(90deg, #0f172a 0%, #1d4ed8 55%, #7c3aed 100%);
+-    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
++    background: none !important; -webkit-text-fill-color: currentColor !important; color: var(--dash-text) !important;
++    font-weight: 700 !important; letter-spacing: -0.01em;
+ }
+-#topbar p {font-size: 0.9rem !important;}
+ 
+-/* Tabs: floating pill bar */
++/* Tabs: bordered bar, selected tab is a soft teal chip */
+ #main-tabs > .tab-nav {
+-    background: #ffffff !important; border: 1px solid var(--dash-border) !important; border-radius: 14px !important;
+-    padding: 6px !important; gap: 4px !important; box-shadow: var(--dash-shadow); margin-bottom: 22px !important;
+-}
+-#main-tabs > .tab-nav button {
+-    border-radius: 10px !important; border-bottom: none !important; margin-bottom: 0 !important;
+-    padding: 9px 16px !important;
++    background: var(--dash-card) !important; border: 1px solid var(--dash-border) !important;
++    border-radius: var(--dash-radius) !important; box-shadow: none !important;
+ }
+-#main-tabs > .tab-nav button:hover {background: #eef2ff !important; color: #1d4ed8 !important;}
++#main-tabs > .tab-nav button {border-radius: 8px !important; color: var(--dash-text-muted) !important;}
++#main-tabs > .tab-nav button:hover {background: var(--dash-soft) !important; color: var(--dash-primary) !important;}
+ #main-tabs > .tab-nav button.selected {
+-    color: #ffffff !important; border-bottom: none !important;
+-    background: linear-gradient(135deg, var(--brand-1), var(--brand-2)) !important;
+-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
++    background: var(--dash-soft) !important; color: var(--dash-primary) !important; box-shadow: none !important;
+ }
+ 
+-/* Cards: softer, lift on hover, subtle entrance */
+-.dash-card {
+-    border-radius: 18px !important; border: 1px solid rgba(226, 232, 240, 0.9) !important;
+-    box-shadow: var(--dash-shadow) !important; transition: box-shadow 0.2s ease, transform 0.2s ease;
+-    animation: card-in 0.35s ease both;
+-}
+-.dash-card:hover {box-shadow: var(--dash-shadow-hover) !important;}
+-@keyframes card-in {from {opacity: 0; transform: translateY(6px);} to {opacity: 1; transform: none;}}
+-
+-/* Section headings with a gradient accent tick */
+-.section-heading {border-bottom: 1px solid #eef1f6 !important;}
+-.section-heading h3 {
+-    display: flex; align-items: center; gap: 10px; margin: 0 !important; font-size: 1rem !important; font-weight: 700 !important;
++/* Cards: flat, 1px border, no lift or entrance animation */
++.dash-card, .kpi-card, .health-card, .rec-card, .agent-progress {
++    background: var(--dash-card) !important; border-color: var(--dash-border) !important;
++    border-radius: var(--dash-radius) !important; box-shadow: none !important; animation: none !important;
++}
++.dash-card:hover, .kpi-card:hover, .health-card:hover, .rec-card:hover {transform: none !important; box-shadow: none !important;}
++.kpi-link:hover {border-color: var(--dash-primary) !important;}
++.section-heading {border-bottom: 1px solid var(--dash-border) !important;}
++.section-heading h3 {font-weight: 600 !important;}
++.section-heading h3::before {display: none !important;}
++
++/* KPI cards: sentence-case label, quieter numbers */
++.kpi-label {text-transform: none !important; letter-spacing: 0 !important; font-size: 0.78rem !important; font-weight: 500 !important;}
++.kpi-value {font-weight: 700 !important; letter-spacing: -0.02em;}
++.kpi-icon {border-radius: 10px !important;}
++.health-dot {box-shadow: none !important;}
++.health-status {text-transform: none !important; letter-spacing: 0 !important;}
++.attention-item {background: var(--dash-soft) !important; border-radius: 8px !important;}
++.attention-ok, .rec-empty, #cache-notice {
++    background: color-mix(in srgb, var(--dash-good) 12%, var(--dash-card)) !important;
++    border: 1px solid color-mix(in srgb, var(--dash-good) 40%, var(--dash-card)) !important; color: var(--dash-good) !important;
++}
++
++/* Buttons: solid teal primary, outlined secondary */
++button.primary, .gr-button.primary, #exec-summary-btn, #rec-writeup-btn, #results-download-btn {
++    background: var(--dash-primary) !important; color: #ffffff !important; border: 1px solid var(--dash-primary) !important;
++    box-shadow: none !important; border-radius: 8px !important; transform: none !important; filter: none !important;
++}
++button.primary:hover, #exec-summary-btn:hover, #rec-writeup-btn:hover, #results-download-btn:hover {
++    background: var(--dash-primary-hover) !important; border-color: var(--dash-primary-hover) !important; transform: none !important;
++}
++#exec-summary-btn, #rec-writeup-btn {border-radius: 8px !important;}
++button.secondary {
++    background: transparent !important; color: var(--dash-primary) !important; border: 1px solid var(--dash-primary) !important;
++    border-radius: 8px !important; box-shadow: none !important;
+ }
+-.section-heading h3::before {
+-    content: ""; width: 4px; height: 18px; border-radius: 4px; flex-shrink: 0;
+-    background: linear-gradient(180deg, var(--brand-1), var(--brand-2));
++button.secondary:hover {background: var(--dash-soft) !important; color: var(--dash-primary-hover) !important; border-color: var(--dash-primary) !important;}
++button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {outline: 3px solid var(--dash-fair) !important; outline-offset: 2px;}
++#exec-summary-output, #rec-writeup-output {
++    background: var(--dash-soft) !important; border: 1px solid var(--dash-border) !important; border-radius: 8px !important;
+ }
+ 
+-/* KPI cards */
+-.kpi-card {
+-    border-radius: 16px !important; border: 1px solid #e8ecf5 !important;
+-    background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%) !important;
+-    box-shadow: var(--dash-shadow) !important; transition: transform 0.18s ease, box-shadow 0.18s ease;
+-}
+-.kpi-card:hover {transform: translateY(-2px); box-shadow: var(--dash-shadow-hover) !important;}
+-.kpi-icon {width: 46px !important; height: 46px !important; border-radius: 14px !important; font-size: 1.3rem !important;}
+-.kpi-value {font-size: 1.9rem !important; font-weight: 800 !important; letter-spacing: -0.02em;}
+-.kpi-label {letter-spacing: 0.06em !important;}
+-
+-/* Health + attention */
+-.health-card {border-radius: 16px !important; transition: transform 0.18s ease, box-shadow 0.18s ease;}
+-.health-card:hover {transform: translateY(-2px); box-shadow: var(--dash-shadow-hover);}
+-.health-dot {box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, #94a3b8) 22%, transparent);}
+-.attention-item {border-radius: 12px !important;}
+-
+-/* Buttons */
+-button.primary, .gr-button.primary {
+-    background: linear-gradient(135deg, var(--brand-1), var(--brand-2)) !important; border: none !important;
+-    color: #ffffff !important; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35) !important;
+-    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+-}
+-button.primary:hover {transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 8px 20px rgba(79, 70, 229, 0.42) !important;}
+-button.secondary {border-radius: 10px !important; font-weight: 600 !important; transition: all 0.15s ease;}
+-button.secondary:hover {border-color: #a5b4fc !important; color: #4338ca !important; background: #eef2ff !important;}
+-
+-/* "Generate summary / write-up" pills share one look */
+-#exec-summary-btn, #rec-writeup-btn {
+-    background: linear-gradient(135deg, var(--brand-1), var(--brand-2)) !important; color: #ffffff !important;
+-    border: none !important; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35) !important;
+-}
+-#exec-summary-btn:hover, #rec-writeup-btn:hover {
+-    background: linear-gradient(135deg, #1d4ed8, #6d28d9) !important; filter: brightness(1.05);
++/* Hero: soft card with step pills (matches the stepper in the demo) */
++.hero-card {
++    background: var(--dash-card) !important; border: 1px solid var(--dash-border) !important; box-shadow: none !important;
++    border-radius: var(--dash-radius) !important;
+ }
+-#exec-summary-output, #rec-writeup-output {
+-    background: linear-gradient(180deg, #f8faff, #ffffff); border: 1px dashed #c7d2fe; border-radius: 12px;
+-    padding: 12px 16px !important;
++.hero-card::before, .hero-card::after {display: none !important;}
++.hero-title {color: var(--dash-text) !important; font-weight: 700 !important;}
++.hero-sub, .hero-note {color: var(--dash-text-muted) !important;}
++.hero-step {
++    background: var(--dash-card) !important; color: var(--dash-text-muted) !important; backdrop-filter: none !important;
++    border: 1px solid var(--dash-border) !important; font-weight: 500 !important;
+ }
++.hero-step-num {background: var(--dash-primary) !important; color: #ffffff !important;}
+ 
+-/* Hero */
+-.hero-card {
+-    position: relative; overflow: hidden; border-radius: 20px !important; padding: 32px 34px !important;
+-    background: linear-gradient(120deg, #0b1626 0%, #16345c 55%, #4338ca 100%) !important;
+-    box-shadow: 0 14px 40px rgba(30, 41, 120, 0.28) !important;
+-}
+-.hero-card::before {
+-    content: ""; position: absolute; right: -70px; top: -90px; width: 320px; height: 320px; border-radius: 50%;
+-    background: radial-gradient(circle, rgba(167, 139, 250, 0.55), transparent 65%);
+-}
+-.hero-card::after {
+-    content: ""; position: absolute; left: 35%; bottom: -120px; width: 300px; height: 300px; border-radius: 50%;
+-    background: radial-gradient(circle, rgba(56, 189, 248, 0.28), transparent 65%);
+-}
+-.hero-card > * {position: relative; z-index: 1;}
+-.hero-title {font-size: 1.7rem !important; font-weight: 800 !important;}
+-.hero-step {backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.12) !important;}
+-.hero-step-num {background: linear-gradient(135deg, #38bdf8, #6366f1) !important;}
+-
+-/* Loaded strip + upload row */
+-#loaded-strip {border-left: 4px solid #22c55e !important;}
+-#input-row {border-radius: 18px !important;}
+-#file-upload .wrap {border-radius: 12px !important; border: 1.5px dashed #a5b4fc !important; background: #f8faff !important;}
++/* Upload row, loaded strip */
++#loaded-strip {border-left: 4px solid var(--dash-good) !important;}
++#input-row {border-radius: var(--dash-radius) !important; background: var(--dash-soft) !important;}
++#file-upload .wrap {border: 2px dashed var(--dash-border) !important; background: var(--dash-card) !important; border-radius: var(--dash-radius) !important;}
++#file-upload .wrap:hover {border-color: var(--dash-primary) !important;}
++
++/* Tables */
++#results-table table th, #timeline-table table th {
++    background: var(--dash-card) !important; color: var(--dash-text-muted) !important; text-transform: none !important;
++    letter-spacing: 0 !important; font-weight: 600 !important; border-bottom: 1px solid var(--dash-border) !important;
++}
++#results-table table tbody tr:nth-child(even) td {background: var(--dash-card) !important;}
++#results-table table tbody tr:hover td {background: var(--dash-soft) !important;}
++#results-table table td {border-bottom: 1px solid var(--dash-border) !important;}
++.mini-table th {text-transform: none !important; letter-spacing: 0 !important; font-size: 0.74rem !important;}
++.mini-table td {border-bottom-color: var(--dash-border) !important;}
++.mini-table tbody tr:hover td {background: var(--dash-soft) !important;}
++
++/* Recommendation cards and chips */
++.rec-chip {background: var(--dash-soft) !important; box-shadow: none !important; border-color: var(--dash-border) !important; color: var(--dash-text) !important;}
++.rec-chip-count {background: var(--dash-card) !important;}
++.rec-badge-area {background: var(--dash-soft) !important;}
++.rec-row-label {text-transform: none !important; letter-spacing: 0 !important; font-size: 0.78rem !important;}
+ 
+-/* Recent Incidents table */
+-#results-table table th {
+-    background: linear-gradient(180deg, #f1f4fb, #e9eef9) !important; color: #475569 !important;
+-    border-bottom: 2px solid #dbe3f3 !important; padding: 9px 12px !important;
+-}
+-#results-table table td {padding: 6px 12px !important; height: 34px !important; max-height: 34px !important;}
+-#results-table table tbody tr:hover td {background: #eef2ff !important;}
+-#results-download-btn {background: linear-gradient(135deg, var(--brand-1), var(--brand-2)) !important; color: #fff !important; border: none !important;}
+-
+-/* Recommendation cards */
+-.rec-card {border-radius: 14px !important; transition: transform 0.18s ease, box-shadow 0.18s ease;}
+-.rec-card:hover {transform: translateY(-2px); box-shadow: var(--dash-shadow-hover);}
+-.rec-chip {background: #ffffff !important; box-shadow: var(--dash-shadow);}
+-.mini-table tbody tr:hover td {background: #f5f7ff;}
+-.bar-fill {background-image: linear-gradient(90deg, rgba(255,255,255,0.0), rgba(255,255,255,0.28)); }
++/* Bars */
++.bar-track {background: var(--dash-soft) !important;}
+ 
+ /* Chat */
+-#chatbot .message.user, #chatbot [class*="user-row"] .bubble, #chatbot .role-user {
+-    background: linear-gradient(135deg, var(--brand-1), var(--brand-2)) !important;
+-}
+-#chat-panel {border-radius: 20px !important;}
++#chatbot .wrap {background: var(--dash-bg) !important;}
++#chatbot .message.user, #chatbot [class*="user-row"] .bubble, #chatbot .role-user {background: var(--dash-primary) !important; color: #ffffff !important;}
++#chatbot .message.bot, #chatbot [class*="bot-row"] .bubble, #chatbot .role-assistant {background: var(--dash-card) !important; color: var(--dash-text) !important;}
++#chat-panel {border-radius: var(--dash-radius) !important;}
++#chat-input-row {background: var(--dash-card) !important;}
++#chat-input-row textarea {background: var(--dash-bg) !important; color: var(--dash-text) !important;}
++#chat-input-row textarea:focus {border-color: var(--dash-primary) !important; background: var(--dash-card) !important;}
+ 
+ /* Progress bar */
+-.agent-progress {border-radius: 16px !important; box-shadow: var(--dash-shadow-hover) !important;}
+-.agent-progress-fill {background: linear-gradient(90deg, #2563eb, #7c3aed, #2563eb) !important;}
++.agent-progress-track {background: var(--dash-soft) !important;}
++.agent-progress-fill {background: linear-gradient(90deg, var(--dash-primary), var(--dash-primary-hover), var(--dash-primary)) !important;}
++
++/* Charts: let the page tokens drive text, separators and the donut gaps */
++.js-plotly-plot .legendtext, .js-plotly-plot .xtick text, .js-plotly-plot .ytick text,
++.js-plotly-plot .g-xtitle text, .js-plotly-plot .g-ytitle text, .js-plotly-plot .annotation text {fill: var(--dash-text) !important;}
++.js-plotly-plot .pielayer .slice path {stroke: var(--dash-card) !important;}
++.js-plotly-plot .gridlayer path {stroke: var(--dash-border) !important;}
+ 
+ /* Scrollbars */
+-* {scrollbar-width: thin; scrollbar-color: #c7d2fe transparent;}
+-*::-webkit-scrollbar {width: 8px; height: 8px;}
+-*::-webkit-scrollbar-thumb {background: #c7d2fe; border-radius: 8px;}
+-*::-webkit-scrollbar-thumb:hover {background: #a5b4fc;}
++* {scrollbar-color: var(--dash-border) transparent;}
++*::-webkit-scrollbar-thumb {background: var(--dash-border);}
++*::-webkit-scrollbar-thumb:hover {background: var(--dash-text-muted);}
+ 
+ /* =====================================================================
+    Compact pass - less vertical space on the Overview so the whole
+@@ -703,7 +687,7 @@
+ .bar-row {gap: 10px !important;}
+ .bar-dot {width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;}
+ .bar-label {flex: 0 0 110px !important; font-weight: 600 !important;}
+-.bar-track {height: 12px !important; background: #eef1f8 !important;}
++.bar-track {height: 12px !important;}
+ .bar-fill {border-radius: 999px !important; background-image: none !important; transition: width 0.4s ease;}
+ .bar-count {flex: 0 0 32px !important; font-weight: 700; color: var(--dash-text) !important;}
+ .bar-share {flex: 0 0 38px; text-align: right; font-size: 0.74rem; font-weight: 600; color: var(--dash-text-muted); font-variant-numeric: tabular-nums;}
+@@ -712,3 +696,23 @@
+     .kpi-grid, .kpi-grid-5, .health-grid {grid-template-columns: repeat(2, 1fr) !important;}
+     #main-col {padding: 14px 12px 24px !important;}
+ }
++
++/* =====================================================================
++   Dark mode. Gradio adds the `dark` class to the page when the viewer's
++   system (or ?__theme=dark) asks for it; only the tokens change.
++   ===================================================================== */
++.dark {
++    --dash-bg: #0f1620;
++    --dash-card: #18222e;
++    --dash-soft: #1d2e38;
++    --dash-border: #2a3846;
++    --dash-text-muted: #93a3b3;
++    --dash-text: #e6edf3;
++    --dash-primary: #4fb3c0;
++    --dash-primary-hover: #7cc7d1;
++    --dash-good: #4cc38a;
++    --dash-fair: #e0a93b;
++    --dash-poor: #ef6b62;
++}
++.dark button.primary, .dark .gr-button.primary, .dark #exec-summary-btn, .dark #rec-writeup-btn, .dark #results-download-btn,
++.dark #chatbot .message.user, .dark #chatbot [class*="user-row"] .bubble, .dark #chatbot .role-user, .dark .hero-step-num, .dark .side-brand-icon {color: #0f1620 !important;}
+diff -ruN a/ui/styles.py b/ui/styles.py
+--- a/ui/styles.py	2026-10-04 08:30:54.000000000 +0000
++++ b/ui/styles.py	2026-10-06 04:16:18.181632847 +0000
+@@ -1,5 +1,23 @@
+-"""Dashboard CSS. The stylesheet itself lives in styles.css next to this file so it can be
+-edited (and syntax-highlighted) as plain CSS; main.py passes CUSTOM_CSS to Gradio."""
++"""Dashboard CSS and Gradio theme. The stylesheet itself lives in styles.css next to this file so it
++can be edited (and syntax-highlighted) as plain CSS; main.py passes CUSTOM_CSS and ITSM_THEME to Gradio.
++
++ITSM_THEME gives Gradio's own widgets (inputs, dropdowns, tables, chat) the same teal primary and
++Public Sans font as the dashboard CSS, in both light and dark mode."""
+ from pathlib import Path
+ 
++import gradio as gr
++
+ CUSTOM_CSS = Path(__file__).with_name("styles.css").read_text(encoding="utf-8")
++
++_TEAL = gr.themes.Color(
++    c50="#e8f1f3", c100="#d1e5e8", c200="#a3cbd1", c300="#75b1ba", c400="#479aa6",
++    c500="#1f8391", c600="#0f6e7a", c700="#0b5862", c800="#08434b", c900="#052e34", c950="#031d21",
++    name="itsm_teal",
++)
++
++ITSM_THEME = gr.themes.Soft(
++    primary_hue=_TEAL,
++    neutral_hue="slate",
++    font=[gr.themes.GoogleFont("Public Sans"), "Inter", "system-ui", "sans-serif"],
++    radius_size=gr.themes.sizes.radius_md,
++)
