@@ -1,0 +1,936 @@
+
+@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap");
+
+/* Design tokens (light). Dark values are defined at the bottom of this file. */
+:root {
+    --dash-bg: #f4f6f8;
+    --dash-card: #ffffff;
+    --dash-soft: #e8f1f3;
+    --dash-border: #dde3e9;
+    --dash-text-muted: #5d6b78;
+    --dash-text: #14202b;
+    --dash-primary: #0f6e7a;
+    --dash-primary-hover: #0b5862;
+    --dash-good: #2e7d5b;
+    --dash-fair: #b7791f;
+    --dash-poor: #b3261e;
+    --dash-shadow: 0 1px 2px rgba(20, 32, 43, 0.04);
+    --dash-radius: 10px;
+}
+
+html, body {margin: 0 !important; padding: 0 !important; background: var(--dash-bg) !important;}
+
+.gradio-container {
+    max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important;
+    background: var(--dash-bg) !important; font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+footer {display: none !important;}
+
+/* App shell (Step: sidebar removed) - a full-width dark header bar
+   (brand only, no nav - navigation lives in the tab bar below it) sits
+   above a single light content column. Simpler than the old
+   sidebar+main-column split, and the content area now gets the full
+   viewport width instead of losing ~210px to a nav rail. */
+#topbar-wrap {
+    background: #0f1f33 !important; padding: 18px 28px !important; margin: 0 !important;
+    border-radius: 0 !important; display: flex !important; align-items: center !important; gap: 12px !important;
+}
+#main-col {padding: 20px 28px 32px !important; max-width: 1440px; margin: 0 auto !important;}
+
+.side-brand {display: flex; align-items: center; gap: 10px;}
+.side-brand-icon {
+    width: 36px; height: 36px; border-radius: 9px; background: var(--dash-primary);
+    display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;
+}
+.side-brand-title {color: #fff; font-weight: 700; font-size: 1rem; line-height: 1.25; letter-spacing: -0.01em;}
+.side-brand-sub {color: #8291a8; font-size: 0.75rem; line-height: 1.2; margin-top: 1px;}
+
+/* Tab bar is now the ONLY navigation (native Gradio tabs, previously
+   hidden and driven by the sidebar buttons instead) - styled as a clean
+   horizontal, icon-led bar rather than Gradio's default pill tabs. */
+#main-tabs > .tab-nav {
+    display: flex !important; gap: 4px !important; background: transparent !important;
+    border: none !important; border-bottom: 1px solid var(--dash-border) !important;
+    margin-bottom: 20px !important; padding: 0 !important; overflow-x: auto !important;
+}
+#main-tabs > .tab-nav button {
+    border: none !important; background: transparent !important; border-radius: 8px 8px 0 0 !important;
+    padding: 10px 16px !important; font-size: 0.86rem !important; font-weight: 600 !important;
+    color: var(--dash-text-muted) !important; border-bottom: 2px solid transparent !important;
+    margin-bottom: -1px !important; white-space: nowrap !important; transition: color 0.15s, background 0.15s;
+}
+#main-tabs > .tab-nav button:hover {color: var(--dash-text) !important; background: #eef1f6 !important;}
+#main-tabs > .tab-nav button.selected {
+    color: #1d5fe0 !important; border-bottom: 2px solid #1d5fe0 !important; background: transparent !important;
+}
+#main-tabs > .tabitem {border: none !important; padding: 0 !important; background: transparent !important;}
+#main-tabs {border: none !important; background: transparent !important;}
+
+/* Top bar - plain title/subtitle on the left, a status badge on the
+   right, replacing the old solid-color banner to match the reference. */
+#topbar {align-items: center !important; margin-bottom: 16px; gap: 14px !important;}
+#topbar h1 {margin: 0; font-size: 1.3rem; font-weight: 700; color: var(--dash-text); letter-spacing: -0.01em;}
+#topbar p {margin: 3px 0 0; font-size: 0.85rem; color: var(--dash-text-muted);}
+.severity-note {font-size: 0.78rem; color: var(--dash-text-muted); margin: 0 0 18px 2px; font-style: italic;}
+.severity-note p {margin: 0;}
+
+/* Section headings used above each dash-card block on the dashboard. */
+.section-heading {
+    font-size: 0.95rem !important; font-weight: 700 !important; color: var(--dash-text) !important;
+    margin: 0 0 14px 0 !important; padding-bottom: 10px !important; border-bottom: 1px solid var(--dash-border) !important;
+    letter-spacing: -0.01em;
+}
+
+#cache-notice {
+    background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px;
+    padding: 8px 14px; font-size: 0.85rem; color: #166534; margin-bottom: 14px;
+}
+
+/* Card wrapper used around every major section - gives the dribbble-style
+   raised-panel look instead of controls floating on the bare page. */
+.dash-card {
+    background: #ffffff !important; border: 1px solid var(--dash-border) !important;
+    border-radius: 16px !important; padding: 18px 20px !important; box-shadow: var(--dash-shadow);
+}
+
+/* KPI strip */
+#metrics-row {margin-bottom: 18px; gap: 14px !important;}
+.kpi-grid {display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;}
+.kpi-grid-5 {grid-template-columns: repeat(5, 1fr);}
+.kpi-card {
+    background: #ffffff; border: 1px solid var(--dash-border); border-radius: 14px;
+    padding: 16px 20px; box-shadow: var(--dash-shadow); border-left: 4px solid var(--accent, #3b82f6);
+    transition: box-shadow 0.15s ease;
+}
+.kpi-card:hover {box-shadow: 0 4px 10px rgba(15, 23, 42, 0.09);}
+.kpi-label {font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--dash-text-muted); margin-bottom: 8px;}
+.kpi-value {font-size: 1.65rem; font-weight: 700; color: var(--dash-text); line-height: 1; font-variant-numeric: tabular-nums;}
+
+/* v2 KPI cards - icon chip + label/value, border-left removed in favor
+   of a plain card since the icon already carries the accent color. */
+.kpi-card-v2 {display: flex; align-items: center; gap: 12px; border-left: 1px solid var(--dash-border);}
+.kpi-icon {width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0;}
+.kpi-note {font-size: 0.68rem; color: var(--dash-text-muted); margin-top: 4px; line-height: 1.3;}
+
+/* Horizontal bar-list panels (category / host breakdowns). */
+.bar-list {display: flex; flex-direction: column; gap: 12px;}
+.bar-row {display: flex; align-items: center; gap: 10px;}
+.bar-label {
+    flex: 0 0 120px; font-size: 0.82rem; color: var(--dash-text); font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bar-track {flex: 1 1 auto; height: 10px; border-radius: 999px; background: #eef1f5; overflow: hidden;}
+.bar-fill {height: 100%; border-radius: 999px;}
+.bar-count {flex: 0 0 40px; font-size: 0.82rem; color: var(--dash-text-muted); text-align: right; font-variant-numeric: tabular-nums;}
+
+/* Mini data tables (repeated issues / assignment group performance). */
+.mini-table {width: 100%; border-collapse: collapse; font-size: 0.82rem;}
+.mini-table th {
+    text-align: left; padding: 6px 8px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.03em; color: var(--dash-text-muted); border-bottom: 1px solid var(--dash-border);
+}
+.mini-table td {padding: 7px 8px; border-bottom: 1px solid #f1f4f8; color: var(--dash-text);}
+.mini-table tbody tr:last-child td {border-bottom: none;}
+
+#panel-row-1 {gap: 14px !important; margin-bottom: 14px;}
+#panel-row-2 {gap: 14px !important; margin-bottom: 20px;}
+
+/* Full-width input bar - a single horizontal card housing the upload,
+   paste, analyze, and download controls with consistent alignment. */
+#input-row {gap: 20px !important; margin-bottom: 18px; align-items: end !important; padding: 12px 20px !important;}
+#input-row label {font-weight: 600; font-size: 0.82rem; color: var(--dash-text);}
+#input-row .gr-button.primary, #input-row button.primary {
+    border-radius: 10px !important; font-weight: 600 !important; box-shadow: 0 1px 2px rgba(15,23,42,.18);
+    height: 36px !important;
+}
+#action-col {display: flex; flex-direction: column; gap: 6px; justify-content: flex-end;}
+#action-col .gr-file, #action-col [data-testid="file"] {min-height: 0 !important;}
+
+/* Compact upload dropzone - the default Gradio File drop area is tall
+   and mostly empty space; shrink it down to a slim strip. */
+#file-upload {min-height: 0 !important;}
+#file-upload .wrap {
+    min-height: 38px !important; padding: 6px 10px !important;
+}
+#file-upload .wrap svg {width: 15px !important; height: 15px !important; margin-bottom: 1px !important;}
+#file-upload .wrap > * {font-size: 0.72rem !important;}
+
+/* Paste-text box in the same row - trim its line height/padding so it
+   matches the shrunk upload dropzone instead of towering over it. */
+#input-row textarea {min-height: 0 !important; padding: 6px 10px !important; font-size: 0.8rem !important;}
+
+#results-section {margin-bottom: 20px;}
+
+/* Recent Incidents card - icon-only download button pinned to the
+   card's own top-right corner, same technique/reasoning as
+   #exec-summary-btn below (position:absolute on the card rather than a
+   gr.Row, since Gradio's own negative Row margins would otherwise push
+   it outside the card border). Sits right next to the table's own
+   built-in copy/fullscreen toolbar icons, which live in the table's own
+   top-right corner - Gradio doesn't expose a hook to place a button
+   inside that native toolbar itself. */
+#results-section {position: relative !important; overflow: visible;}
+#results-section .section-heading {padding-right: 56px !important;}
+#results-download-btn {
+    position: absolute !important; top: 16px !important; right: 20px !important;
+    z-index: 5 !important; display: inline-flex !important; align-items: center !important;
+    justify-content: center !important;
+    background: #ffffff !important; color: var(--dash-primary) !important;
+    border: 1px solid #bfdbfe !important; border-radius: 999px !important;
+    font-size: 0.95rem !important; line-height: 1 !important;
+    padding: 0 !important; height: 32px !important; width: 32px !important; min-width: 0 !important;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.06) !important;
+}
+#results-download-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
+
+/* Results table - fixed-height, single-line rows instead of letting long
+   Description/Worklog text blow rows out. The Python side already
+   truncates + strips HTML tags (see _preview_html); this just makes sure
+   the CSS doesn't fight that by re-wrapping or auto-growing rows. Full
+   text is available on hover via the native title tooltip. */
+#results-table table th {
+    background: #f8fafc !important; font-weight: 600 !important; font-size: 0.72rem !important;
+    text-transform: uppercase; letter-spacing: 0.03em; color: var(--dash-text-muted) !important;
+    padding: 6px 10px !important;
+}
+#results-table table td {
+    padding: 4px 10px !important; font-size: 0.78rem !important;
+    height: 26px !important; max-height: 26px !important; line-height: 1.1 !important;
+    vertical-align: middle !important;
+    white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+    border-bottom: 1px solid #eef1f5 !important;
+}
+#results-table table td span[title] {cursor: help;}
+#results-table table tbody tr:nth-child(even) td {background: #fbfcfe !important;}
+#results-table table tbody tr:hover td {background: #f8fafc !important;}
+
+#pagination-row {
+    margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 16px;
+}
+#pagination-row button {border-radius: 8px !important; font-weight: 600 !important;}
+#page-indicator {text-align: center; font-size: 0.85rem; color: var(--dash-text-muted); padding-top: 8px; font-weight: 500;}
+#page-size-dropdown {min-width: 130px !important; max-width: 150px !important;}
+#page-size-dropdown label span {font-size: 0.72rem !important; color: var(--dash-text-muted) !important;}
+
+.plotly {border-radius: 10px;}
+
+/* Animated "agent working" progress bar - shown in one fixed, centered
+   spot (a compact card, not a full-width strip) while an analysis is
+   running, instead of Gradio's default per-component loading overlays
+   scattered across the summary/donut chart section. */
+#agent-progress {margin: 0 auto 16px; max-width: 600px;}
+.agent-progress {
+    display: flex; align-items: center; gap: 14px;
+    background: #ffffff; border: 1px solid var(--dash-border); border-radius: 14px;
+    padding: 12px 20px; box-shadow: var(--dash-shadow);
+}
+.agent-progress-icon {
+    font-size: 1.3rem; flex-shrink: 0;
+    animation: agent-bounce 1s ease-in-out infinite;
+}
+@keyframes agent-bounce {
+    0%, 100% {transform: translateY(0) rotate(0deg);}
+    50% {transform: translateY(-4px) rotate(-6deg);}
+}
+.agent-progress-track {
+    position: relative; flex: 1; height: 8px; border-radius: 999px;
+    background: #eef1f5; overflow: hidden;
+}
+.agent-progress-fill {
+    position: absolute; top: 0; left: -40%; width: 40%; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #16345c, #3b82f6, #16345c);
+    animation: agent-slide 1.15s ease-in-out infinite;
+}
+@keyframes agent-slide {
+    0% {left: -40%;}
+    100% {left: 100%;}
+}
+.agent-progress-text {
+    font-size: 0.85rem; font-weight: 600; color: var(--dash-text);
+    white-space: nowrap; flex-shrink: 0;
+}
+.agent-progress-text .dots span {
+    animation: agent-dot 1.4s infinite; opacity: 0;
+}
+.agent-progress-text .dots span:nth-child(2) {animation-delay: 0.2s;}
+.agent-progress-text .dots span:nth-child(3) {animation-delay: 0.4s;}
+@keyframes agent-dot {
+    0% {opacity: 0;}
+    20% {opacity: 1;}
+    100% {opacity: 0;}
+}
+
+/* Q&A (Agent) - bounded, dribbble-style chat panel. Intro, transcript,
+   and composer all live inside one fixed-height card instead of loosely
+   stacked components, so the tab stays a fixed height and only the
+   transcript scrolls internally, like a real chat product. */
+#chat-panel {
+    display: flex !important; flex-direction: column !important;
+    height: 640px !important; max-height: 78vh !important;
+    padding: 0 !important; overflow: hidden !important;
+}
+.chat-intro {
+    margin: 0 !important; padding: 14px 20px 12px !important;
+    border-bottom: 1px solid var(--dash-border); flex-shrink: 0;
+}
+#chatbot {flex: 1 1 auto !important; min-height: 0 !important; border: none !important;}
+#chatbot .wrap {background: #f8fafc !important;}
+#chatbot .bubble-wrap, #chatbot .message-wrap {padding: 16px 20px !important; gap: 12px !important;}
+
+/* Message bubbles - best-effort selectors covering the class names used
+   across recent Gradio chatbot versions; harmless no-ops if a selector
+   doesn't match the installed version's DOM. */
+#chatbot .message, #chatbot [class*="user-row"] .bubble, #chatbot [class*="bot-row"] .bubble {
+    border-radius: 16px !important; font-size: 0.88rem !important; line-height: 1.45 !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important; border: none !important;
+}
+#chatbot .message.user, #chatbot [class*="user-row"] .bubble, #chatbot .role-user {
+    background: var(--dash-primary) !important; color: #ffffff !important;
+}
+#chatbot .message.bot, #chatbot [class*="bot-row"] .bubble, #chatbot .role-assistant {
+    background: #ffffff !important; color: var(--dash-text) !important;
+    border: 1px solid var(--dash-border) !important;
+}
+#chatbot .avatar-container {border-radius: 10px !important; box-shadow: var(--dash-shadow);}
+
+/* Composer - pinned to the bottom of the panel, pill-shaped input/button
+   so it reads as a real chat composer rather than a generic form row. */
+#chat-input-row {
+    flex-shrink: 0 !important; margin: 0 !important; gap: 10px !important;
+    align-items: center !important; padding: 14px 20px !important;
+    border-top: 1px solid var(--dash-border) !important; background: #ffffff !important;
+}
+#chat-input-row textarea {
+    border-radius: 22px !important; padding: 10px 18px !important; font-size: 0.88rem !important;
+    border: 1px solid var(--dash-border) !important; background: #f8fafc !important;
+}
+#chat-input-row textarea:focus {border-color: var(--dash-primary) !important; background: #ffffff !important;}
+#chat-input-row button.primary {
+    border-radius: 22px !important; font-weight: 600 !important; height: 42px !important; padding: 0 22px !important;
+}
+#chat-clear-btn {
+    flex-shrink: 0 !important; margin: 10px 20px 14px !important; align-self: flex-start !important;
+    border-radius: 8px !important; font-size: 0.78rem !important; font-weight: 500 !important;
+    color: var(--dash-text-muted) !important; background: transparent !important;
+    border: 1px solid var(--dash-border) !important; box-shadow: none !important;
+}
+
+/* Overview - Incident Health traffic-light grid. Reuses the same card
+   look as .kpi-card (white panel, left accent bar) so it reads as part
+   of the same dashboard rather than a new visual language. */
+.health-grid {display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;}
+.health-card {
+    background: #ffffff; border: 1px solid var(--dash-border); border-radius: 14px;
+    padding: 14px 16px; box-shadow: var(--dash-shadow); border-left: 4px solid var(--accent, #94a3b8);
+}
+.health-card-top {display: flex; align-items: center; gap: 8px; margin-bottom: 6px;}
+.health-dot {width: 9px; height: 9px; border-radius: 999px; background: var(--accent, #94a3b8); flex-shrink: 0;}
+.health-label {font-size: 0.78rem; font-weight: 600; color: var(--dash-text);}
+.health-status {font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; color: var(--accent, #94a3b8);}
+.health-detail {font-size: 0.76rem; color: var(--dash-text-muted); line-height: 1.35;}
+
+/* Overview - Attention Required list. Same card language as the mini
+   bar-list rows elsewhere, colored by severity via a left accent bar. */
+.attention-list {display: flex; flex-direction: column; gap: 10px;}
+.attention-item {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px;
+    border-radius: 10px; border-left: 4px solid var(--accent, #94a3b8);
+    background: #f8fafc; font-size: 0.82rem;
+}
+.attention-icon {flex-shrink: 0; font-size: 0.95rem; line-height: 1.4;}
+.attention-title {font-weight: 600; color: var(--dash-text);}
+.attention-detail {color: var(--dash-text-muted); font-size: 0.78rem; margin-top: 2px;}
+.attention-ok {
+    padding: 10px 14px; border-radius: 10px; background: #f0fdf4; border: 1px solid #bbf7d0;
+    color: #166534; font-size: 0.85rem;
+}
+
+/* Overview - Executive Summary card/button. The button is pinned with
+   position:absolute onto the card's own padding box (via
+   #exec-summary-card {position:relative}) instead of living inside a
+   gr.Row next to the heading - Gradio applies its own negative side
+   margins to Row internals to get edge-to-edge children, which was
+   pulling the button outside the card's visible border. Taking it out
+   of the normal flow entirely avoids that regardless of Gradio version. */
+#exec-summary-card {margin-top: 14px; position: relative !important; overflow: visible;}
+#exec-summary-card .section-heading {padding-right: 150px !important;}
+#exec-summary-btn {
+    position: absolute !important; top: 18px !important; right: 20px !important;
+    z-index: 5 !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
+    background: #ffffff !important; color: var(--dash-primary) !important;
+    border: 1px solid #bfdbfe !important; border-radius: 999px !important;
+    font-size: 0.78rem !important; font-weight: 600 !important; line-height: 1 !important;
+    padding: 7px 16px !important; height: auto !important; min-width: 0 !important;
+    width: auto !important; box-shadow: 0 1px 2px rgba(15,23,42,0.06) !important; white-space: nowrap !important;
+}
+#exec-summary-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
+#exec-summary-output {
+    margin-top: 4px; font-size: 0.88rem; color: var(--dash-text); line-height: 1.55;
+}
+#exec-summary-output p {margin: 0 0 8px 0;}
+
+/* Recommendations tab. Deliberately reuses .dash-card / the same left
+   accent bar as .attention-item and .health-card so this reads as another
+   panel of the same dashboard, not a new visual language. The card is a
+   fixed five-part structure (observation / evidence / recommendation /
+   attention / expected benefit) because every recommendation has exactly
+   those parts - see app/services/recommendations.py. */
+.rec-summary-bar {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+}
+.rec-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+    border-radius: 999px; background: #f1f5f9; border: 1px solid var(--dash-border);
+    font-size: 0.76rem; font-weight: 600; color: var(--dash-text);
+}
+.rec-chip-count {
+    background: #ffffff; border-radius: 999px; padding: 0 7px;
+    font-size: 0.72rem; color: var(--dash-text-muted);
+}
+.rec-list {display: flex; flex-direction: column; gap: 12px;}
+.rec-card {
+    border: 1px solid var(--dash-border); border-left: 4px solid var(--accent, #94a3b8);
+    border-radius: 10px; background: #ffffff; padding: 14px 16px;
+    box-shadow: var(--dash-shadow);
+}
+.rec-card-top {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px; margin-bottom: 8px;
+}
+.rec-observation {font-weight: 600; font-size: 0.88rem; color: var(--dash-text); line-height: 1.4;}
+.rec-badges {display: flex; gap: 6px; flex-shrink: 0;}
+.rec-badge {
+    border-radius: 999px; padding: 3px 10px; font-size: 0.7rem;
+    font-weight: 700; white-space: nowrap; line-height: 1.4;
+}
+.rec-badge-area {background: #f1f5f9; color: var(--dash-text-muted); font-weight: 600;}
+.rec-row {display: flex; gap: 8px; font-size: 0.81rem; line-height: 1.5; margin-top: 6px;}
+.rec-row-label {
+    flex-shrink: 0; width: 132px; color: var(--dash-text-muted);
+    font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.02em;
+    padding-top: 1px;
+}
+.rec-row-value {color: var(--dash-text);}
+.rec-empty {
+    padding: 14px 16px; border-radius: 10px; background: #f0fdf4;
+    border: 1px solid #bbf7d0; color: #166534; font-size: 0.85rem; line-height: 1.5;
+}
+/* Same pinned-button treatment as #exec-summary-btn above, for the same
+   Gradio negative-margin reason - see that comment. */
+#rec-writeup-card {margin-top: 14px; position: relative !important; overflow: visible;}
+#rec-writeup-card .section-heading {padding-right: 210px !important;}
+#rec-writeup-btn {
+    position: absolute !important; top: 18px !important; right: 20px !important;
+    z-index: 5 !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
+    background: #ffffff !important; color: var(--dash-primary) !important;
+    border: 1px solid #bfdbfe !important; border-radius: 999px !important;
+    font-size: 0.78rem !important; font-weight: 600 !important; line-height: 1 !important;
+    padding: 7px 16px !important; height: auto !important; min-width: 0 !important;
+    width: auto !important; box-shadow: 0 1px 2px rgba(15,23,42,0.06) !important; white-space: nowrap !important;
+}
+#rec-writeup-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
+#rec-writeup-output {margin-top: 4px; font-size: 0.88rem; color: var(--dash-text); line-height: 1.55;}
+#rec-writeup-output p {margin: 0 0 8px 0;}
+
+/* First-run experience (Overview). Hero card shown before any analysis,
+   slim "Loaded" strip shown after, and dimmed result tabs until data exists. */
+#hero {margin-bottom: 14px;}
+.hero-card {
+    background: linear-gradient(135deg, #0f1f33 0%, #16345c 100%); border-radius: 16px;
+    padding: 26px 28px; box-shadow: var(--dash-shadow);
+}
+.hero-title {color: #ffffff; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px;}
+.hero-sub {color: #b6c2d4; font-size: 0.9rem; line-height: 1.5; max-width: 760px;}
+.hero-steps {display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px;}
+.hero-step {
+    display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px;
+    background: rgba(255,255,255,0.10); color: #e2e8f0; font-size: 0.8rem; font-weight: 600;
+}
+.hero-step-num {
+    width: 20px; height: 20px; border-radius: 999px; background: var(--dash-primary); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem;
+}
+.hero-note {color: #8291a8; font-size: 0.78rem; margin-top: 14px;}
+
+#loaded-strip {gap: 14px !important; margin-bottom: 14px; align-items: center !important; padding: 10px 20px !important;}
+.loaded-strip-text {font-size: 0.88rem; color: var(--dash-text); line-height: 1.4;}
+.loaded-strip-text .loaded-meta {color: var(--dash-text-muted); font-size: 0.8rem;}
+#sample-btn {border-radius: 10px !important; font-weight: 600 !important;}
+
+#main-tabs > .tab-nav button:disabled,
+#main-tabs > .tab-nav button[disabled] {opacity: 0.4 !important; cursor: not-allowed !important;}
+.agent-progress-step {
+    font-size: 0.72rem; font-weight: 600; color: var(--dash-text-muted); white-space: nowrap; flex-shrink: 0;
+}
+
+/* Overview polish: KPI deltas / sparkline / clickable cards, bolder
+   Executive Summary button now that the card sits right under the KPIs. */
+.kpi-delta {display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 5px; font-size: 0.72rem; font-weight: 700; line-height: 1.3;}
+.kpi-delta-good {color: var(--dash-good);}
+.kpi-delta-bad {color: var(--dash-poor);}
+.kpi-delta-flat {color: var(--dash-text-muted);}
+.kpi-delta-sub {font-weight: 500; color: var(--dash-text-muted);}
+.kpi-spark {margin-left: auto; flex-shrink: 0;}
+.kpi-link {cursor: pointer;}
+.kpi-link:hover {border-color: #bfdbfe; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.12);}
+#exec-summary-card {margin-top: 0 !important;}
+#exec-summary-btn {background: var(--dash-primary) !important; color: #ffffff !important; border-color: var(--dash-primary) !important;}
+#exec-summary-btn:hover {background: var(--dash-primary-hover) !important; border-color: var(--dash-primary-hover) !important;}
+
+/* =====================================================================
+   Look & feel v3 - "Incident Quality Analyzer" design language.
+   Flat white cards on a cool grey page, teal primary, 10px radii,
+   sentence-case labels, Public Sans. Layered over the base styles with
+   the same ids/classes, so layout and wiring are untouched. All colors
+   come from the tokens at the top of this file (dark mode redefines
+   them at the bottom).
+   ===================================================================== */
+html, body, .gradio-container {
+    background: var(--dash-bg) !important; color: var(--dash-text);
+    font-family: "Public Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif !important;
+}
+button, input, textarea, select {font-family: inherit !important;}
+
+/* Header: light bar with a bottom rule instead of the dark gradient */
+#topbar-wrap {
+    background: var(--dash-card) !important; box-shadow: none !important;
+    border-bottom: 1px solid var(--dash-border) !important; overflow: visible;
+}
+#topbar-wrap::after {display: none !important;}
+.side-brand-icon {background: var(--dash-primary) !important; box-shadow: none !important; border-radius: 10px !important;}
+.side-brand-title {color: var(--dash-text) !important; font-weight: 700 !important;}
+.side-brand-sub {color: var(--dash-text-muted) !important;}
+
+/* Page title: plain ink, no gradient text */
+#topbar h1 {
+    background: none !important; -webkit-text-fill-color: currentColor !important; color: var(--dash-text) !important;
+    font-weight: 700 !important; letter-spacing: -0.01em;
+}
+
+/* Tabs: bordered bar, selected tab is a soft teal chip */
+#main-tabs > .tab-nav {
+    background: var(--dash-card) !important; border: 1px solid var(--dash-border) !important;
+    border-radius: var(--dash-radius) !important; box-shadow: none !important;
+}
+#main-tabs > .tab-nav button {border-radius: 8px !important; color: var(--dash-text-muted) !important;}
+#main-tabs > .tab-nav button:hover {background: var(--dash-soft) !important; color: var(--dash-primary) !important;}
+#main-tabs > .tab-nav button.selected {
+    background: var(--dash-soft) !important; color: var(--dash-primary) !important; box-shadow: none !important;
+}
+
+/* Cards: flat, 1px border, no lift or entrance animation */
+.dash-card, .kpi-card, .health-card, .rec-card, .agent-progress {
+    background: var(--dash-card) !important; border-color: var(--dash-border) !important;
+    border-radius: var(--dash-radius) !important; box-shadow: none !important; animation: none !important;
+}
+.dash-card:hover, .kpi-card:hover, .health-card:hover, .rec-card:hover {transform: none !important; box-shadow: none !important;}
+.kpi-link:hover {border-color: var(--dash-primary) !important;}
+.section-heading {border-bottom: 1px solid var(--dash-border) !important;}
+.section-heading h3 {font-weight: 600 !important;}
+.section-heading h3::before {display: none !important;}
+
+/* KPI cards: sentence-case label, quieter numbers */
+.kpi-label {text-transform: none !important; letter-spacing: 0 !important; font-size: 0.78rem !important; font-weight: 500 !important;}
+.kpi-value {font-weight: 700 !important; letter-spacing: -0.02em;}
+.kpi-icon {border-radius: 10px !important;}
+.health-dot {box-shadow: none !important;}
+.health-status {text-transform: none !important; letter-spacing: 0 !important;}
+.attention-item {background: var(--dash-soft) !important; border-radius: 8px !important;}
+.attention-ok, .rec-empty, #cache-notice {
+    background: color-mix(in srgb, var(--dash-good) 12%, var(--dash-card)) !important;
+    border: 1px solid color-mix(in srgb, var(--dash-good) 40%, var(--dash-card)) !important; color: var(--dash-good) !important;
+}
+
+/* Buttons: solid teal primary, outlined secondary */
+button.primary, .gr-button.primary, #exec-summary-btn, #rec-writeup-btn, #results-download-btn {
+    background: var(--dash-primary) !important; color: #ffffff !important; border: 1px solid var(--dash-primary) !important;
+    box-shadow: none !important; border-radius: 8px !important; transform: none !important; filter: none !important;
+}
+button.primary:hover, #exec-summary-btn:hover, #rec-writeup-btn:hover, #results-download-btn:hover {
+    background: var(--dash-primary-hover) !important; border-color: var(--dash-primary-hover) !important; transform: none !important;
+}
+#exec-summary-btn, #rec-writeup-btn {border-radius: 8px !important;}
+button.secondary {
+    background: transparent !important; color: var(--dash-primary) !important; border: 1px solid var(--dash-primary) !important;
+    border-radius: 8px !important; box-shadow: none !important;
+}
+button.secondary:hover {background: var(--dash-soft) !important; color: var(--dash-primary-hover) !important; border-color: var(--dash-primary) !important;}
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {outline: 3px solid var(--dash-fair) !important; outline-offset: 2px;}
+#exec-summary-output, #rec-writeup-output {
+    background: var(--dash-soft) !important; border: 1px solid var(--dash-border) !important; border-radius: 8px !important;
+}
+
+/* Hero: soft card with step pills (matches the stepper in the demo) */
+.hero-card {
+    background: var(--dash-card) !important; border: 1px solid var(--dash-border) !important; box-shadow: none !important;
+    border-radius: var(--dash-radius) !important;
+}
+.hero-card::before, .hero-card::after {display: none !important;}
+.hero-title {color: var(--dash-text) !important; font-weight: 700 !important;}
+.hero-sub, .hero-note {color: var(--dash-text-muted) !important;}
+.hero-step {
+    background: var(--dash-card) !important; color: var(--dash-text-muted) !important; backdrop-filter: none !important;
+    border: 1px solid var(--dash-border) !important; font-weight: 500 !important;
+}
+.hero-step-num {background: var(--dash-primary) !important; color: #ffffff !important;}
+
+/* Upload row, loaded strip */
+#loaded-strip {border-left: 4px solid var(--dash-good) !important;}
+#input-row {border-radius: var(--dash-radius) !important; background: var(--dash-soft) !important;}
+#file-upload .wrap {border: 2px dashed var(--dash-border) !important; background: var(--dash-card) !important; border-radius: var(--dash-radius) !important;}
+#file-upload .wrap:hover {border-color: var(--dash-primary) !important;}
+
+/* Tables */
+#results-table table th, #timeline-table table th {
+    background: var(--dash-card) !important; color: var(--dash-text-muted) !important; text-transform: none !important;
+    letter-spacing: 0 !important; font-weight: 600 !important; border-bottom: 1px solid var(--dash-border) !important;
+}
+#results-table table tbody tr:nth-child(even) td {background: var(--dash-card) !important;}
+#results-table table tbody tr:hover td {background: var(--dash-soft) !important;}
+#results-table table td {border-bottom: 1px solid var(--dash-border) !important;}
+.mini-table th {text-transform: none !important; letter-spacing: 0 !important; font-size: 0.74rem !important;}
+.mini-table td {border-bottom-color: var(--dash-border) !important;}
+.mini-table tbody tr:hover td {background: var(--dash-soft) !important;}
+
+/* Recommendation cards and chips */
+.rec-chip {background: var(--dash-soft) !important; box-shadow: none !important; border-color: var(--dash-border) !important; color: var(--dash-text) !important;}
+.rec-chip-count {background: var(--dash-card) !important;}
+.rec-badge-area {background: var(--dash-soft) !important;}
+.rec-row-label {text-transform: none !important; letter-spacing: 0 !important; font-size: 0.78rem !important;}
+
+/* Bars */
+.bar-track {background: var(--dash-soft) !important;}
+
+/* Chat */
+#chatbot .wrap {background: var(--dash-bg) !important;}
+#chatbot .message.user, #chatbot [class*="user-row"] .bubble, #chatbot .role-user {background: var(--dash-primary) !important; color: #ffffff !important;}
+#chatbot .message.bot, #chatbot [class*="bot-row"] .bubble, #chatbot .role-assistant {background: var(--dash-card) !important; color: var(--dash-text) !important;}
+#chat-panel {border-radius: var(--dash-radius) !important;}
+#chat-input-row {background: var(--dash-card) !important;}
+#chat-input-row textarea {background: var(--dash-bg) !important; color: var(--dash-text) !important;}
+#chat-input-row textarea:focus {border-color: var(--dash-primary) !important; background: var(--dash-card) !important;}
+
+/* Progress bar */
+.agent-progress-track {background: var(--dash-soft) !important;}
+.agent-progress-fill {background: linear-gradient(90deg, var(--dash-primary), var(--dash-primary-hover), var(--dash-primary)) !important;}
+
+/* Charts: let the page tokens drive text, separators and the donut gaps */
+.js-plotly-plot .legendtext, .js-plotly-plot .xtick text, .js-plotly-plot .ytick text,
+.js-plotly-plot .g-xtitle text, .js-plotly-plot .g-ytitle text, .js-plotly-plot .annotation text {fill: var(--dash-text) !important;}
+.js-plotly-plot .pielayer .slice path {stroke: var(--dash-card) !important;}
+.js-plotly-plot .gridlayer path {stroke: var(--dash-border) !important;}
+
+/* Scrollbars */
+* {scrollbar-color: var(--dash-border) transparent;}
+*::-webkit-scrollbar-thumb {background: var(--dash-border);}
+*::-webkit-scrollbar-thumb:hover {background: var(--dash-text-muted);}
+
+/* =====================================================================
+   Compact pass - less vertical space on the Overview so the whole
+   dashboard needs far less scrolling.
+   ===================================================================== */
+#main-col {padding: 12px 24px 20px !important;}
+#topbar-wrap {padding: 12px 24px !important;}
+#topbar {margin-bottom: 6px !important;}
+#topbar h1 {font-size: 1.25rem !important;}
+#topbar p {margin-top: 1px !important; font-size: 0.8rem !important;}
+.severity-note {margin: 0 0 8px 2px !important; font-size: 0.72rem !important;}
+#main-tabs > .tab-nav {margin-bottom: 12px !important; padding: 4px !important;}
+#main-tabs > .tab-nav button {padding: 7px 14px !important;}
+
+.dash-card {padding: 12px 16px !important;}
+.section-heading {margin: 0 0 8px 0 !important; padding-bottom: 6px !important;}
+.section-heading h3 {font-size: 0.92rem !important;}
+
+/* First-run hero: one slim row instead of a big banner */
+#hero {margin-bottom: 8px !important;}
+.hero-card {padding: 14px 22px !important; border-radius: 14px !important;}
+.hero-card::before {width: 200px; height: 200px; right: -50px; top: -80px;}
+.hero-card::after {display: none;}
+.hero-main {display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap;}
+.hero-title {font-size: 1.1rem !important; margin-bottom: 2px !important;}
+.hero-sub {font-size: 0.8rem !important; max-width: 520px !important; line-height: 1.4 !important;}
+.hero-steps {margin-top: 0 !important; gap: 6px !important;}
+.hero-step {padding: 4px 10px !important; font-size: 0.74rem !important;}
+.hero-step-num {width: 17px !important; height: 17px !important; font-size: 0.66rem !important;}
+
+/* Upload / paste row + loaded strip */
+#input-row {padding: 8px 14px !important; margin-bottom: 8px !important; gap: 12px !important;}
+#loaded-strip {padding: 6px 14px !important; margin-bottom: 8px !important;}
+
+/* KPI strip + cards */
+#metrics-row {margin-bottom: 10px !important;}
+.kpi-grid {gap: 10px !important;}
+.kpi-card {padding: 10px 14px !important;}
+.kpi-icon {width: 38px !important; height: 38px !important; font-size: 1.1rem !important;}
+.kpi-value {font-size: 1.55rem !important;}
+.kpi-label {margin-bottom: 4px !important;}
+
+/* Executive summary + panels */
+#exec-summary-card {margin-bottom: 10px !important;}
+#exec-summary-output {padding: 8px 12px !important; font-size: 0.84rem !important; line-height: 1.45 !important;}
+#overview-panel-row-1 {gap: 10px !important; margin-bottom: 10px !important;}
+.bar-list {gap: 8px !important;}
+
+/* Health cards */
+.health-grid {gap: 10px !important;}
+.health-card {padding: 9px 12px !important;}
+.health-card-top {margin-bottom: 2px !important;}
+.health-status {margin-bottom: 2px !important;}
+.health-detail {font-size: 0.72rem !important; line-height: 1.3 !important;}
+
+/* Gradio's default gaps between stacked blocks */
+#overview-results {gap: 10px !important;}
+.gradio-container .gap, .gradio-container .form {gap: 8px !important;}
+
+/* Category / priority presentation */
+.bar-row {gap: 10px !important;}
+.bar-dot {width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;}
+.bar-label {flex: 0 0 110px !important; font-weight: 600 !important;}
+.bar-track {height: 12px !important;}
+.bar-fill {border-radius: 999px !important; background-image: none !important; transition: width 0.4s ease;}
+.bar-count {flex: 0 0 32px !important; font-weight: 700; color: var(--dash-text) !important;}
+.bar-share {flex: 0 0 38px; text-align: right; font-size: 0.74rem; font-weight: 600; color: var(--dash-text-muted); font-variant-numeric: tabular-nums;}
+
+@media (max-width: 900px) {
+    .kpi-grid, .kpi-grid-5, .health-grid {grid-template-columns: repeat(2, 1fr) !important;}
+    #main-col {padding: 14px 12px 24px !important;}
+}
+
+/* =====================================================================
+   Demo parity: component shapes from the Incident Quality Analyzer demo.
+   CSS only; the HTML the components emit is unchanged.
+   ===================================================================== */
+/* KPI cards: big number on top, quiet label under it, no icon chip */
+.kpi-card-v2 {display: flex !important; flex-direction: column; align-items: flex-start !important; gap: 2px !important; padding: 14px 16px !important;}
+.kpi-card-v2 .kpi-icon {display: none !important;}
+.kpi-card-v2 > div:nth-child(2) {display: flex; flex-direction: column; width: 100%;}
+.kpi-card-v2 .kpi-value {order: -1; font-size: 1.75rem !important; margin-bottom: 3px;}
+.kpi-card-v2 .kpi-label {margin: 0 !important;}
+.kpi-card-v2 .kpi-spark {margin: 6px 0 0 0 !important;}
+
+/* Bar lists: label | bar | value, single teal bars on a soft track */
+.bar-row {display: grid !important; grid-template-columns: 130px 1fr 34px 40px; gap: 8px !important; align-items: center;}
+.bar-dot {display: none !important;}
+.bar-label {flex: none !important; font-weight: 500 !important; font-size: 0.83rem !important;}
+.bar-track {height: 14px !important; border-radius: 4px !important; background: var(--dash-soft) !important;}
+.bar-fill {border-radius: 4px !important; background: var(--dash-primary) !important;}
+.bar-count {flex: none !important; text-align: right; font-weight: 600 !important;}
+
+/* Recommendations: coloured left rule, Evidence / Recommendation / Benefit as label | text */
+.rec-card {border: 1px solid var(--dash-border) !important; border-left: 4px solid var(--accent) !important; border-radius: 8px !important; padding: 10px 14px !important;}
+.rec-observation {font-weight: 600 !important;}
+.rec-row {display: grid !important; grid-template-columns: 130px 1fr; gap: 8px !important;}
+.rec-row-label {color: var(--dash-text-muted) !important; font-weight: 600 !important;}
+
+/* Headings, header and hero */
+.section-heading {border-bottom: none !important; padding-bottom: 0 !important;}
+.section-heading h3 {font-size: 0.95rem !important;}
+#topbar h1 {font-size: 1.4rem !important;}
+#topbar p {color: var(--dash-text-muted) !important;}
+.hero-card {background: var(--dash-soft) !important; border: 2px dashed var(--dash-border) !important; border-radius: var(--dash-radius) !important; padding: 16px 20px !important;}
+.hero-step {border-radius: 999px !important; font-size: 0.78rem !important; padding: 4px 10px !important;}
+.mini-table th {font-size: 0.76rem !important;}
+
+/* =====================================================================
+   Professional dashboard shell (v4)
+   Fixed navy sidebar (brand + vertical navigation), sticky page header,
+   wide content area. Pure CSS over the existing Gradio DOM: no ids,
+   components or handlers changed. Reference: Grafana / Datadog / Linear
+   style app shells.
+
+   Navigation note: Gradio decides which tabs fit by comparing tab widths
+   with the width of the tab strip, so the strip is kept very wide (and
+   invisible) and each tab button is pinned into the sidebar instead.
+   ===================================================================== */
+:root {
+    --nav-w: 248px; --nav-bg: #0b1c2c; --nav-text: #a8bacb; --nav-muted: #6f8499; --nav-accent: #4fb3c0;
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.06);
+}
+html, body {overflow-x: hidden;}
+.gradio-container, .gradio-container .main, .gradio-container .wrap, .gradio-container main.contain {
+    max-width: none !important; width: 100% !important; padding: 0 !important; margin: 0 !important;
+}
+
+/* --- Sidebar panel, section label, footer note ---------------------- */
+body::before {content: ""; position: fixed; left: 0; top: 0; bottom: 0; width: var(--nav-w); background: var(--nav-bg); z-index: 50;}
+body::after {
+    content: "WORKSPACE"; position: fixed; left: 26px; top: 92px; z-index: 51;
+    font-size: 0.68rem; letter-spacing: 0.1em; font-weight: 600; color: var(--nav-muted);
+}
+html::after {
+    content: "Free-text fields are treated as untrusted data."; position: fixed; left: 26px; bottom: 20px; width: 196px; z-index: 51;
+    font-size: 0.7rem; line-height: 1.4; color: var(--nav-muted);
+}
+
+/* --- Sidebar: brand ------------------------------------------------ */
+#topbar-wrap {
+    position: fixed !important; top: 0; left: 0; width: var(--nav-w) !important; min-width: var(--nav-w) !important; height: 72px;
+    z-index: 60; background: var(--nav-bg) !important; border: 0 !important; border-bottom: 1px solid rgba(255,255,255,.08) !important;
+    border-radius: 0 !important; padding: 0 20px !important; display: flex; align-items: center; box-shadow: none !important;
+}
+#topbar-wrap .side-brand {display: flex; align-items: center; gap: 12px;}
+.side-brand-icon {background: linear-gradient(135deg, #1f8391, #0f6e7a) !important; width: 38px !important; height: 38px !important; border-radius: 10px !important; box-shadow: none !important;}
+.side-brand-title {color: #ffffff !important; font-size: 1rem !important; font-weight: 700 !important; letter-spacing: -0.01em;}
+.side-brand-sub {color: var(--nav-muted) !important; font-size: 0.74rem !important;}
+
+/* --- Sidebar: navigation (the gr.Tabs buttons, pinned vertically) --- */
+#main-tabs {position: relative;}
+#main-tabs > .tab-wrapper {position: absolute; top: 0; left: 0; width: 4000px; height: 0; overflow: visible; border: 0 !important; background: none !important; pointer-events: none;}
+#main-tabs .tab-container:not(.visually-hidden) {height: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; overflow: visible !important;}
+#main-tabs .tab-container:not(.visually-hidden)::after {display: none !important;}
+#main-tabs .tab-container:not(.visually-hidden) button {
+    position: fixed !important; left: 12px; width: calc(var(--nav-w) - 24px); height: 42px; z-index: 56; pointer-events: auto;
+    display: flex !important; justify-content: flex-start; align-items: center; text-align: left; margin: 0 !important;
+    padding: 0 14px !important; border: 0 !important; border-radius: 8px !important; background: transparent !important;
+    color: var(--nav-text) !important; font-size: 0.88rem !important; font-weight: 500 !important; transition: background .12s, color .12s;
+}
+#main-tabs .tab-container:not(.visually-hidden) button:nth-child(1) {top: 116px;}
+#main-tabs .tab-container:not(.visually-hidden) button:nth-child(2) {top: 160px;}
+#main-tabs .tab-container:not(.visually-hidden) button:nth-child(3) {top: 204px;}
+#main-tabs .tab-container:not(.visually-hidden) button:nth-child(4) {top: 248px;}
+#main-tabs .tab-container:not(.visually-hidden) button:nth-child(5) {top: 292px;}
+#main-tabs .tab-container:not(.visually-hidden) button:nth-child(6) {top: 336px;}
+#main-tabs .tab-container:not(.visually-hidden) button:nth-child(7) {top: 380px;}
+#main-tabs .tab-container:not(.visually-hidden) button:nth-child(8) {top: 424px;}
+#main-tabs .tab-container:not(.visually-hidden) button:hover {background: rgba(255,255,255,.06) !important; color: #ffffff !important;}
+#main-tabs .tab-container:not(.visually-hidden) button.selected {
+    background: rgba(79,179,192,.16) !important; color: #ffffff !important; font-weight: 600 !important; box-shadow: inset 3px 0 0 var(--nav-accent) !important;
+}
+#main-tabs .tab-container button::after {display: none !important;}
+#main-tabs .overflow-menu {display: none !important;}
+
+/* --- Page header + content area ------------------------------------ */
+#main-col {margin: 0 0 0 var(--nav-w) !important; width: calc(100% - var(--nav-w)) !important; max-width: none !important; padding: 0 !important; gap: 0 !important;}
+#topbar {
+    position: sticky; top: 0; z-index: 40; background: var(--dash-card) !important; border: 0 !important; border-bottom: 1px solid var(--dash-border) !important;
+    border-radius: 0 !important; padding: 18px 32px 16px !important; box-shadow: var(--shadow-sm) !important;
+}
+#topbar h1 {font-size: 1.35rem !important; margin: 0 !important;}
+#topbar p {margin: 2px 0 0 !important; font-size: 0.85rem !important;}
+.severity-note {padding: 0 !important; margin: 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important; max-width: none !important; width: 100%;}
+#main-col > .severity-note {padding: 16px 32px 0 !important;}
+.severity-note p {display: block; margin: 0 !important; padding: 8px 14px !important; background: var(--dash-soft); border: 1px solid var(--dash-border); border-radius: 8px;}
+.severity-note, .severity-note p, .severity-note em {font-style: normal !important; font-size: 0.78rem !important; color: var(--dash-text-muted) !important;}
+#main-tabs > .tabitem {padding: 20px 32px 48px !important; background: transparent !important; border: 0 !important;}
+
+/* --- Cards ---------------------------------------------------------- */
+.dash-card, .kpi-card, .health-card, .rec-card, .agent-progress {box-shadow: var(--shadow-sm) !important; border-radius: 12px !important;}
+.health-card {border-left-width: 3px !important;}
+
+/* --- KPI cards: label, big value, note and icon chip ---------------- */
+#metrics-row {gap: 16px !important; padding: 0 !important; margin: 0 !important; border: 0 !important; background: transparent !important;}
+.kpi-card-v2 {
+    display: grid !important; grid-template-columns: 1fr auto; grid-template-areas: "text icon" "spark spark";
+    gap: 4px 12px !important; align-items: start !important; padding: 16px 18px !important;
+}
+.kpi-card-v2 .kpi-icon {display: flex !important; grid-area: icon; align-items: center; justify-content: center; width: 38px !important; height: 38px !important; border-radius: 10px !important; font-size: 1.05rem;}
+.kpi-card-v2 > div:nth-child(2) {grid-area: text; display: block !important; min-width: 0;}
+.kpi-card-v2 .kpi-label {font-size: 0.76rem !important; font-weight: 600 !important; color: var(--dash-text-muted) !important; margin: 0 0 4px 0 !important;}
+.kpi-card-v2 .kpi-value {order: 0 !important; font-size: 1.5rem !important; font-weight: 700 !important; line-height: 1.2; margin: 0 !important; white-space: nowrap;}
+.kpi-card-v2 .kpi-note {margin-top: 4px;}
+.kpi-card-v2 .kpi-spark {grid-area: spark; margin: 8px 0 0 0 !important;}
+
+/* --- Equal-height chart rows, quieter Plotly toolbar ---------------- */
+#overview-panel-row-1, #panel-row-1, #panel-row-2 {align-items: stretch !important; gap: 16px !important;}
+#overview-panel-row-1 > .column, #panel-row-1 > .column, #panel-row-2 > .column {align-self: stretch;}
+.section-heading h3 {font-size: 0.98rem !important;}
+.js-plotly-plot .modebar {background: transparent !important;}
+.js-plotly-plot .modebar-btn path {fill: var(--dash-text-muted) !important;}
+.js-plotly-plot .modebar-btn:hover path {fill: var(--dash-primary) !important;}
+
+/* --- Upload / action bar -------------------------------------------- */
+#input-row {gap: 16px !important; padding: 16px !important;}
+
+/* --- Polish: chart chrome, labels, tables --------------------------- */
+.js-plotly-plot .main-svg > .bg, .js-plotly-plot .bglayer .bg {fill: transparent !important;}
+.js-plotly-plot .main-svg {background: transparent !important;}
+.js-plotly-plot .gtitle, .js-plotly-plot .g-gtitle text, .js-plotly-plot .cbtitle text {fill: var(--dash-text) !important;}
+.js-plotly-plot .gridlayer path, .js-plotly-plot .zerolinelayer path {stroke: var(--dash-border) !important;}
+[data-testid="block-label"] {background: transparent !important; border: 0 !important; box-shadow: none !important; color: var(--dash-text-muted) !important;}
+.js-plotly-plot .modebar-container {opacity: 0; transition: opacity .15s;}
+.js-plotly-plot:hover .modebar-container {opacity: 1;}
+[data-testid="block-info"], .block-title, .block-label {
+    background: transparent !important; border: 0 !important; padding: 0 !important; box-shadow: none !important;
+    color: var(--dash-text-muted) !important; font-size: 0.8rem !important; font-weight: 600 !important;
+}
+#results-table, #results-table *, #timeline-table, #timeline-table * {font-family: "Public Sans", "Inter", system-ui, sans-serif !important;}
+.mini-table {border: 0 !important; border-collapse: collapse !important; width: 100%;}
+.prose table, .prose tr, .prose th, .prose td, .mini-table, .mini-table tr {border-left: 0 !important; border-right: 0 !important; box-shadow: none !important; outline: 0 !important;}
+.mini-table th, .mini-table td {border: 0 !important; border-bottom: 1px solid var(--dash-border) !important; padding: 8px 10px !important; text-align: left;}
+
+/* --- Small screens: fall back to a top bar + horizontal tabs -------- */
+@media (max-width: 900px) {
+    body::before, body::after, html::after {display: none;}
+    #topbar-wrap {position: static !important; width: 100% !important; min-width: 0 !important;}
+    #main-tabs > .tab-wrapper {position: static; width: 100%; height: auto; pointer-events: auto; background: var(--nav-bg) !important; padding: 8px;}
+    #main-tabs .tab-container:not(.visually-hidden) {height: auto !important; display: flex; flex-wrap: wrap;}
+    #main-tabs .tab-container:not(.visually-hidden) button {position: static !important; width: auto; height: 38px;}
+    #main-col {margin: 0 !important; width: 100% !important;}
+    #main-tabs > .tabitem {padding: 16px !important;}
+}
+
+/* =====================================================================
+   Dark mode. Gradio adds the `dark` class to the page when the viewer's
+   system (or ?__theme=dark) asks for it; only the tokens change.
+   ===================================================================== */
+.dark {
+    --dash-bg: #0f1620;
+    --dash-card: #18222e;
+    --dash-soft: #1d2e38;
+    --dash-border: #2a3846;
+    --dash-text-muted: #93a3b3;
+    --dash-text: #e6edf3;
+    --dash-primary: #4fb3c0;
+    --dash-primary-hover: #7cc7d1;
+    --dash-good: #4cc38a;
+    --dash-fair: #e0a93b;
+    --dash-poor: #ef6b62;
+}
+.dark button.primary, .dark .gr-button.primary, .dark #exec-summary-btn, .dark #rec-writeup-btn, .dark #results-download-btn,
+.dark #chatbot .message.user, .dark #chatbot [class*="user-row"] .bubble, .dark #chatbot .role-user, .dark .hero-step-num, .dark .side-brand-icon {color: #0f1620 !important;}
+
+/* =====================================================================
+   Categorization tab: summary strip, filter bar, row detail drawer
+   ===================================================================== */
+.cat-summary-grid {display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px;}
+#cat-summary {background: transparent !important; border: 0 !important; padding: 0 !important; box-shadow: none !important;}
+#cat-filter-bar {gap: 12px !important; align-items: flex-end !important; margin: 4px 0 10px !important; background: transparent !important; border: 0 !important; padding: 0 !important;}
+#cat-search textarea, #cat-search input {background: var(--dash-bg) !important; border: 1px solid var(--dash-border) !important; border-radius: 8px !important; min-height: 40px;}
+#cat-review-only {align-self: center;}
+#results-table .virtual-row .body-cell, #results-table .virtual-row .body-cell * {cursor: pointer;}
+
+#detail-drawer {
+    position: fixed !important; top: 0; right: 0; bottom: 0; width: min(460px, 100vw) !important; max-width: 100vw !important; z-index: 80;
+    background: var(--dash-card) !important; border-left: 1px solid var(--dash-border) !important; box-shadow: -12px 0 32px rgba(16,24,40,.18) !important;
+    border-radius: 0 !important; padding: 16px 20px 28px !important; overflow-y: auto; gap: 8px !important;
+}
+#detail-close-btn {align-self: flex-end; width: auto !important; flex: 0 0 auto !important;}
+#row-detail {background: transparent !important; border: 0 !important; padding: 0 !important;}
+.drw-id {font-size: 0.78rem; font-weight: 600; color: var(--dash-primary); letter-spacing: .02em;}
+.drw-title {font-size: 1.05rem; font-weight: 700; line-height: 1.35; margin: 2px 0 10px;}
+.drw-chips {display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0;}
+.drw-chip {display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: var(--dash-soft); color: var(--dash-text); border: 1px solid var(--dash-border);}
+.drw-chip-cat {background: color-mix(in srgb, var(--dash-primary) 14%, var(--dash-card)); color: var(--dash-primary); border-color: transparent;}
+.drw-chip-warn {background: color-mix(in srgb, var(--dash-fair) 16%, var(--dash-card)); color: var(--dash-fair); border-color: transparent;}
+.drw-chip-ok {background: color-mix(in srgb, var(--dash-good) 14%, var(--dash-card)); color: var(--dash-good); border-color: transparent;}
+.drw-meters {display: grid; gap: 12px; margin: 14px 0;}
+.drw-meter-label {display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--dash-text-muted); margin-bottom: 4px;}
+.drw-meter-label b {color: var(--dash-text);}
+.drw-track {height: 8px; border-radius: 999px; background: var(--dash-soft); overflow: hidden;}
+.drw-track i {display: block; height: 100%; border-radius: 999px;}
+.drw-track i.good {background: var(--dash-good);} .drw-track i.fair {background: var(--dash-fair);} .drw-track i.poor {background: var(--dash-poor);}
+.drw-meta {display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin: 14px 0; padding: 12px 0; border-top: 1px solid var(--dash-border); border-bottom: 1px solid var(--dash-border);}
+.drw-meta-k {font-size: 0.72rem; color: var(--dash-text-muted);} .drw-meta-v {font-size: 0.85rem; font-weight: 600; word-break: break-word;}
+.drw-sec {margin-top: 14px;} .drw-sec-title {font-size: 0.78rem; font-weight: 700; color: var(--dash-text-muted); margin-bottom: 4px;}
+.drw-text {font-size: 0.86rem; line-height: 1.5; white-space: pre-wrap; background: var(--dash-bg); border: 1px solid var(--dash-border); border-radius: 8px; padding: 10px 12px;}
+.drw-empty {color: var(--dash-text-muted); font-style: italic;}
+
+#cat-filter-bar > *, #cat-filter-bar .block, #cat-filter-bar .form, #cat-filter-bar .wrap {background: transparent !important; box-shadow: none !important;}
+#cat-filter-bar .block, #cat-filter-bar .form {border: 0 !important; padding: 0 !important;}
+#cat-filter-bar [data-testid="block-info"] {margin-bottom: 4px;}
+#cat-filter-bar input[type=text], #cat-filter-bar .wrap-inner {background: var(--dash-card) !important; border-radius: 8px !important;}
+#cat-review-only {border: 1px solid var(--dash-border) !important; border-radius: 8px !important; padding: 9px 12px !important; background: var(--dash-card) !important; min-height: 40px;}
+#cat-review-only label, #cat-review-only span {color: var(--dash-text) !important; font-weight: 500 !important; font-size: 0.85rem !important; white-space: nowrap;}
+#cat-analytics-row {align-items: stretch !important; gap: 16px !important;}
+#cat-analytics-row > .column {align-self: stretch;}
