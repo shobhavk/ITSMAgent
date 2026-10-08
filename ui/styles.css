@@ -934,3 +934,34 @@ html::after {
 #cat-review-only label, #cat-review-only span {color: var(--dash-text) !important; font-weight: 500 !important; font-size: 0.85rem !important; white-space: nowrap;}
 #cat-analytics-row {align-items: stretch !important; gap: 16px !important;}
 #cat-analytics-row > .column {align-self: stretch;}
+
+/* Theme toggle (header, right) */
+.theme-toggle {
+    position: absolute; right: 32px; top: 50%; transform: translateY(-50%);
+    background: var(--dash-card); color: var(--dash-text); border: 1px solid var(--dash-border); border-radius: 999px;
+    padding: 6px 14px; font: 600 0.8rem "Public Sans", system-ui, sans-serif; cursor: pointer; box-shadow: var(--shadow-sm);
+}
+.theme-toggle:hover {border-color: var(--dash-primary); color: var(--dash-primary);}
+body.dark .theme-toggle .to-dark, body:not(.dark) .theme-toggle .to-light {display: none;}
+#topbar {position: sticky;}
+@media (max-width: 900px) {.theme-toggle {position: static; transform: none; margin-top: 8px;}}
+
+/* Plotly charts sit directly on the card (no lighter Gradio block behind them), in both themes */
+.block:has(.js-plotly-plot), .block:has(.js-plotly-plot) .plot-container {background: transparent !important; border-color: transparent !important; box-shadow: none !important;}
+
+/* Chat bubbles: style the outer bubble only (the inner .message used to be styled too, which
+   double-wrapped the text and clipped it), give answers room, and keep lists tidy. */
+#chatbot .message-row.user-row .message.user {
+    background: var(--dash-primary) !important; color: #ffffff !important; border: 0 !important; box-shadow: none !important;
+    border-radius: 14px 14px 4px 14px !important; padding: 10px 14px !important; overflow: visible !important;
+}
+#chatbot .message-row.bot-row .message.bot {
+    background: var(--dash-card) !important; color: var(--dash-text) !important; border: 1px solid var(--dash-border) !important; box-shadow: none !important;
+    border-radius: 14px 14px 14px 4px !important; padding: 10px 14px !important; overflow: visible !important;
+}
+#chatbot .message .message {background: transparent !important; border: 0 !important; padding: 0 !important; box-shadow: none !important; color: inherit !important; border-radius: 0 !important;}
+#chatbot .message-row.bot-row {max-width: 88% !important;}
+#chatbot .message-content {white-space: normal; overflow-wrap: anywhere;}
+#chatbot .message-content p {margin: 0 0 0.5em;} #chatbot .message-content p:last-child {margin-bottom: 0;}
+#chatbot .message-content ul, #chatbot .message-content ol {margin: 0.25em 0 0.25em 1.1em; padding: 0;}
+#chatbot .message-content em {color: var(--dash-text-muted); font-size: 0.85em;}
