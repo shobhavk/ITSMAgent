@@ -172,4 +172,8 @@ SIDEBAR_BRAND_HTML = """
 TOPBAR_HTML = """
 <h1>ITSM Incident Analytics</h1>
 <p>AI-powered insights for better service and faster resolution</p>
+<button type="button" class="theme-toggle" title="Switch between light and dark theme" aria-label="Toggle dark mode"
+  onclick="var d=document.body.classList.toggle('dark');try{localStorage.setItem('itsm-theme',d?'dark':'light')}catch(e){}">
+  <span class="to-dark">🌙 Dark</span><span class="to-light">☀️ Light</span>
+</button>
 """
