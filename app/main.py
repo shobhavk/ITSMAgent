@@ -63,7 +63,7 @@ app.include_router(chat.router)
 # (which reference absolute "/assets/..." paths) resolve correctly. The
 # REST API lives under /api/v1/... and /health, both registered above and
 # therefore matched before this catch-all mount. ---
-from ui.gradio_app import CUSTOM_CSS, build_ui  # noqa: E402  (import after app creation intentional)
+from ui.gradio_app import CUSTOM_CSS, ITSM_THEME, build_ui  # noqa: E402  (import after app creation intentional)
 import gradio as gr  # noqa: E402
 
-gr.mount_gradio_app(app, build_ui(), path="/", theme=gr.themes.Soft(primary_hue="blue"), css=CUSTOM_CSS)
+gr.mount_gradio_app(app, build_ui(), path="/", theme=ITSM_THEME, css=CUSTOM_CSS)
