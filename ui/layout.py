@@ -33,7 +33,16 @@ from ui.tab_trends import (
 )
 from ui.tab_recommendations import _generate_recommendations_writeup, _refresh_recommendations
 from ui.styles import CUSTOM_CSS
-from ui.tab_results import _change_page_size, _go_to_page, _refresh_view
+from ui.tab_results import (
+    _CAT_SUMMARY_PLACEHOLDER,
+    _change_page_size,
+    _close_row_detail,
+    _filter_view,
+    _go_to_page,
+    _refresh_categorization_controls,
+    _refresh_view,
+    _show_row_detail,
+)
 from ui.tab_chat import _build_chat_index, _chat_clear, _chat_respond
 from ui.tab_kb import _kb_delete, _kb_refresh, _kb_reindex, _kb_upload
 from ui.analysis import _analyze, _analyze_sample, _reveal_after_analysis
@@ -170,63 +179,58 @@ def build_ui() -> gr.Blocks:
                         attention_html = gr.HTML(_ATTENTION_PLACEHOLDER)
 
                 with gr.Tab("🗂️ Categorization", id=1, interactive=False) as tab_categorization:
-                    # Category x Priority heatmap: replaces the category bar-list +
-                    # priority donut that this tab used to repeat from Overview
-                    # (Overview keeps those two). The old row is kept below but
-                    # hidden, same approach as the other hidden Overview cards,
-                    # so _analyze's outputs (category_bar_html / category_chart)
-                    # stay untouched.
-                    with gr.Column(elem_classes=["dash-card"]):
-                        gr.Markdown("### 🔥 Category × Priority", elem_classes=["section-heading"])
-                        category_heatmap = gr.Plot(show_label=False)
+                    # Categorization tab, laid out as: summary strip -> incident
+                    # table (with filter bar) -> Category x Priority chart + top
+                    # categories. Clicking a table row opens a detail drawer.
+                    # category_chart (the priority donut) is kept in a hidden
+                    # column so _analyze's output contract stays untouched.
+                    cat_summary_html = gr.HTML(_CAT_SUMMARY_PLACEHOLDER, elem_id="cat-summary")
 
-                    with gr.Row(elem_id="panel-row-1", visible=False):
-                        with gr.Column(scale=1, elem_classes=["dash-card"]):
-                            gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
-                            category_bar_html = gr.HTML(
-                                '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
-                            )
-                        with gr.Column(scale=1, elem_classes=["dash-card"]):
-                            gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
-                            category_chart = gr.Plot(show_label=False)
-
-                    # Recent Incidents: relocated here verbatim from the
-                    # former Incident Analysis tab. The components and
-                    # their event wiring (_refresh_view / prev_btn /
-                    # next_btn) are untouched - only the parent tab
-                    # changed - so pagination and filtering behave
-                    # exactly as before.
+                    # Recent Incidents table with its original wiring
+                    # (_refresh_view / prev_btn / next_btn / page size). The
+                    # filter bar below drives it through _filter_view.
                     #
-                    # download_file: was a separate "Download Results"
-                    # card; now an icon-only gr.DownloadButton pinned
-                    # into this card's own heading, in the same
-                    # top-right corner where the table's built-in
-                    # copy/fullscreen icons sit (see #results-download-btn
-                    # in CUSTOM_CSS - it can't literally sit inside
-                    # Gradio's native table toolbar, which is compiled
-                    # frontend Gradio doesn't expose a hook into, but
-                    # pinning it to this card's corner puts it right
-                    # next to that toolbar). It still receives the same
-                    # full, untruncated CSV path from _analyze, by the
-                    # same variable, in the same outputs list - clicking
-                    # it downloads immediately, no intermediate file box.
+                    # download_file: icon-only gr.DownloadButton pinned into
+                    # this card's heading corner (see #results-download-btn in
+                    # CUSTOM_CSS); it still receives the same full CSV path
+                    # from _analyze.
                     with gr.Column(elem_id="results-section", elem_classes=["dash-card"]):
                         gr.Markdown("### 📋 Recent Incidents (Analyzed &amp; Categorized)", elem_classes=["section-heading"])
                         gr.Markdown(
                             "Includes each incident's timeline: when it came in, time to acknowledge, any "
                             "reassignment found in External Info, and whether External Info carries a "
-                            "timestamp trail (best-effort read of the text). Scroll right for all columns.",
+                            "timestamp trail (best-effort read of the text). Click a row for full details; "
+                            "scroll right for all columns.",
                             elem_classes=["severity-note"],
                         )
                         download_file = gr.DownloadButton(
                             "⬇", elem_id="results-download-btn", size="sm",
                         )
+                        with gr.Row(elem_id="cat-filter-bar", equal_height=False):
+                            search_box = gr.Textbox(
+                                placeholder="Search ticket ID, description or worklog…",
+                                show_label=False, container=False, scale=4, min_width=220,
+                                elem_id="cat-search",
+                            )
+                            category_filter = gr.Dropdown(
+                                choices=["All"], value="All", label="Category",
+                                scale=2, min_width=170, elem_id="cat-filter-category",
+                            )
+                            priority_filter = gr.Dropdown(
+                                choices=["All"], value="All", label="Priority",
+                                scale=1, min_width=120, elem_id="cat-filter-priority",
+                            )
+                            review_only = gr.Checkbox(
+                                label="Needs review only", value=False,
+                                scale=1, min_width=210, elem_id="cat-review-only",
+                            )
                         results_table = gr.Dataframe(
                             label=None,
                             show_label=False,
                             interactive=False,
                             wrap=False,
                             max_height=460,
+                            pinned_columns=1,
                             elem_id="results-table",
                         )
                         with gr.Row(elem_id="pagination-row"):
@@ -238,6 +242,23 @@ def build_ui() -> gr.Blocks:
                                 scale=0, min_width=130, elem_id="page-size-dropdown",
                             )
                             next_btn = gr.Button("Next →", size="sm")
+
+                    with gr.Row(elem_id="cat-analytics-row", equal_height=False):
+                        with gr.Column(scale=2, elem_classes=["dash-card"]):
+                            gr.Markdown("### 📊 Category × Priority", elem_classes=["section-heading"])
+                            category_heatmap = gr.Plot(show_label=False)
+                        with gr.Column(scale=1, elem_classes=["dash-card"]):
+                            gr.Markdown("### 🗂️ Top Categories", elem_classes=["section-heading"])
+                            category_bar_html = gr.HTML(
+                                '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
+                            )
+                    with gr.Column(visible=False):
+                        category_chart = gr.Plot(show_label=False)
+
+                    # Row detail drawer (opened by clicking a table row).
+                    with gr.Column(elem_id="detail-drawer", visible=False) as detail_drawer:
+                        detail_close_btn = gr.Button("✕ Close", size="sm", elem_id="detail-close-btn")
+                        row_detail_html = gr.HTML("", elem_id="row-detail")
 
                 with gr.Tab("📊 Trends & Insights", id=2, interactive=False) as tab_trends:
                     # KPI trend - ticket volume + worklog quality over
@@ -498,6 +519,10 @@ def build_ui() -> gr.Blocks:
                 inputs=[full_results_state, category_state, min_score_state, page_size_state],
                 outputs=[results_table, page_indicator, filtered_results_state, page_state],
             ).then(
+                fn=_refresh_categorization_controls,
+                inputs=[full_results_state],
+                outputs=[category_filter, priority_filter, search_box, review_only, cat_summary_html, detail_drawer],
+            ).then(
                 fn=_build_chat_index,
                 inputs=[full_results_state],
                 outputs=[chat_index_state],
@@ -573,6 +598,23 @@ def build_ui() -> gr.Blocks:
             inputs=[chat_index_state],
             outputs=[semantic_recurrence_html],
         )
+
+        # Categorization filter bar -> same table/pagination outputs as _refresh_view.
+        _filter_inputs = [
+            full_results_state, search_box, category_filter, priority_filter,
+            review_only, min_score_state, page_size_state,
+        ]
+        _filter_outputs = [results_table, page_indicator, filtered_results_state, page_state]
+        for _ctl in (search_box, category_filter, priority_filter, review_only):
+            _ctl.input(fn=_filter_view, inputs=_filter_inputs, outputs=_filter_outputs)
+
+        # Row click -> detail drawer.
+        results_table.select(
+            fn=_show_row_detail,
+            inputs=[filtered_results_state, page_state, page_size_state],
+            outputs=[detail_drawer, row_detail_html],
+        )
+        detail_close_btn.click(fn=_close_row_detail, inputs=None, outputs=[detail_drawer])
 
         prev_btn.click(
             fn=lambda filtered_df, page, page_size: _go_to_page(filtered_df, page, page_size, -1),

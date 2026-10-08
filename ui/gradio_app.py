@@ -17,9 +17,9 @@ The implementation is split across this package:
     tab_*.py                 per-tab refresh/generate handlers
     layout.py                build_ui(): layout and event wiring
 
-main.py keeps importing `CUSTOM_CSS` and `build_ui` from here, unchanged.
+main.py imports `CUSTOM_CSS`, `ITSM_THEME` and `build_ui` from here.
 """
 from ui.layout import build_ui
-from ui.styles import CUSTOM_CSS
+from ui.styles import CUSTOM_CSS, ITSM_THEME
 
-__all__ = ["CUSTOM_CSS", "build_ui"]
+__all__ = ["CUSTOM_CSS", "ITSM_THEME", "build_ui"]

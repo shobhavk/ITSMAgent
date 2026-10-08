@@ -43,7 +43,7 @@ _WS_RE = re.compile(r"\s+")
 
 
 ALL_COLUMNS = [
-    "Ticket ID", "Category", "Category Confidence", "Category Method",
+    "Ticket ID", "Category", "Category Confidence", "Review", "Category Method",
     "Short Description", "Description", "Worklog Notes", "Worklog Score",
     "Worklog Rating", "Worklog Flags", "Priority", "Status",
     "Assignment Group", "Host / CI", "Validation Notes",
@@ -53,8 +53,14 @@ ALL_COLUMNS = [
 
 DEFAULT_VISIBLE_COLUMNS = [
     "Ticket ID", "Category", "Priority", "Host / CI", "Assignment Group",
-    "Worklog Score", "Status", "Category Confidence",
+    "Worklog Score", "Status", "Category Confidence", "Review",
 ]
+
+
+# Categorization tab: a ticket is flagged "Needs review" when the category
+# confidence is below this value, or when it could not be categorised at all.
+LOW_CONFIDENCE_THRESHOLD = 0.8
+UNCATEGORISED_LABELS = {"", "other", "uncategorized", "uncategorised", "unknown", "unclassified"}
 
 
 TIMELINE_COLUMNS = [
@@ -65,8 +71,8 @@ TIMELINE_COLUMNS = [
 
 
 _CATEGORY_PALETTE = [
-    "#6366f1", "#14b8a6", "#f59e0b", "#f43f5e",
-    "#0ea5e9", "#a855f7", "#22c55e", "#64748b",
+    "#0f6e7a", "#3b6ea5", "#b7791f", "#b3261e",
+    "#2e7d5b", "#7a5c99", "#c05621", "#64748b",
 ]
 
 
@@ -80,9 +86,9 @@ _DELTA_MIN_PER_HALF = 3
 
 
 _HEALTH_STATUS_STYLE = {
-    "good": ("#10b981", "Good"),
-    "warning": ("#f59e0b", "Needs Attention"),
-    "critical": ("#ef4444", "Critical"),
+    "good": ("#2e7d5b", "Good"),
+    "warning": ("#b7791f", "Needs Attention"),
+    "critical": ("#b3261e", "Critical"),
     "unknown": ("#94a3b8", "No Data"),
 }
 
@@ -120,17 +126,14 @@ _RECOMMENDATIONS_PLACEHOLDER = (
 
 
 _REC_ATTENTION_STYLE = {
-    "Critical": ("#ef4444", "#fef2f2", "🔴 Critical"),
-    "High": ("#f59e0b", "#fffbeb", "🟠 High"),
-    "Medium": ("#3b82f6", "#eff6ff", "🔵 Medium"),
-    "Low": ("#94a3b8", "#f8fafc", "⚪ Low"),
+    "Critical": ("#b3261e", "#b3261e1f", "🔴 Critical"),
+    "High": ("#b7791f", "#b7791f1f", "🟠 High"),
+    "Medium": ("#2b7a9b", "#2b7a9b1f", "🔵 Medium"),
+    "Low": ("#94a3b8", "#94a3b81f", "⚪ Low"),
 }
 
 
-_TREND_BAR_PALETTE = [
-    "#3b82f6", "#f97316", "#10b981", "#8b5cf6", "#ec4899",
-    "#06b6d4", "#f59e0b", "#84cc16", "#ef4444", "#6366f1",
-]
+_TREND_BAR_PALETTE = ["#0f6e7a"]  # single series colour; indexed with % len() by the trend chart
 
 
 # --- Incident Timeline -------------------------------------------------

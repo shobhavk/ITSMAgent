@@ -135,7 +135,7 @@ async def _analyze(file_obj, pasted_text):
         sorted(category_counts.items(), key=lambda kv: kv[1], reverse=True), multicolor=True
     )
     host_bar_html = _bar_list_html(
-        sorted(host_counts.items(), key=lambda kv: kv[1], reverse=True), color="#3b82f6"
+        sorted(host_counts.items(), key=lambda kv: kv[1], reverse=True), color="#0f6e7a"
     )
     recurring_issues_html = _recurring_issues_table_html(recurring_issues.detect_exact_recurrence(full_df))
     assignment_group_html = _assignment_group_table_html(_assignment_group_performance(full_df))

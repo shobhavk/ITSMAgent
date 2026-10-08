@@ -38,7 +38,7 @@ def _agent_progress_html(stage: str = "Agent analyzing tickets", step: int | Non
 AGENT_PROGRESS_HTML = _agent_progress_html()
 
 
-def _bar_list_html(items: list, max_items: int = 6, color: str = "#3b82f6", multicolor: bool = False) -> str:
+def _bar_list_html(items: list, max_items: int = 6, color: str = "#0f6e7a", multicolor: bool = False) -> str:
     """Renders a sorted list of (label, count) tuples as a horizontal
     bar-list panel, matching the "Incidents by Category" / "Top Affected
     Servers" style in the reference dashboard."""
@@ -161,10 +161,10 @@ def _kpi_card(label: str, value, accent: str) -> str:
 
 _KPI_PLACEHOLDER = (
     '<div class="kpi-grid">'
-    + _kpi_card("Total Records Seen", "—", "#3b82f6")
-    + _kpi_card("Valid Records Analyzed", "—", "#10b981")
-    + _kpi_card("Rejected Records", "—", "#ef4444")
-    + _kpi_card("Average Worklog Score", "—", "#f59e0b")
+    + _kpi_card("Total Records Seen", "—", "#0f6e7a")
+    + _kpi_card("Valid Records Analyzed", "—", "#2e7d5b")
+    + _kpi_card("Rejected Records", "—", "#b3261e")
+    + _kpi_card("Average Worklog Score", "—", "#b7791f")
     + "</div>"
 )
 
@@ -175,10 +175,10 @@ def _summary_kpi_html(stats: dict) -> str:
     a management-dashboard-style presentation."""
     return (
         '<div class="kpi-grid">'
-        + _kpi_card("Total Records Seen", stats["total_records"], "#3b82f6")
-        + _kpi_card("Valid Records Analyzed", stats["valid_records"], "#10b981")
-        + _kpi_card("Rejected Records", stats["rejected_records"], "#ef4444")
-        + _kpi_card("Average Worklog Score", f'{stats["average_worklog_score"]} / 100', "#f59e0b")
+        + _kpi_card("Total Records Seen", stats["total_records"], "#0f6e7a")
+        + _kpi_card("Valid Records Analyzed", stats["valid_records"], "#2e7d5b")
+        + _kpi_card("Rejected Records", stats["rejected_records"], "#b3261e")
+        + _kpi_card("Average Worklog Score", f'{stats["average_worklog_score"]} / 100', "#b7791f")
         + "</div>"
     )
 
@@ -275,7 +275,7 @@ def _delta_html(deltas: dict, key: str) -> str:
     return f'<div class="kpi-delta"><span class="{cls}">{arrow} {abs(change):g}{unit}</span>{sub}</div>'
 
 
-def _volume_sparkline_html(full_df: pd.DataFrame, color: str = "#3b82f6") -> str:
+def _volume_sparkline_html(full_df: pd.DataFrame, color: str = "#0f6e7a") -> str:
     """Tiny inline-SVG daily-volume sparkline for the Total Incidents card.
     Empty string when there aren't enough dated days to draw a line."""
     try:
@@ -300,11 +300,11 @@ def _volume_sparkline_html(full_df: pd.DataFrame, color: str = "#3b82f6") -> str
 
 _KPI_PLACEHOLDER_V2 = (
     '<div class="kpi-grid kpi-grid-5">'
-    + _kpi_card_v2("🎫", "Total Records Seen", "—", "#3b82f6")
-    + _kpi_card_v2("✅", "Valid Records Analyzed", "—", "#10b981")
-    + _kpi_card_v2("⚠️", "Rejected Records", "—", "#ef4444")
-    + _kpi_card_v2("📝", "Average Worklog Score", "—", "#f59e0b")
-    + _kpi_card_v2("🔴", "High Priority Tickets", "—", "#f97316")
+    + _kpi_card_v2("🎫", "Total Records Seen", "—", "#0f6e7a")
+    + _kpi_card_v2("✅", "Valid Records Analyzed", "—", "#2e7d5b")
+    + _kpi_card_v2("⚠️", "Rejected Records", "—", "#b3261e")
+    + _kpi_card_v2("📝", "Average Worklog Score", "—", "#b7791f")
+    + _kpi_card_v2("🔴", "High Priority Tickets", "—", "#c05621")
     + "</div>"
 )
 
@@ -316,22 +316,22 @@ def _summary_kpi_html_v2(stats: dict, full_df: pd.DataFrame) -> str:
     high_priority = _high_priority_count(full_df)
     return (
         '<div class="kpi-grid kpi-grid-5">'
-        + _kpi_card_v2("🎫", "Total Records Seen", stats["total_records"], "#3b82f6")
-        + _kpi_card_v2("✅", "Valid Records Analyzed", stats["valid_records"], "#10b981")
-        + _kpi_card_v2("⚠️", "Rejected Records", stats["rejected_records"], "#ef4444")
-        + _kpi_card_v2("📝", "Average Worklog Score", f'{stats["average_worklog_score"]} / 100', "#f59e0b")
-        + _kpi_card_v2("🔴", "High Priority Tickets", high_priority, "#f97316")
+        + _kpi_card_v2("🎫", "Total Records Seen", stats["total_records"], "#0f6e7a")
+        + _kpi_card_v2("✅", "Valid Records Analyzed", stats["valid_records"], "#2e7d5b")
+        + _kpi_card_v2("⚠️", "Rejected Records", stats["rejected_records"], "#b3261e")
+        + _kpi_card_v2("📝", "Average Worklog Score", f'{stats["average_worklog_score"]} / 100', "#b7791f")
+        + _kpi_card_v2("🔴", "High Priority Tickets", high_priority, "#c05621")
         + "</div>"
     )
 
 
 _OVERVIEW_KPI_PLACEHOLDER = (
     '<div class="kpi-grid kpi-grid-5">'
-    + _kpi_card_v2("🎫", "Total Incidents", "—", "#3b82f6")
-    + _kpi_card_v2("🔴", "P1/P2 Incidents", "—", "#ef4444")
-    + _kpi_card_v2("⏱️", "Avg Resolution Time", "—", "#0ea5e9")
-    + _kpi_card_v2("📝", "Avg Worklog Score", "—", "#f59e0b")
-    + _kpi_card_v2("⚠️", "Poor Worklog %", "—", "#f97316")
+    + _kpi_card_v2("🎫", "Total Incidents", "—", "#0f6e7a")
+    + _kpi_card_v2("🔴", "P1/P2 Incidents", "—", "#b3261e")
+    + _kpi_card_v2("⏱️", "Avg Resolution Time", "—", "#2b7a9b")
+    + _kpi_card_v2("📝", "Avg Worklog Score", "—", "#b7791f")
+    + _kpi_card_v2("⚠️", "Poor Worklog %", "—", "#c05621")
     + "</div>"
 )
 
@@ -350,25 +350,25 @@ def _overview_kpi_html(kpis: dict, deltas: dict | None = None, spark_html: str =
         return (
             '<div class="kpi-grid kpi-grid-5">'
             + _kpi_card_v2(
-                "🎫", "Total Incidents", kpis.get("total_incidents", 0), "#3b82f6",
+                "🎫", "Total Incidents", kpis.get("total_incidents", 0), "#0f6e7a",
                 delta_html=_delta_html(deltas, "total_incidents"), spark_html=spark_html,
                 link_tab="Categorization",
             )
             + _kpi_card_v2(
-                "🔴", "P1/P2 Incidents", kpis.get("high_priority_count", 0), "#ef4444",
+                "🔴", "P1/P2 Incidents", kpis.get("high_priority_count", 0), "#b3261e",
                 note=f'{kpis.get("high_priority_pct", 0)}% of total',
                 delta_html=_delta_html(deltas, "high_priority_count"), link_tab="Categorization",
             )
             + _kpi_card_v2(
-                "⏱️", "Avg Resolution Time", resolution_value, "#0ea5e9",
+                "⏱️", "Avg Resolution Time", resolution_value, "#2b7a9b",
                 delta_html=_delta_html(deltas, "avg_resolution_hours"), link_tab="Trends",
             )
             + _kpi_card_v2(
-                "📝", "Avg Worklog Score", f'{kpis.get("avg_worklog_score", 0)} / 100', "#f59e0b",
+                "📝", "Avg Worklog Score", f'{kpis.get("avg_worklog_score", 0)} / 100', "#b7791f",
                 delta_html=_delta_html(deltas, "avg_worklog_score"), link_tab="Trends",
             )
             + _kpi_card_v2(
-                "⚠️", "Poor Worklog %", f'{kpis.get("poor_worklog_pct", 0)}%', "#f97316",
+                "⚠️", "Poor Worklog %", f'{kpis.get("poor_worklog_pct", 0)}%', "#c05621",
                 note=f'{kpis.get("poor_worklog_count", 0)} incident(s)',
                 delta_html=_delta_html(deltas, "poor_worklog_pct"), link_tab="Recommendations",
             )
@@ -411,7 +411,7 @@ def _attention_html(items: list) -> str:
     try:
         if not items:
             return '<div class="attention-ok">✅ No urgent issues - all monitored metrics are within healthy ranges.</div>'
-        accents = {"critical": "#ef4444", "warning": "#f59e0b"}
+        accents = {"critical": "#b3261e", "warning": "#b7791f"}
         rows = []
         for item in items:
             accent = accents.get(item.get("severity"), "#94a3b8")
@@ -488,10 +488,10 @@ def _recommendations_html(result: dict) -> str:
 
 _RESOLUTION_METRICS_PLACEHOLDER = (
     '<div class="kpi-grid">'
-    + _kpi_card_v2("🔍", "MTTD (Detect)", "—", "#6366f1")
-    + _kpi_card_v2("📨", "MTTA (Acknowledge)", "—", "#0ea5e9")
-    + _kpi_card_v2("🛠️", "MTTR (Resolve)", "—", "#10b981")
-    + _kpi_card_v2("🎯", "SLA Compliance", "—", "#f59e0b")
+    + _kpi_card_v2("🔍", "MTTD (Detect)", "—", "#4c6a92")
+    + _kpi_card_v2("📨", "MTTA (Acknowledge)", "—", "#2b7a9b")
+    + _kpi_card_v2("🛠️", "MTTR (Resolve)", "—", "#2e7d5b")
+    + _kpi_card_v2("🎯", "SLA Compliance", "—", "#b7791f")
     + "</div>"
 )
 
@@ -514,15 +514,15 @@ def _resolution_metrics_html(full_df: pd.DataFrame) -> str:
         sla_card = _kpi_card_v2("🎯", "SLA Compliance", "N/A", "#94a3b8", note=sla["note"])
     else:
         sla_card = _kpi_card_v2(
-            "🎯", "SLA Compliance", f'{sla["compliance_pct"]}%', "#f59e0b",
+            "🎯", "SLA Compliance", f'{sla["compliance_pct"]}%', "#b7791f",
             note=f'{sla["sample_size"]} resolved ticket(s), target by priority',
         )
 
     return (
         '<div class="kpi-grid">'
-        + _duration_card("🔍", "MTTD (Detect)", "#6366f1", metrics["mttd"])
-        + _duration_card("📨", "MTTA (Acknowledge)", "#0ea5e9", metrics["mtta"])
-        + _duration_card("🛠️", "MTTR (Resolve)", "#10b981", metrics["mttr"])
+        + _duration_card("🔍", "MTTD (Detect)", "#4c6a92", metrics["mttd"])
+        + _duration_card("📨", "MTTA (Acknowledge)", "#2b7a9b", metrics["mtta"])
+        + _duration_card("🛠️", "MTTR (Resolve)", "#2e7d5b", metrics["mttr"])
         + sla_card
         + "</div>"
     )
@@ -532,8 +532,8 @@ def _timeline_kpi_html(aggregate: dict) -> str:
     if not aggregate or not aggregate.get("available"):
         return (
             '<div class="kpi-grid">'
-            + _kpi_card_v2("📨", "Avg time to acknowledge", "—", "#0ea5e9")
-            + _kpi_card_v2("🔁", "Reassignments detected", "—", "#8b5cf6")
+            + _kpi_card_v2("📨", "Avg time to acknowledge", "—", "#2b7a9b")
+            + _kpi_card_v2("🔁", "Reassignments detected", "—", "#7a5c99")
             + _kpi_card_v2("📝", "External Info missing", "—", "#94a3b8")
             + "</div>"
         )
@@ -543,12 +543,12 @@ def _timeline_kpi_html(aggregate: dict) -> str:
     return (
         '<div class="kpi-grid">'
         + _kpi_card_v2(
-            "📨", "Avg time to acknowledge", f"{ack}h" if ack is not None else "N/A", "#0ea5e9",
+            "📨", "Avg time to acknowledge", f"{ack}h" if ack is not None else "N/A", "#2b7a9b",
             note=f"{aggregate.get('acknowledgment_data_available_for', 0)} ticket(s) with data" if ack is not None
             else "No acknowledgment timestamp in this data",
         )
         + _kpi_card_v2(
-            "🔁", "Reassignments detected", aggregate.get("incidents_with_reassignment_detected", 0), "#8b5cf6",
+            "🔁", "Reassignments detected", aggregate.get("incidents_with_reassignment_detected", 0), "#7a5c99",
             note="Detected in External Info text",
         )
         + _kpi_card_v2(
