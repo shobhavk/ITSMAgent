@@ -193,13 +193,19 @@ def _kpi_card_v2(
     note_html = f'<div class="kpi-note">{note}</div>' if note else ""
     link_cls, link_attrs = "", ""
     if link_tab:
+        # The tab strip is rendered twice (a hidden copy Gradio uses for width
+        # measuring, then the real one), so look in the visible strip first.
         js = (
-            "var t=[...document.querySelectorAll('#main-tabs button')]"
-            f".find(function(b){{return b.textContent.indexOf('{link_tab}')!==-1}});"
-            "if(t){t.click();}"
-        )
+            "var m=function(b){{return b.textContent.indexOf('{link_tab}')!==-1}};"
+            "var t=[...document.querySelectorAll('#main-tabs .tab-container:not(.visually-hidden) button')].find(m)"
+            "||[...document.querySelectorAll('#main-tabs button')].find(m);"
+            "if(t){{t.click();window.scrollTo({{top:0,behavior:'smooth'}});}}"
+        ).replace('{link_tab}', link_tab).replace('{{', '{').replace('}}', '}')
         link_cls = " kpi-link"
-        link_attrs = f' role="button" tabindex="0" title="Open {link_tab}" onclick="{js}"'
+        link_attrs = (
+            f' role="button" tabindex="0" title="Open {link_tab}" onclick="{js}"'
+            " onkeydown=\"if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}\""
+        )
     return (
         f'<div class="kpi-card kpi-card-v2{link_cls}" style="--accent:{accent}"{link_attrs}>'
         f'<div class="kpi-icon" style="background:{accent}1a; color:{accent};">{icon}</div>'
