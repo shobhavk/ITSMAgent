@@ -421,6 +421,117 @@ _NO_LLM_INTENT_KEYWORDS = [
 ]
 
 
+def _format_no_llm_result(intent: str, result: dict) -> str:
+    """Turns one of the tool-result dicts above into plain, readable text.
+
+    The real LLM path already produces natural language itself (that's
+    what the model is for) - this formatter exists only for
+    _no_llm_fallback below, where there is no model to do that, so the
+    person still gets a readable answer instead of a raw JSON dump. Each
+    branch mirrors one tool's exact return shape (see chat_tools.py /
+    recommendations.py / knowledge_base.py); a shape not explicitly
+    handled falls through to a generic key: value listing rather than
+    erroring."""
+    if not isinstance(result, dict):
+        return str(result)
+    if result.get("error"):
+        return f"I couldn't get that: {result['error']}"
+
+    try:
+        if intent == "category":
+            top = result.get("top_categories", [])
+            if not top:
+                return "No category data is available for this batch."
+            lines = [f"Top categories (of {result.get('total_categories', 'N/A')} total):"]
+            lines += [f"- {c['category']}: {c['count']} incident(s)" for c in top]
+            return "\n".join(lines)
+
+        if intent == "priority":
+            dist = result.get("distribution_pct", {})
+            counts = result.get("counts_by_priority", {})
+            if not counts:
+                return "No priority data is available for this batch."
+            lines = ["Incidents by priority:"]
+            for p, n in counts.items():
+                pct = dist.get(p)
+                lines.append(f"- {p}: {n} incident(s)" + (f" ({pct}%)" if pct is not None else ""))
+            return "\n".join(lines)
+
+        if intent == "server":
+            top = result.get("top_servers", [])
+            if not top:
+                return "No server/host data is available for this batch."
+            lines = ["Most-affected servers/hosts:"]
+            lines += [f"- {s['server']}: {s['count']} incident(s)" for s in top]
+            return "\n".join(lines)
+
+        if intent == "recurring":
+            rows = result.get("recurring_issues", [])
+            if not rows:
+                return result.get("note") or "No recurring issues were found in this batch."
+            lines = ["Recurring issues:"]
+            for r in rows:
+                lines.append(
+                    f"- {r['server']} / {r['category']}: {r['frequency']} occurrence(s) "
+                    f"(first seen {r.get('first_seen', 'N/A')}, last seen {r.get('last_seen', 'N/A')})"
+                )
+            return "\n".join(lines)
+
+        if intent == "recommend":
+            recs = result.get("recommendations", [])
+            if not recs:
+                return result.get("note") or "No recommendations were generated for this batch."
+            lines = []
+            for i, r in enumerate(recs, start=1):
+                lines.append(f"{i}. [{r.get('attention', '')}] {r.get('observation', '')}")
+                if r.get("evidence"):
+                    lines.append(f"   Evidence: {r['evidence']}")
+                if r.get("recommendation"):
+                    lines.append(f"   Recommendation: {r['recommendation']}")
+            return "\n".join(lines)
+
+        if intent == "kb":
+            chunks = result.get("chunks", [])
+            if not chunks:
+                return result.get("note") or "I couldn't find a relevant procedure in the current knowledge base."
+            lines = []
+            for c in chunks:
+                source = c.get("document_name", "Unknown document")
+                if c.get("page_number"):
+                    source += f", page {c['page_number']}"
+                if c.get("section_title"):
+                    source += f", section: {c['section_title']}"
+                lines.append(f"{c.get('text', '')}\n(Source: {source})")
+            return "\n\n".join(lines)
+
+        if intent == "search":
+            total = result.get("total_matching", 0)
+            rows = result.get("results", [])
+            if not rows:
+                return f"No incidents matched that search (0 of {total})."
+            lines = [f"Found {total} matching incident(s), showing {len(rows)}:"]
+            for row in rows:
+                lines.append("- " + ", ".join(f"{k}: {v}" for k, v in row.items()))
+            return "\n".join(lines)
+
+        # "summary" and the default (unmatched-intent) case share this shape.
+        lines = [f"Total incidents: {result.get('total_incidents', 'N/A')}"]
+        lines.append(f"P1 incidents: {result.get('p1_incidents', 'N/A')}   P2 incidents: {result.get('p2_incidents', 'N/A')}")
+        if result.get("average_resolution_time_hours") is not None:
+            lines.append(f"Average resolution time: {result['average_resolution_time_hours']} hours")
+        elif result.get("average_resolution_time_note"):
+            lines.append(f"Average resolution time: {result['average_resolution_time_note']}")
+        if result.get("average_worklog_score") is not None:
+            lines.append(f"Average worklog score: {result['average_worklog_score']} / 100")
+        if result.get("poor_worklog_percentage") is not None:
+            lines.append(f"Tickets with a poor worklog: {result['poor_worklog_percentage']}%")
+        return "\n".join(lines)
+    except Exception:
+        # Any shape this formatter doesn't recognize - a plain listing
+        # beats either crashing or falling back to raw JSON.
+        return "\n".join(f"{k}: {v}" for k, v in result.items())
+
+
 async def _no_llm_fallback(question: str, full_df) -> str:
     """rule_based mode: no chat model, so no tool-calling loop is
     possible. Dispatches to the same tool functions directly via a
@@ -451,7 +562,7 @@ async def _no_llm_fallback(question: str, full_df) -> str:
                 result = chat_tools.get_category_analysis(full_df)
             else:
                 result = chat_tools.get_incident_summary(full_df)
-            return json.dumps(result, indent=2, default=str)
+            return _format_no_llm_result(intent, result)
 
     # No intent keyword matched - try search_incidents with any exact
     # category/priority value mentioned verbatim in the question, else
@@ -463,11 +574,11 @@ async def _no_llm_fallback(question: str, full_df) -> str:
         matched_priority = next((p for p in priorities if p and p.lower() in q), "")
         if matched_category or matched_priority:
             result = chat_tools.search_incidents(full_df, category=matched_category, priority=matched_priority)
-            return json.dumps(result, indent=2, default=str)
+            return _format_no_llm_result("search", result)
     except Exception as exc:
         logger.info("No-LLM fallback intent detection failed, using summary instead: %s", exc)
 
-    return json.dumps(chat_tools.get_incident_summary(full_df), indent=2, default=str)
+    return _format_no_llm_result("summary", chat_tools.get_incident_summary(full_df))
 
 
 def _history_to_messages(history: list[tuple[str, str]]) -> list:
