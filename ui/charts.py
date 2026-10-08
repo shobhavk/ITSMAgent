@@ -81,7 +81,7 @@ def _donut_figure(
         height=230,
         margin=dict(t=8, b=8, l=8, r=8),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, Segoe UI, sans-serif", size=12, color="#334155"),
+        font=dict(family="Public Sans, Inter, Segoe UI, sans-serif", size=12, color="#14202b"),
         legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=1.0, font=dict(size=12)),
         annotations=[
             dict(text=f"<b style='font-size:22px'>{total}</b><br><span style='color:#64748b'>incidents</span>",
@@ -138,7 +138,7 @@ def _category_priority_heatmap(full_df: pd.DataFrame) -> go.Figure:
             go.Heatmap(
                 z=z, x=list(table.columns), y=list(table.index),
                 text=text, texttemplate="%{text}",
-                colorscale=[[0.0, "#f1f5f9"], [0.35, "#c7d2fe"], [0.7, "#6366f1"], [1.0, "#3730a3"]],
+                colorscale=[[0.0, "#eef4f6"], [0.35, "#a3cbd1"], [0.7, "#0f6e7a"], [1.0, "#08434b"]],
                 xgap=3, ygap=3, showscale=False,
                 hovertemplate="%{y} · %{x}: %{z} tickets<extra></extra>",
             )
@@ -153,8 +153,55 @@ def _category_priority_heatmap(full_df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def _category_priority_stacked_bar(full_df: pd.DataFrame) -> go.Figure:
+    """Category x Priority as horizontal stacked bars: one bar per category
+    (busiest first), split by priority. Reads better than the heatmap when
+    counts are small, and the priority colours match the rest of the UI."""
+    if (
+        full_df is None or len(full_df) == 0
+        or "Category" not in full_df.columns or "Priority" not in full_df.columns
+    ):
+        fig = go.Figure()
+        fig.update_layout(
+            annotations=[dict(text="No data yet", showarrow=False, font=dict(size=14))],
+            height=260, margin=dict(t=30, b=10, l=10, r=10),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        )
+        return fig
+
+    category = full_df["Category"].fillna("").astype(str).str.strip().replace("", "Uncategorized")
+    priority = full_df["Priority"].fillna("").astype(str).str.strip().replace("", "Unspecified")
+    table = pd.crosstab(category, priority)
+    table = table.loc[table.sum(axis=1).sort_values(ascending=False).index]
+    table = table[sorted(table.columns, key=_priority_sort_key)]
+
+    fig = go.Figure()
+    for pri in table.columns:
+        values = [int(v) for v in table[pri].tolist()]
+        fig.add_bar(
+            y=list(table.index), x=values, name=str(pri), orientation="h",
+            marker=dict(color=_priority_color(str(pri))),
+            text=[str(v) if v else "" for v in values], textposition="inside",
+            insidetextanchor="middle", textfont=dict(color="#ffffff"),
+            hovertemplate="%{y} · " + str(pri) + ": %{x} tickets<extra></extra>",
+        )
+    longest = max(len(str(c)) for c in table.index)
+    fig.update_layout(
+        barmode="stack", bargap=0.35,
+        height=max(260, 46 * len(table.index) + 110),
+        margin=dict(t=10, b=10, l=10, r=10),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, traceorder="normal"),
+        yaxis=dict(autorange="reversed", showgrid=False, automargin=True),
+        xaxis=dict(showgrid=True, zeroline=False, dtick=1 if int(table.sum(axis=1).max()) <= 10 else None),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+    )
+    return fig
+
+
 def _refresh_category_heatmap(full_df: pd.DataFrame):
-    return _category_priority_heatmap(full_df)
+    # Name kept so the existing .then() wiring is unchanged; the Categorization
+    # tab now shows stacked bars instead of the old heatmap.
+    return _category_priority_stacked_bar(full_df)
 
 
 def _category_chart_figure(category_counts: dict) -> go.Figure:
@@ -171,15 +218,15 @@ def _priority_color(label: str) -> str:
     "high" substring match, since "high" also occurs inside it."""
     l = (label or "").lower()
     if "critical" in l or "p1" in l:
-        return "#dc2626"
+        return "#b3261e"
     if "very high" in l:
-        return "#ea580c"
+        return "#c05621"
     if "high" in l or "p2" in l:
-        return "#f59e0b"
+        return "#b7791f"
     if "medium" in l or "p3" in l:
-        return "#3b82f6"
+        return "#2b7a9b"
     if "low" in l or "p4" in l:
-        return "#10b981"
+        return "#2e7d5b"
     return "#94a3b8"
 
 
@@ -223,7 +270,7 @@ def _overview_trend_figure(full_df: pd.DataFrame) -> go.Figure:
         counts = [p["count"] for p in series]
         fig.add_trace(go.Scatter(
             x=periods, y=counts, mode="lines+markers", name="Incidents",
-            line=dict(color="#2563eb", width=2), marker=dict(size=5),
+            line=dict(color="#0f6e7a", width=2), marker=dict(size=5),
             fill="tozeroy", fillcolor="rgba(37, 99, 235, 0.08)",
         ))
         fig.update_layout(
