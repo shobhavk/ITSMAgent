@@ -2,6 +2,7 @@
 import pandas as pd
 
 from app.services import rag
+from ui.chat_format import clean_answer
 
 
 def _build_chat_index(full_df: pd.DataFrame) -> "rag.TicketIndex":
@@ -33,7 +34,8 @@ async def _chat_respond(message: str, history: list, full_df, stats: dict):
     if full_df is None or len(full_df) == 0:
         answer = "Run an analysis on the Dashboard tab first - then come back and ask away."
     else:
-        answer = await rag.answer_question(message, full_df, stats or {}, history)
+        # The model (or the no-LLM fallback) sometimes answers with a JSON blob; show readable text.
+        answer = clean_answer(await rag.answer_question(message, full_df, stats or {}, history))
 
     history = history + [(message, answer)]
     return _history_to_messages(history), history, ""
