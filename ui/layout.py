@@ -667,4 +667,12 @@ def build_ui() -> gr.Blocks:
         )
         chat_clear_btn.click(fn=_chat_clear, outputs=[chatbot, chat_history_state])
 
+        # Apply the theme the viewer last picked with the header toggle (if any).
+        demo.load(
+            fn=None, inputs=None, outputs=None,
+            js="() => { try { var t = localStorage.getItem('itsm-theme');"
+               " if (t === 'dark') document.body.classList.add('dark');"
+               " else if (t === 'light') document.body.classList.remove('dark'); } catch (e) {} }",
+        )
+
     return demo
