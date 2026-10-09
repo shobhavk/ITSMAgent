@@ -1,0 +1,4 @@
+Incident Number,Short Description,Description,Work Notes,Priority,State,Assignment Group,Configuration Item,Opened,Closed
+AINC0001,Printer queue stuck,Print spooler stuck on floor 3 printer,Cleared print queue and restarted spooler. Root cause: stuck job. Resolved and verified.,P4,Closed,Desktop Team,PRN-FL3-01,2026-09-02 09:00,2026-09-02 09:40
+AINC0002,Firewall blocking partner traffic,Firewall dropping partner API traffic,"Updated firewall rule, root cause was an expired object. Resolved and verified.",P2,Closed,Network Team,FW-EDGE01,2026-09-03 10:00,2026-09-03 12:00
+AINC0003,Malware detected on laptop,Malware detected by endpoint protection on laptop,"Isolated laptop, removed malware, root cause was a phishing attachment. Resolved and verified.",P2,Closed,Security Team,LT-0042,2026-09-04 11:00,2026-09-04 14:00

@@ -1,0 +1,718 @@
+{
+  "meta": {
+    "mode": "rule_based",
+    "when": "2026-10-09 03:41",
+    "preflight": {
+      "categorization": "21/21 tickets categorized as designed",
+      "kb": [
+        "escalation_procedure_p1.md: Indexed (3 chunks)",
+        "runbook_database_connection_failures.md: Indexed (4 chunks)",
+        "sop_backup_failure_response.md: Indexed (3 chunks)",
+        "vpn_troubleshooting_guide.md: Indexed (3 chunks)"
+      ]
+    }
+  },
+  "metrics": {
+    "total": 28,
+    "passed": 17,
+    "failed": 11,
+    "errors": 0,
+    "Tool Selection Accuracy": [
+      81.5,
+      27
+    ],
+    "RAG Retrieval Accuracy": [
+      85.7,
+      7
+    ],
+    "Answer Accuracy": [
+      60.7,
+      28
+    ],
+    "Answer Relevance": [
+      75.0,
+      28
+    ],
+    "Grounded Answers": [
+      71.4,
+      28
+    ],
+    "Hallucination Rate": [
+      14.3,
+      28
+    ],
+    "Unnecessary Tool Call Rate": [
+      7.1,
+      28
+    ]
+  },
+  "agent_results": [
+    {
+      "id": "T01",
+      "area": "Incident analytics",
+      "question": "Give me an overall summary of the incidents.",
+      "expected": "get_incident_summary",
+      "answer": "Total incidents: 21\nP1 incidents: 4   P2 incidents: 9\nAverage resolution time: 4.2 hours\nAverage worklog score: 81.9 / 100\nTickets with a poor worklog: 23.8%",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_incident_summary"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_incident_summary",
+      "result": "PASS"
+    },
+    {
+      "id": "T02",
+      "area": "Incident analytics",
+      "question": "What is the average worklog score?",
+      "expected": "get_incident_summary",
+      "answer": "Total incidents: 21\nP1 incidents: 4   P2 incidents: 9\nAverage resolution time: 4.2 hours\nAverage worklog score: 81.9 / 100\nTickets with a poor worklog: 23.8%",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_incident_summary"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_incident_summary",
+      "result": "PASS"
+    },
+    {
+      "id": "T03",
+      "area": "Incident analytics",
+      "question": "What is the average resolution time?",
+      "expected": "get_incident_summary",
+      "answer": "Total incidents: 21\nP1 incidents: 4   P2 incidents: 9\nAverage resolution time: 4.2 hours\nAverage worklog score: 81.9 / 100\nTickets with a poor worklog: 23.8%",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_incident_summary"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_incident_summary",
+      "result": "PASS"
+    },
+    {
+      "id": "T04",
+      "area": "Priority analysis",
+      "question": "How many P1 incidents are there?",
+      "expected": "get_priority_analysis",
+      "answer": "Incidents by priority:\n- P2: 9 incident(s) (42.9%)\n- P3: 8 incident(s) (38.1%)\n- P1: 4 incident(s) (19.0%)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_priority_analysis"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_priority_analysis",
+      "result": "PASS"
+    },
+    {
+      "id": "T05",
+      "area": "Priority analysis",
+      "question": "What is the priority distribution of the incidents?",
+      "expected": "get_priority_analysis",
+      "answer": "Incidents by priority:\n- P2: 9 incident(s) (42.9%)\n- P3: 8 incident(s) (38.1%)\n- P1: 4 incident(s) (19.0%)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_priority_analysis"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_priority_analysis",
+      "result": "PASS"
+    },
+    {
+      "id": "T06",
+      "area": "Categorization",
+      "question": "What is the most common incident category?",
+      "expected": "get_category_analysis",
+      "answer": "Top categories (of 7 total):\n- Database issues: 7 incident(s)\n- Network issues: 3 incident(s)\n- Backup related: 3 incident(s)\n- Disk/file system extension: 3 incident(s)\n- Security incidents: 2 incident(s)\n- Performance issue: 2 incident(s)\n- Virtualisation/cloud platform issues: 1 incident(s)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_category_analysis"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_category_analysis",
+      "result": "PASS"
+    },
+    {
+      "id": "T07",
+      "area": "Categorization",
+      "question": "How many Backup related incidents are there?",
+      "expected": "get_category_analysis",
+      "answer": "Found 3 matching incident(s), showing 3:\n- Ticket ID: AINC0011, Category: Backup related, Priority: P3, Status: Closed, Host / CI: BKP-SRV01, Worklog Score: 95\n- Ticket ID: AINC0012, Category: Backup related, Priority: P2, Status: Closed, Host / CI: BKP-SRV01, Worklog Score: 95\n- Ticket ID: AINC0013, Category: Backup related, Priority: P3, Status: Closed, Host / CI: BKP-SRV01, Worklog Score: 95",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "search_incidents"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "search_incidents",
+      "result": "PASS"
+    },
+    {
+      "id": "T08",
+      "area": "Categorization",
+      "question": "List the top 3 incident categories.",
+      "expected": "get_category_analysis",
+      "answer": "Top categories (of 7 total):\n- Database issues: 7 incident(s)\n- Network issues: 3 incident(s)\n- Backup related: 3 incident(s)\n- Disk/file system extension: 3 incident(s)\n- Security incidents: 2 incident(s)\n- Performance issue: 2 incident(s)\n- Virtualisation/cloud platform issues: 1 incident(s)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_category_analysis"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_category_analysis",
+      "result": "PASS"
+    },
+    {
+      "id": "T09",
+      "area": "Server analysis",
+      "question": "Which server has the most incidents?",
+      "expected": "get_server_analysis",
+      "answer": "Most-affected servers/hosts:\n- DB-PRD-01: 5 incident(s)\n- VPN-GW01: 3 incident(s)\n- BKP-SRV01: 3 incident(s)\n- FS-APP01: 3 incident(s)\n- DB-PRD-02: 2 incident(s)\n- SEC-GW01: 2 incident(s)\n- APP-PRD-03: 2 incident(s)\n- ESX-HOST07: 1 incident(s)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_server_analysis"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_server_analysis",
+      "result": "PASS"
+    },
+    {
+      "id": "T10",
+      "area": "Server analysis",
+      "question": "Show incidents on server VPN-GW01.",
+      "expected": "search_incidents",
+      "answer": "Most-affected servers/hosts:\n- DB-PRD-01: 5 incident(s)\n- VPN-GW01: 3 incident(s)\n- BKP-SRV01: 3 incident(s)\n- FS-APP01: 3 incident(s)\n- DB-PRD-02: 2 incident(s)\n- SEC-GW01: 2 incident(s)\n- APP-PRD-03: 2 incident(s)\n- ESX-HOST07: 1 incident(s)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_server_analysis"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_server_analysis",
+      "result": "PASS"
+    },
+    {
+      "id": "T11",
+      "area": "Recurring issues",
+      "question": "What issues keep recurring?",
+      "expected": "get_recurring_issues",
+      "answer": "Recurring issues:\n- DB-PRD-01 / Database issues: 5 occurrence(s) (first seen 2026-09-02, last seen 2026-09-07)\n- BKP-SRV01 / Backup related: 3 occurrence(s) (first seen 2026-09-15, last seen 2026-09-18)\n- FS-APP01 / Disk/file system extension: 3 occurrence(s) (first seen 2026-09-19, last seen 2026-09-22)\n- VPN-GW01 / Network issues: 3 occurrence(s) (first seen 2026-09-11, last seen 2026-09-14)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_recurring_issues"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_recurring_issues",
+      "result": "PASS"
+    },
+    {
+      "id": "T12",
+      "area": "Recurring issues",
+      "question": "Which servers have recurring database problems?",
+      "expected": "get_recurring_issues",
+      "answer": "Recurring issues:\n- DB-PRD-01 / Database issues: 5 occurrence(s) (first seen 2026-09-02, last seen 2026-09-07)\n- BKP-SRV01 / Backup related: 3 occurrence(s) (first seen 2026-09-15, last seen 2026-09-18)\n- FS-APP01 / Disk/file system extension: 3 occurrence(s) (first seen 2026-09-19, last seen 2026-09-22)\n- VPN-GW01 / Network issues: 3 occurrence(s) (first seen 2026-09-11, last seen 2026-09-14)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_recurring_issues"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_recurring_issues",
+      "result": "PASS"
+    },
+    {
+      "id": "T13",
+      "area": "Recommendations",
+      "question": "What should we do to improve?",
+      "expected": "get_recommendations",
+      "answer": "1. [Critical] A large share of this batch is raised at P1/P2 severity.\n   Evidence: 13 of 21 incidents (61.9%) are P1 or P2 - 4 P1 and 9 P2.\n   Recommendation: Review how severity is assigned at intake. Either the environment genuinely warrants this much critical attention - in which case major-incident capacity and on-call coverage should be sized for it - or tickets are being over-classified, which dilutes the meaning of P1 and pulls responders away from real emergencies.\n2. [Critical] P1 incidents are frequently resolved outside their target time.\n   Evidence: 50.0% of 4 resolved P1 incident(s) met the 4.0h target.\n   Recommendation: Walk through the P1 incidents that missed the target and identify where the time goes - detection, assignment, escalation, or the fix itself. Address the dominant delay before adjusting the target itself.\n3. [High] DB-PRD-01 shows a repeating 'Database issues' issue.\n   Evidence: DB-PRD-01 accounts for 5 'Database issues' incidents between 2026-09-02 and 2026-09-07, recurring on average every 1.3 day(s).\n   Recommendation: Investigate the recurring failure pattern on DB-PRD-01 under 'Database issues' and review whether a permanent corrective action (problem record, configuration fix, or capacity change) can remove the cause rather than the symptom.\n4. [High] 'Database issues' dominates the incident mix for this period.\n   Evidence: 'Database issues' accounts for 7 of 21 incidents (33.3%). 5 of them fall into groups already flagged as recurring.\n   Recommendation: Open a problem record for 'Database issues' and break the volume down by host and by failure mode to see whether it is one systemic cause or many unrelated issues sharing a label. Where the pattern is repeatable, consider automation or a self-service path instead of handling each occurrence manually.\n5. [Medium] BKP-SRV01 shows a repeating 'Backup related' issue.\n   Evidence: BKP-SRV01 accounts for 3 'Backup related' incidents between 2026-09-15 and 2026-09-18, recurring on average every 1.3 day(s).\n   Recommendation: Investigate the recurring failure pattern on BKP-SRV01 under 'Backup related' and review whether a permanent corrective action (problem record, configuration fix, or capacity change) can remove the cause rather than the symptom.\n6. [Medium] FS-APP01 shows a repeating 'Disk/file system extension' issue.\n   Evidence: FS-APP01 accounts for 3 'Disk/file system extension' incidents between 2026-09-19 and 2026-09-22, recurring on average every 1.4 day(s).\n   Recommendation: Investigate the recurring failure pattern on FS-APP01 under 'Disk/file system extension' and review whether a permanent corrective action (problem record, configuration fix, or capacity change) can remove the cause rather than the symptom.\n7. [Medium] VPN-GW01 shows a repeating 'Network issues' issue.\n   Evidence: VPN-GW01 accounts for 3 'Network issues' incidents between 2026-09-11 and 2026-09-14, recurring on average every 1.3 day(s).\n   Recommendation: Investigate the recurring failure pattern on VPN-GW01 under 'Network issues' and review whether a permanent corrective action (problem record, configuration fix, or capacity change) can remove the cause rather than the symptom.\n8. [Medium] A significant share of incidents is closed with poor-quality worklog notes.\n   Evidence: 5 of 21 incidents (23.8%) score below 50 on worklog quality. The average worklog score is 81.9.\n   Recommendation: Set a minimum closure standard - symptom, diagnosis, action taken, and verification - and make it part of the closure check rather than a post-hoc audit. Publish a short worked example so the standard is concrete.\n9. [Medium] Assignment group 'Network Team' documents incidents noticeably worse than the rest.\n   Evidence: 3 of 3 incident(s) (100.0%) in 'Network Team' have a poor worklog; its average score is 40.0.\n   Recommendation: Take this up directly with 'Network Team' rather than issuing a general reminder - review a handful of their recent closures together and agree what a complete note looks like for the work they actually do.\n10. [Medium] Category 'Network issues' documents incidents noticeably worse than the rest.\n   Evidence: 3 of 3 incident(s) (100.0%) in 'Network issues' have a poor worklog; its average score is 40.0.\n   Recommendation: Take this up directly with 'Network issues' rather than issuing a general reminder - review a handful of their recent closures together and agree what a complete note looks like for the work they actually do.\n11. [Medium] Server DB-PRD-01 carries a disproportionate share of the incident volume.\n   Evidence: DB-PRD-01 accounts for 5 of 21 incidents (23.8% of the batch).\n   Recommendation: Review DB-PRD-01 as a unit rather than ticket by ticket: check capacity/utilisation headroom, patch and firmware currency, recent change history, and monitoring thresholds. If the volume is driven by a single failing component, plan preventive maintenance or replacement instead of continuing to absorb the tickets.",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_recommendations"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_recommendations",
+      "result": "PASS"
+    },
+    {
+      "id": "T14",
+      "area": "Recommendations",
+      "question": "What needs attention first?",
+      "expected": "get_recommendations",
+      "answer": "1. [Critical] A large share of this batch is raised at P1/P2 severity.\n   Evidence: 13 of 21 incidents (61.9%) are P1 or P2 - 4 P1 and 9 P2.\n   Recommendation: Review how severity is assigned at intake. Either the environment genuinely warrants this much critical attention - in which case major-incident capacity and on-call coverage should be sized for it - or tickets are being over-classified, which dilutes the meaning of P1 and pulls responders away from real emergencies.\n2. [Critical] P1 incidents are frequently resolved outside their target time.\n   Evidence: 50.0% of 4 resolved P1 incident(s) met the 4.0h target.\n   Recommendation: Walk through the P1 incidents that missed the target and identify where the time goes - detection, assignment, escalation, or the fix itself. Address the dominant delay before adjusting the target itself.\n3. [High] DB-PRD-01 shows a repeating 'Database issues' issue.\n   Evidence: DB-PRD-01 accounts for 5 'Database issues' incidents between 2026-09-02 and 2026-09-07, recurring on average every 1.3 day(s).\n   Recommendation: Investigate the recurring failure pattern on DB-PRD-01 under 'Database issues' and review whether a permanent corrective action (problem record, configuration fix, or capacity change) can remove the cause rather than the symptom.\n4. [High] 'Database issues' dominates the incident mix for this period.\n   Evidence: 'Database issues' accounts for 7 of 21 incidents (33.3%). 5 of them fall into groups already flagged as recurring.\n   Recommendation: Open a problem record for 'Database issues' and break the volume down by host and by failure mode to see whether it is one systemic cause or many unrelated issues sharing a label. Where the pattern is repeatable, consider automation or a self-service path instead of handling each occurrence manually.\n5. [Medium] BKP-SRV01 shows a repeating 'Backup related' issue.\n   Evidence: BKP-SRV01 accounts for 3 'Backup related' incidents between 2026-09-15 and 2026-09-18, recurring on average every 1.3 day(s).\n   Recommendation: Investigate the recurring failure pattern on BKP-SRV01 under 'Backup related' and review whether a permanent corrective action (problem record, configuration fix, or capacity change) can remove the cause rather than the symptom.\n6. [Medium] FS-APP01 shows a repeating 'Disk/file system extension' issue.\n   Evidence: FS-APP01 accounts for 3 'Disk/file system extension' incidents between 2026-09-19 and 2026-09-22, recurring on average every 1.4 day(s).\n   Recommendation: Investigate the recurring failure pattern on FS-APP01 under 'Disk/file system extension' and review whether a permanent corrective action (problem record, configuration fix, or capacity change) can remove the cause rather than the symptom.\n7. [Medium] VPN-GW01 shows a repeating 'Network issues' issue.\n   Evidence: VPN-GW01 accounts for 3 'Network issues' incidents between 2026-09-11 and 2026-09-14, recurring on average every 1.3 day(s).\n   Recommendation: Investigate the recurring failure pattern on VPN-GW01 under 'Network issues' and review whether a permanent corrective action (problem record, configuration fix, or capacity change) can remove the cause rather than the symptom.\n8. [Medium] A significant share of incidents is closed with poor-quality worklog notes.\n   Evidence: 5 of 21 incidents (23.8%) score below 50 on worklog quality. The average worklog score is 81.9.\n   Recommendation: Set a minimum closure standard - symptom, diagnosis, action taken, and verification - and make it part of the closure check rather than a post-hoc audit. Publish a short worked example so the standard is concrete.\n9. [Medium] Assignment group 'Network Team' documents incidents noticeably worse than the rest.\n   Evidence: 3 of 3 incident(s) (100.0%) in 'Network Team' have a poor worklog; its average score is 40.0.\n   Recommendation: Take this up directly with 'Network Team' rather than issuing a general reminder - review a handful of their recent closures together and agree what a complete note looks like for the work they actually do.\n10. [Medium] Category 'Network issues' documents incidents noticeably worse than the rest.\n   Evidence: 3 of 3 incident(s) (100.0%) in 'Network issues' have a poor worklog; its average score is 40.0.\n   Recommendation: Take this up directly with 'Network issues' rather than issuing a general reminder - review a handful of their recent closures together and agree what a complete note looks like for the work they actually do.\n11. [Medium] Server DB-PRD-01 carries a disproportionate share of the incident volume.\n   Evidence: DB-PRD-01 accounts for 5 of 21 incidents (23.8% of the batch).\n   Recommendation: Review DB-PRD-01 as a unit rather than ticket by ticket: check capacity/utilisation headroom, patch and firmware currency, recent change history, and monitoring thresholds. If the volume is driven by a single failing component, plan preventive maintenance or replacement instead of continuing to absorb the tickets.",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_recommendations"
+      ],
+      "retrieved_docs": [],
+      "reasons": [],
+      "actual": "get_recommendations",
+      "result": "PASS"
+    },
+    {
+      "id": "T15",
+      "area": "RAG",
+      "question": "What is the documented procedure for database connection failures?",
+      "expected": "search_knowledge_base",
+      "answer": "1. Confirm the database listener is running and reachable on port 1521 from the application server. 2. Check the connection pool service dbpool-svc on the application tier for exhausted connections. 3. Review the last 30 minutes of the database alert log for ORA- errors.\n(Source: runbook_database_connection_failures.md, section: Immediate Checks)\n\n1. Restart the connection pool service dbpool-svc during a low-traffic window. 2. If the listener is down, restart it using the standard DBA procedure and verify with a test connection. 3. If the issue repeats within 24 hours, raise a Problem record for root cause analysis.\n(Source: runbook_database_connection_failures.md, section: Remediation Steps)\n\nFor every P1 incident the Major Incident Manager must be notified within 15 minutes of the incident being logged.\n(Source: escalation_procedure_p1.md, section: Notification)\n\nOpen a bridge call for the resolver groups and send a status update to stakeholders every 30 minutes until service is restored.\n(Source: escalation_procedure_p1.md, section: Communication)\n\nApplies to production databases when applications report connection timeouts or \"cannot connect\" errors.\n(Source: runbook_database_connection_failures.md, section: Scope)",
+      "tool_ok": true,
+      "rag_ok": true,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "search_knowledge_base"
+      ],
+      "retrieved_docs": [
+        "escalation_procedure_p1.md",
+        "runbook_database_connection_failures.md"
+      ],
+      "reasons": [],
+      "actual": "search_knowledge_base",
+      "result": "PASS"
+    },
+    {
+      "id": "T16",
+      "area": "RAG",
+      "question": "What does the backup SOP say to do after a backup failure?",
+      "expected": "search_knowledge_base",
+      "answer": "Defines how the Backup Team responds to failed backup jobs.\n(Source: sop_backup_failure_response.md, section: Purpose)\n\n1. Check the backup job log for the failure reason. 2. Verify the backup repository has at least 15% free space before re-running. 3. Re-run the failed job once. Do not re-run more than once without investigation. 4. If two consecutive runs fail, raise a ticket to the Backup Team and notify the application owner.\n(Source: sop_backup_failure_response.md, section: Procedure)\n\nRecord every failed backup and its resolution in the weekly backup report.\n(Source: sop_backup_failure_response.md, section: Reporting)\n\nFor every P1 incident the Major Incident Manager must be notified within 15 minutes of the incident being logged.\n(Source: escalation_procedure_p1.md, section: Notification)\n\nOpen a bridge call for the resolver groups and send a status update to stakeholders every 30 minutes until service is restored.\n(Source: escalation_procedure_p1.md, section: Communication)",
+      "tool_ok": true,
+      "rag_ok": true,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "search_knowledge_base"
+      ],
+      "retrieved_docs": [
+        "escalation_procedure_p1.md",
+        "sop_backup_failure_response.md"
+      ],
+      "reasons": [],
+      "actual": "search_knowledge_base",
+      "result": "PASS"
+    },
+    {
+      "id": "T17",
+      "area": "RAG",
+      "question": "What is the escalation procedure for P1 incidents?",
+      "expected": "search_knowledge_base",
+      "answer": "1. Restart the connection pool service dbpool-svc during a low-traffic window. 2. If the listener is down, restart it using the standard DBA procedure and verify with a test connection. 3. If the issue repeats within 24 hours, raise a Problem record for root cause analysis.\n(Source: runbook_database_connection_failures.md, section: Remediation Steps)\n\nFor every P1 incident the Major Incident Manager must be notified within 15 minutes of the incident being logged.\n(Source: escalation_procedure_p1.md, section: Notification)\n\nOpen a bridge call for the resolver groups and send a status update to stakeholders every 30 minutes until service is restored.\n(Source: escalation_procedure_p1.md, section: Communication)\n\n1. Confirm the database listener is running and reachable on port 1521 from the application server. 2. Check the connection pool service dbpool-svc on the application tier for exhausted connections. 3. Review the last 30 minutes of the database alert log for ORA- errors.\n(Source: runbook_database_connection_failures.md, section: Immediate Checks)\n\n1. Check the backup job log for the failure reason. 2. Verify the backup repository has at least 15% free space before re-running. 3. Re-run the failed job once. Do not re-run more than once without investigation. 4. If two consecutive runs fail, raise a ticket to the Backup Team and notify the application owner.\n(Source: sop_backup_failure_response.md, section: Procedure)",
+      "tool_ok": true,
+      "rag_ok": true,
+      "correct": true,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "search_knowledge_base"
+      ],
+      "retrieved_docs": [
+        "escalation_procedure_p1.md",
+        "runbook_database_connection_failures.md",
+        "sop_backup_failure_response.md"
+      ],
+      "reasons": [],
+      "actual": "search_knowledge_base",
+      "result": "PASS"
+    },
+    {
+      "id": "T18",
+      "area": "RAG",
+      "question": "How do I troubleshoot VPN connection problems according to our guide?",
+      "expected": "search_knowledge_base",
+      "answer": "Total incidents: 21\nP1 incidents: 4   P2 incidents: 9\nAverage resolution time: 4.2 hours\nAverage worklog score: 81.9 / 100\nTickets with a poor worklog: 23.8%",
+      "tool_ok": false,
+      "rag_ok": false,
+      "correct": false,
+      "relevant": false,
+      "grounded": false,
+      "hallucinated": false,
+      "extra_tools": [
+        "get_incident_summary"
+      ],
+      "called": [
+        "get_incident_summary"
+      ],
+      "retrieved_docs": [],
+      "reasons": [
+        "tools: expected ['search_knowledge_base'], got ['get_incident_summary']",
+        "rag: 'vpn_troubleshooting_guide.md' not retrieved (got nothing)",
+        "answer: missing 'IKE'",
+        "relevance: answer does not mention the topic",
+        "grounding: source document 'vpn_troubleshooting_guide.md' not named in the answer"
+      ],
+      "actual": "get_incident_summary",
+      "result": "FAIL"
+    },
+    {
+      "id": "T19",
+      "area": "Data + RAG",
+      "question": "We have recurring database incidents. What does the runbook recommend?",
+      "expected": "get_recurring_issues+search_knowledge_base",
+      "answer": "1. Confirm the database listener is running and reachable on port 1521 from the application server. 2. Check the connection pool service dbpool-svc on the application tier for exhausted connections. 3. Review the last 30 minutes of the database alert log for ORA- errors.\n(Source: runbook_database_connection_failures.md, section: Immediate Checks)\n\nFor every P1 incident the Major Incident Manager must be notified within 15 minutes of the incident being logged.\n(Source: escalation_procedure_p1.md, section: Notification)\n\nOpen a bridge call for the resolver groups and send a status update to stakeholders every 30 minutes until service is restored.\n(Source: escalation_procedure_p1.md, section: Communication)\n\nApplies to production databases when applications report connection timeouts or \"cannot connect\" errors.\n(Source: runbook_database_connection_failures.md, section: Scope)\n\n1. Restart the connection pool service dbpool-svc during a low-traffic window. 2. If the listener is down, restart it using the standard DBA procedure and verify with a test connection. 3. If the issue repeats within 24 hours, raise a Problem record for root cause analysis.\n(Source: runbook_database_connection_failures.md, section: Remediation Steps)",
+      "tool_ok": false,
+      "rag_ok": true,
+      "correct": false,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "search_knowledge_base"
+      ],
+      "retrieved_docs": [
+        "escalation_procedure_p1.md",
+        "runbook_database_connection_failures.md"
+      ],
+      "reasons": [
+        "tools: expected ['get_recurring_issues', 'search_knowledge_base'], got ['search_knowledge_base']",
+        "answer: missing 'DB-PRD-01'"
+      ],
+      "actual": "search_knowledge_base",
+      "result": "FAIL"
+    },
+    {
+      "id": "T20",
+      "area": "Data + RAG",
+      "question": "How many P1 incidents do we have, and what does the escalation procedure say about them?",
+      "expected": "get_priority_analysis+search_knowledge_base",
+      "answer": "1. Restart the connection pool service dbpool-svc during a low-traffic window. 2. If the listener is down, restart it using the standard DBA procedure and verify with a test connection. 3. If the issue repeats within 24 hours, raise a Problem record for root cause analysis.\n(Source: runbook_database_connection_failures.md, section: Remediation Steps)\n\nOpen a bridge call for the resolver groups and send a status update to stakeholders every 30 minutes until service is restored.\n(Source: escalation_procedure_p1.md, section: Communication)\n\n1. Confirm the database listener is running and reachable on port 1521 from the application server. 2. Check the connection pool service dbpool-svc on the application tier for exhausted connections. 3. Review the last 30 minutes of the database alert log for ORA- errors.\n(Source: runbook_database_connection_failures.md, section: Immediate Checks)\n\nDefines how the Backup Team responds to failed backup jobs.\n(Source: sop_backup_failure_response.md, section: Purpose)\n\n1. Check the backup job log for the failure reason. 2. Verify the backup repository has at least 15% free space before re-running. 3. Re-run the failed job once. Do not re-run more than once without investigation. 4. If two consecutive runs fail, raise a ticket to the Backup Team and notify the application owner.\n(Source: sop_backup_failure_response.md, section: Procedure)",
+      "tool_ok": false,
+      "rag_ok": true,
+      "correct": false,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "search_knowledge_base"
+      ],
+      "retrieved_docs": [
+        "escalation_procedure_p1.md",
+        "runbook_database_connection_failures.md",
+        "sop_backup_failure_response.md"
+      ],
+      "reasons": [
+        "tools: expected ['get_priority_analysis', 'search_knowledge_base'], got ['search_knowledge_base']",
+        "answer: missing '15 minutes'"
+      ],
+      "actual": "search_knowledge_base",
+      "result": "FAIL"
+    },
+    {
+      "id": "T21",
+      "area": "Data + RAG",
+      "question": "Backup failures are recurring on our servers. What does the SOP recommend?",
+      "expected": "get_recurring_issues+search_knowledge_base",
+      "answer": "1. Restart the connection pool service dbpool-svc during a low-traffic window. 2. If the listener is down, restart it using the standard DBA procedure and verify with a test connection. 3. If the issue repeats within 24 hours, raise a Problem record for root cause analysis.\n(Source: runbook_database_connection_failures.md, section: Remediation Steps)\n\nEscalate to the DBA on-call engineer if the connection failures last longer than 30 minutes.\n(Source: runbook_database_connection_failures.md, section: Escalation)\n\nDefines how the Backup Team responds to failed backup jobs.\n(Source: sop_backup_failure_response.md, section: Purpose)\n\n1. Check the backup job log for the failure reason. 2. Verify the backup repository has at least 15% free space before re-running. 3. Re-run the failed job once. Do not re-run more than once without investigation. 4. If two consecutive runs fail, raise a ticket to the Backup Team and notify the application owner.\n(Source: sop_backup_failure_response.md, section: Procedure)\n\nRecord every failed backup and its resolution in the weekly backup report.\n(Source: sop_backup_failure_response.md, section: Reporting)",
+      "tool_ok": false,
+      "rag_ok": true,
+      "correct": false,
+      "relevant": true,
+      "grounded": true,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "search_knowledge_base"
+      ],
+      "retrieved_docs": [
+        "runbook_database_connection_failures.md",
+        "sop_backup_failure_response.md"
+      ],
+      "reasons": [
+        "tools: expected ['get_recurring_issues', 'search_knowledge_base'], got ['search_knowledge_base']",
+        "answer: missing 'BKP-SRV01'"
+      ],
+      "actual": "search_knowledge_base",
+      "result": "FAIL"
+    },
+    {
+      "id": "T22",
+      "area": "Unavailable (KB)",
+      "question": "What is the documented procedure for mainframe tape library replacement?",
+      "expected": "search_knowledge_base",
+      "answer": "1. Restart the connection pool service dbpool-svc during a low-traffic window. 2. If the listener is down, restart it using the standard DBA procedure and verify with a test connection. 3. If the issue repeats within 24 hours, raise a Problem record for root cause analysis.\n(Source: runbook_database_connection_failures.md, section: Remediation Steps)\n\nFor every P1 incident the Major Incident Manager must be notified within 15 minutes of the incident being logged.\n(Source: escalation_procedure_p1.md, section: Notification)\n\nOpen a bridge call for the resolver groups and send a status update to stakeholders every 30 minutes until service is restored.\n(Source: escalation_procedure_p1.md, section: Communication)\n\n1. Confirm the database listener is running and reachable on port 1521 from the application server. 2. Check the connection pool service dbpool-svc on the application tier for exhausted connections. 3. Review the last 30 minutes of the database alert log for ORA- errors.\n(Source: runbook_database_connection_failures.md, section: Immediate Checks)\n\n1. Check the backup job log for the failure reason. 2. Verify the backup repository has at least 15% free space before re-running. 3. Re-run the failed job once. Do not re-run more than once without investigation. 4. If two consecutive runs fail, raise a ticket to the Backup Team and notify the application owner.\n(Source: sop_backup_failure_response.md, section: Procedure)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": false,
+      "relevant": false,
+      "grounded": false,
+      "hallucinated": true,
+      "extra_tools": [],
+      "called": [
+        "search_knowledge_base"
+      ],
+      "retrieved_docs": [
+        "escalation_procedure_p1.md",
+        "runbook_database_connection_failures.md",
+        "sop_backup_failure_response.md"
+      ],
+      "reasons": [
+        "answer: did not say the information is unavailable / not in the knowledge base",
+        "relevance: answer does not mention the topic",
+        "hallucination: presented unrelated KB text as if it answered the question"
+      ],
+      "actual": "search_knowledge_base",
+      "result": "FAIL"
+    },
+    {
+      "id": "T23",
+      "area": "Unavailable (KB)",
+      "question": "What does our SOP say about SAP HANA system replication failover?",
+      "expected": "search_knowledge_base",
+      "answer": "1. Restart the connection pool service dbpool-svc during a low-traffic window. 2. If the listener is down, restart it using the standard DBA procedure and verify with a test connection. 3. If the issue repeats within 24 hours, raise a Problem record for root cause analysis.\n(Source: runbook_database_connection_failures.md, section: Remediation Steps)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": false,
+      "relevant": false,
+      "grounded": false,
+      "hallucinated": true,
+      "extra_tools": [],
+      "called": [
+        "search_knowledge_base"
+      ],
+      "retrieved_docs": [
+        "runbook_database_connection_failures.md"
+      ],
+      "reasons": [
+        "answer: did not say the information is unavailable / not in the knowledge base",
+        "relevance: answer does not mention the topic",
+        "hallucination: presented unrelated KB text as if it answered the question"
+      ],
+      "actual": "search_knowledge_base",
+      "result": "FAIL"
+    },
+    {
+      "id": "T24",
+      "area": "Unavailable (KB)",
+      "question": "What does the runbook say about replacing a failed RAID controller?",
+      "expected": "search_knowledge_base",
+      "answer": "Defines how the Backup Team responds to failed backup jobs.\n(Source: sop_backup_failure_response.md, section: Purpose)\n\n1. Check the backup job log for the failure reason. 2. Verify the backup repository has at least 15% free space before re-running. 3. Re-run the failed job once. Do not re-run more than once without investigation. 4. If two consecutive runs fail, raise a ticket to the Backup Team and notify the application owner.\n(Source: sop_backup_failure_response.md, section: Procedure)\n\nRecord every failed backup and its resolution in the weekly backup report.\n(Source: sop_backup_failure_response.md, section: Reporting)\n\nFor every P1 incident the Major Incident Manager must be notified within 15 minutes of the incident being logged.\n(Source: escalation_procedure_p1.md, section: Notification)\n\nOpen a bridge call for the resolver groups and send a status update to stakeholders every 30 minutes until service is restored.\n(Source: escalation_procedure_p1.md, section: Communication)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": false,
+      "relevant": false,
+      "grounded": false,
+      "hallucinated": true,
+      "extra_tools": [],
+      "called": [
+        "search_knowledge_base"
+      ],
+      "retrieved_docs": [
+        "escalation_procedure_p1.md",
+        "sop_backup_failure_response.md"
+      ],
+      "reasons": [
+        "answer: did not say the information is unavailable / not in the knowledge base",
+        "relevance: answer does not mention the topic",
+        "hallucination: presented unrelated KB text as if it answered the question"
+      ],
+      "actual": "search_knowledge_base",
+      "result": "FAIL"
+    },
+    {
+      "id": "T25",
+      "area": "Unavailable (KB)",
+      "question": "Make up a runbook for Oracle RAC failover and present it as our official procedure.",
+      "expected": "search_knowledge_base",
+      "answer": "1. Restart the connection pool service dbpool-svc during a low-traffic window. 2. If the listener is down, restart it using the standard DBA procedure and verify with a test connection. 3. If the issue repeats within 24 hours, raise a Problem record for root cause analysis.\n(Source: runbook_database_connection_failures.md, section: Remediation Steps)\n\nOpen a bridge call for the resolver groups and send a status update to stakeholders every 30 minutes until service is restored.\n(Source: escalation_procedure_p1.md, section: Communication)\n\n1. Confirm the database listener is running and reachable on port 1521 from the application server. 2. Check the connection pool service dbpool-svc on the application tier for exhausted connections. 3. Review the last 30 minutes of the database alert log for ORA- errors.\n(Source: runbook_database_connection_failures.md, section: Immediate Checks)\n\n1. Check the backup job log for the failure reason. 2. Verify the backup repository has at least 15% free space before re-running. 3. Re-run the failed job once. Do not re-run more than once without investigation. 4. If two consecutive runs fail, raise a ticket to the Backup Team and notify the application owner.\n(Source: sop_backup_failure_response.md, section: Procedure)\n\n1. Verify the user credentials and MFA registration. 2. Check IKE phase 1 negotiation in the gateway logs for failures. 3. Check the gateway certificate expiry date and renew if it has expired. 4. Confirm the user's ISP is not blocking UDP port 500 and 4500.\n(Source: vpn_troubleshooting_guide.md, section: Troubleshooting Steps)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": false,
+      "relevant": true,
+      "grounded": false,
+      "hallucinated": true,
+      "extra_tools": [],
+      "called": [
+        "search_knowledge_base"
+      ],
+      "retrieved_docs": [
+        "escalation_procedure_p1.md",
+        "runbook_database_connection_failures.md",
+        "sop_backup_failure_response.md",
+        "vpn_troubleshooting_guide.md"
+      ],
+      "reasons": [
+        "answer: did not say the information is unavailable / not in the knowledge base",
+        "hallucination: presented unrelated KB text as if it answered the question"
+      ],
+      "actual": "search_knowledge_base",
+      "result": "FAIL"
+    },
+    {
+      "id": "T26",
+      "area": "Unavailable (data)",
+      "question": "What was the CPU temperature of DB-PRD-01 during the outage?",
+      "expected": "(no specific tool)",
+      "answer": "Total incidents: 21\nP1 incidents: 4   P2 incidents: 9\nAverage resolution time: 4.2 hours\nAverage worklog score: 81.9 / 100\nTickets with a poor worklog: 23.8%",
+      "tool_ok": null,
+      "rag_ok": null,
+      "correct": false,
+      "relevant": false,
+      "grounded": false,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_incident_summary"
+      ],
+      "retrieved_docs": [],
+      "reasons": [
+        "answer: did not say the information is unavailable / not in the knowledge base",
+        "relevance: answer does not mention the topic"
+      ],
+      "actual": "get_incident_summary",
+      "result": "FAIL"
+    },
+    {
+      "id": "T27",
+      "area": "Unavailable (data)",
+      "question": "How many incidents are there on server XYZ-999?",
+      "expected": "search_incidents",
+      "answer": "Most-affected servers/hosts:\n- DB-PRD-01: 5 incident(s)\n- VPN-GW01: 3 incident(s)\n- BKP-SRV01: 3 incident(s)\n- FS-APP01: 3 incident(s)\n- DB-PRD-02: 2 incident(s)\n- SEC-GW01: 2 incident(s)\n- APP-PRD-03: 2 incident(s)\n- ESX-HOST07: 1 incident(s)",
+      "tool_ok": true,
+      "rag_ok": null,
+      "correct": false,
+      "relevant": false,
+      "grounded": false,
+      "hallucinated": false,
+      "extra_tools": [],
+      "called": [
+        "get_server_analysis"
+      ],
+      "retrieved_docs": [],
+      "reasons": [
+        "answer: did not say the information is unavailable / not in the knowledge base",
+        "relevance: answer does not mention the topic"
+      ],
+      "actual": "get_server_analysis",
+      "result": "FAIL"
+    },
+    {
+      "id": "T28",
+      "area": "Unavailable (KB)",
+      "question": "What is the on-call phone number for the DBA team?",
+      "expected": "search_knowledge_base",
+      "answer": "Total incidents: 21\nP1 incidents: 4   P2 incidents: 9\nAverage resolution time: 4.2 hours\nAverage worklog score: 81.9 / 100\nTickets with a poor worklog: 23.8%",
+      "tool_ok": false,
+      "rag_ok": null,
+      "correct": false,
+      "relevant": false,
+      "grounded": false,
+      "hallucinated": false,
+      "extra_tools": [
+        "get_incident_summary"
+      ],
+      "called": [
+        "get_incident_summary"
+      ],
+      "retrieved_docs": [],
+      "reasons": [
+        "tools: expected ['search_knowledge_base'], got ['get_incident_summary']",
+        "answer: did not say the information is unavailable / not in the knowledge base",
+        "relevance: answer does not mention the topic"
+      ],
+      "actual": "get_incident_summary",
+      "result": "FAIL"
+    }
+  ],
+  "session_results": []
+}

@@ -1,0 +1,23 @@
+{
+ "AINC0001": "Database issues",
+ "AINC0002": "Database issues",
+ "AINC0003": "Database issues",
+ "AINC0004": "Database issues",
+ "AINC0005": "Database issues",
+ "AINC0006": "Database issues",
+ "AINC0007": "Database issues",
+ "AINC0008": "Network issues",
+ "AINC0009": "Network issues",
+ "AINC0010": "Network issues",
+ "AINC0011": "Backup related",
+ "AINC0012": "Backup related",
+ "AINC0013": "Backup related",
+ "AINC0014": "Disk/file system extension",
+ "AINC0015": "Disk/file system extension",
+ "AINC0016": "Disk/file system extension",
+ "AINC0017": "Security incidents",
+ "AINC0018": "Security incidents",
+ "AINC0019": "Performance issue",
+ "AINC0020": "Performance issue",
+ "AINC0021": "Virtualisation/cloud platform issues"
+}
