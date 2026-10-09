@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.models.schemas import ChatRequest, ChatResponse
-from app.security import verify_api_key
+from app.security import get_session_key
 from app.services import chat_tools, rag
 from app.services.session_store import get_last_result
 
@@ -12,10 +12,10 @@ router = APIRouter(prefix="/api/v1", tags=["chat"])
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest, api_key: str = Depends(verify_api_key)):
+async def chat(req: ChatRequest, api_key: str = Depends(get_session_key)):
     result = get_last_result(api_key)
     if not result:
-        raise HTTPException(status_code=404, detail="No analysis found for this API key yet. Run /analyze first.")
+        raise HTTPException(status_code=404, detail="No analysis found for this session yet. Run /analyze first.")
 
     full_df = chat_tools.tickets_to_dataframe(result.results)
     stats = {
