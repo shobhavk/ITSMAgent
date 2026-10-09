@@ -10,7 +10,7 @@ Security controls:
 import re
 from typing import Annotated
 
-from fastapi import Header, HTTPException, UploadFile, status
+from fastapi import Depends, Header, HTTPException, UploadFile, status
 
 from app.config import get_settings
 
@@ -102,3 +102,25 @@ def sanitize_for_llm(text: str, max_len: int = 4000) -> str:
 
 def contains_injection_attempt(text: str) -> bool:
     return bool(text and _INJECTION_RE.search(text))
+
+
+_SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_\-]{8,64}$")
+
+
+def get_session_key(
+    api_key: str = Depends(verify_api_key),
+    x_session_id: Annotated[str | None, Header()] = None,
+) -> str:
+    """FastAPI dependency: the key under which a user's analysis is stored.
+
+    Without an X-Session-ID header the key is just the API key (the old
+    behaviour, so existing clients keep working - but everyone sharing that
+    API key then shares one slot). With the header, each session ID gets its
+    own isolated slot under that API key, so several people can safely share
+    one key. Create an ID with POST /api/v1/session (or any 8-64 char token).
+    """
+    if x_session_id is None:
+        return api_key
+    if not _SESSION_ID_RE.match(x_session_id):
+        raise HTTPException(status_code=400, detail="X-Session-ID must be 8-64 characters: letters, digits, '-' or '_'.")
+    return f"{api_key}:{x_session_id}"
