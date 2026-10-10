@@ -56,3 +56,6 @@ Thumbs.db
 
 # --- Jupyter (in case notebooks are used for exploration) ---
 .ipynb_checkpoints/
+
+# --- Operational logs (may contain stack traces) ---
+logs/
