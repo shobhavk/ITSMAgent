@@ -57,6 +57,8 @@ from app.security import validate_kb_upload
 from app.services import persistence
 from app.services.llm_client import embeddings_retry, get_embeddings_model
 
+from app.services.observability import kb_fields, traced_tool  # Step 15 tracing
+
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
@@ -342,6 +344,7 @@ def delete_document(document_id: int) -> bool:
 # 5. Retrieval - the only function the search_knowledge_base tool calls.
 # --------------------------------------------------------------------------
 
+@traced_tool("search_knowledge_base", component="rag", extract=kb_fields)
 async def retrieve_relevant_chunks(query: str, top_k: int | None = None) -> list[dict]:
     """Returns up to `top_k` chunks relevant to `query`, each as
     {"text", "document_name", "document_type", "page_number",
