@@ -44,6 +44,7 @@ from ui.tab_results import (
     _show_row_detail,
 )
 from ui.tab_chat import _build_chat_index, _chat_clear, _chat_respond
+from ui.tab_observability import build_observability_tab
 from ui.tab_kb import _kb_delete, _kb_refresh, _kb_reindex, _kb_upload
 from ui.analysis import _analyze, _analyze_sample, _reveal_after_analysis
 
@@ -434,6 +435,9 @@ def build_ui() -> gr.Blocks:
                             )
                             chat_send = gr.Button("Send", variant="primary", scale=1)
                         chat_clear_btn = gr.Button("Clear conversation", size="sm", elem_id="chat-clear-btn")
+
+                with gr.Tab("🔭 Observability", id=7):
+                    build_observability_tab()
 
                 with gr.Tab("⚙️ Settings", id=6):
                     with gr.Column(elem_classes=["dash-card"]):
