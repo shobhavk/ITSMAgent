@@ -65,6 +65,10 @@ from app.services.llm_client import (
     with_chat_retry,
 )
 
+from app.services.observability import (  # Step 15 tracing
+    note_question, note_tool_selection, record_event, request_trace, set_mode, traced_llm_ainvoke,
+)
+
 logger = logging.getLogger(__name__)
 
 TOP_K = 8
@@ -590,7 +594,7 @@ def _history_to_messages(history: list[tuple[str, str]]) -> list:
     return messages
 
 
-async def answer_question(
+async def _answer_question_impl(
     question: str,
     full_df,
     stats: dict | None = None,
@@ -611,6 +615,7 @@ async def answer_question(
     being pre-computed once and pasted into the prompt, so the agent's
     numbers can never go stale relative to what's actually in full_df."""
     question = sanitize_for_llm(question, max_len=1000).strip()
+    note_question(question)
     if not question:
         return 'Ask a question about the analyzed tickets - e.g. "how many P1 tickets are there?"'
 
@@ -618,6 +623,7 @@ async def answer_question(
         return "No analyzed tickets are available yet - run an analysis first, then come back and ask away."
 
     raw_chat_model = get_raw_chat_model()
+    set_mode("rule_based" if raw_chat_model is None else "llm")
     if raw_chat_model is None:
         try:
             return await _no_llm_fallback(question, full_df)
@@ -638,14 +644,17 @@ async def answer_question(
         messages += _history_to_messages(history)
         messages.append(HumanMessage(content=question))
 
-        for _ in range(MAX_TOOL_ROUNDS):
-            response = await model_with_tools.ainvoke(messages)
+        for _round in range(MAX_TOOL_ROUNDS):
+            response = await traced_llm_ainvoke(model_with_tools, messages, "agent_turn")
             messages.append(response)
             if not getattr(response, "tool_calls", None):
                 return response.content.strip()
+            note_tool_selection([c.get("name") for c in response.tool_calls], _round + 1)
 
             for call in response.tool_calls:
                 tool_fn = tool_map.get(call["name"])
+                if tool_fn is None:
+                    record_event("tool", str(call.get("name"))[:60], "error", 0.0, error_type="UnknownTool")
                 try:
                     result = await tool_fn.ainvoke(call["args"]) if tool_fn else json.dumps({"error": f"Unknown tool: {call['name']}"})
                 except Exception as exc:
@@ -655,8 +664,10 @@ async def answer_question(
 
         # Exceeded MAX_TOOL_ROUNDS without a final answer - force one
         # without giving the model tools to call again.
-        final = await with_chat_retry(raw_chat_model).ainvoke(
-            messages + [HumanMessage(content="Answer the original question now, using only the information already gathered above.")]
+        final = await traced_llm_ainvoke(
+            with_chat_retry(raw_chat_model),
+            messages + [HumanMessage(content="Answer the original question now, using only the information already gathered above.")],
+            "forced_final_answer",
         )
         return final.content.strip()
     except Exception:
@@ -665,3 +676,16 @@ async def answer_question(
             return "I couldn't reach the assistant model just now. Here's what the data shows directly:\n\n" + await _no_llm_fallback(question, full_df)
         except Exception:
             return "I couldn't generate an answer right now - please try again."
+
+
+async def answer_question(
+    question: str,
+    full_df,
+    stats: dict | None = None,
+    history: list[tuple[str, str]] | None = None,
+) -> str:
+    """Public entry point - unchanged signature and behaviour. Wraps the agent
+    in a traced request (Step 15): reuses the REST request context if one is
+    active, otherwise starts its own (Gradio path). See observability.py."""
+    with request_trace("chat", source="agent"):
+        return await _answer_question_impl(question, full_df, stats, history)
