@@ -41,6 +41,8 @@ import pandas as pd
 
 from app.services import recurring_issues, trend_metrics
 
+from app.services.observability import traced_tool  # Step 15 tracing (decorator only; results unchanged)
+
 logger = logging.getLogger(__name__)
 
 # Mirrors the "Poor" band in ui/gradio_app.py's _score_badge() (score < 50
@@ -100,6 +102,7 @@ def _to_native(value):
     return value
 
 
+@traced_tool("get_incident_summary")
 def get_incident_summary(full_df: pd.DataFrame) -> dict:
     """Total incidents, P1/P2 counts, average resolution time (MTTR),
     average worklog score, and the percentage of tickets with a "poor"
@@ -140,6 +143,7 @@ def get_incident_summary(full_df: pd.DataFrame) -> dict:
         return {"error": f"Could not compute the incident summary: {exc}"}
 
 
+@traced_tool("get_category_analysis")
 def get_category_analysis(full_df: pd.DataFrame, top_n: int = DEFAULT_TOP_N) -> dict:
     """Incident count by category, plus the top N categories."""
     try:
@@ -156,6 +160,7 @@ def get_category_analysis(full_df: pd.DataFrame, top_n: int = DEFAULT_TOP_N) -> 
         return {"error": f"Could not compute category analysis: {exc}"}
 
 
+@traced_tool("get_priority_analysis")
 def get_priority_analysis(full_df: pd.DataFrame) -> dict:
     """Incident count by priority, plus the percentage distribution."""
     try:
@@ -174,6 +179,7 @@ def get_priority_analysis(full_df: pd.DataFrame) -> dict:
         return {"error": f"Could not compute priority analysis: {exc}"}
 
 
+@traced_tool("get_server_analysis")
 def get_server_analysis(full_df: pd.DataFrame, top_n: int = DEFAULT_TOP_N) -> dict:
     """Incident count by server/host, plus the top N most-affected servers."""
     try:
@@ -193,6 +199,7 @@ def get_server_analysis(full_df: pd.DataFrame, top_n: int = DEFAULT_TOP_N) -> di
         return {"error": f"Could not compute server analysis: {exc}"}
 
 
+@traced_tool("get_recurring_issues")
 def get_recurring_issues(full_df: pd.DataFrame, threshold: int = recurring_issues.DEFAULT_RECURRENCE_THRESHOLD) -> dict:
     """Recurring issues (exact-match: same host+category recurring at
     least `threshold` times), their frequency, and affected servers.
@@ -222,6 +229,7 @@ def get_recurring_issues(full_df: pd.DataFrame, threshold: int = recurring_issue
         return {"error": f"Could not compute recurring issues: {exc}"}
 
 
+@traced_tool("search_incidents")
 def search_incidents(
     full_df: pd.DataFrame,
     incident_id: str = "",
