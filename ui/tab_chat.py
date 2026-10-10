@@ -1,7 +1,8 @@
 """Q&A (Agent) tab: chat index and chat handlers."""
+import gradio as gr
 import pandas as pd
 
-from app.services import rag
+from app.services import observability, rag
 from ui.chat_format import clean_answer
 
 
@@ -26,7 +27,7 @@ def _history_to_messages(history: list[tuple[str, str]]) -> list[dict]:
     return messages
 
 
-async def _chat_respond(message: str, history: list, full_df, stats: dict):
+async def _chat_respond(message: str, history: list, full_df, stats: dict, request: gr.Request = None):
     message = (message or "").strip()
     if not message:
         return _history_to_messages(history), history, ""
@@ -35,7 +36,10 @@ async def _chat_respond(message: str, history: list, full_df, stats: dict):
         answer = "Run an analysis on the Dashboard tab first - then come back and ask away."
     else:
         # The model (or the no-LLM fallback) sometimes answers with a JSON blob; show readable text.
-        answer = clean_answer(await rag.answer_question(message, full_df, stats or {}, history))
+        # Step 15: one traced request per question; the Gradio session hash is
+        # pseudonymised before it reaches any log (see observability.pseudonymize).
+        with observability.request_trace("chat", getattr(request, "session_hash", None), source="gradio"):
+            answer = clean_answer(await rag.answer_question(message, full_df, stats or {}, history))
 
     history = history + [(message, answer)]
     return _history_to_messages(history), history, ""
