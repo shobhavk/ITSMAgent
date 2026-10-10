@@ -8,3 +8,5 @@ tests
 sample_data
 *.md
 .pytest_cache
+
+logs/
