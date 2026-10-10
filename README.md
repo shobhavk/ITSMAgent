@@ -355,3 +355,16 @@ remains separately available and secured for automation/integration use.
 - SLA/trend dashboards over time, not just per-upload snapshots
 - Multi-tenant API key scoping with per-team dashboards
 - Batch/async processing for very large files (current v1 is synchronous)
+
+## Observability (Step 15)
+
+Every chat/API request gets a unique `request_id` (returned in the `X-Request-ID` header) and a one-way
+hashed session id. Tools, RAG searches and LLM calls are timed and logged as JSON events; metrics are
+counted from those events. See `app/services/observability.py`.
+
+- **Config (.env):** `LOG_LEVEL`, `LOG_FILE_ENABLED`, `LOG_DIR`, `LOG_FILE_MAX_BYTES`, `LOG_FILE_BACKUP_COUNT`,
+  `OBS_DETAILED_DIAGNOSTICS`, `OBS_ADMIN_TOKEN` (see `.env.example`).
+- **Metrics:** Observability tab in the dashboard, or `GET /api/v1/metrics` (API key). Since app start only.
+- **Follow one request:** `python trace_request.py <request_id>` (needs `LOG_FILE_ENABLED=true`).
+- **Tests:** `pip install -r requirements-dev.txt && python -m pytest tests -v`
+- **Evaluation vs observability:** `python evaluate_agent.py` measures answer *quality*; observability measures runtime *behaviour*.
