@@ -47,6 +47,8 @@ import pandas as pd
 
 from app.services import chat_tools, recurring_issues, trend_metrics
 
+from app.services.observability import traced_tool  # Step 15 tracing
+
 logger = logging.getLogger(__name__)
 
 RECOMMENDATION_THRESHOLDS = {
@@ -724,6 +726,7 @@ def fallback_recommendations_markdown(result: dict) -> str:
         return "Could not render the recommendations write-up from the current data."
 
 
+@traced_tool("get_recommendations")
 def get_recommendations(full_df: pd.DataFrame, thresholds: dict | None = None) -> dict:
     """Agent-tool-shaped wrapper (see rag.py): same small, JSON-safe
     contract as the chat_tools functions - the recommendations without
