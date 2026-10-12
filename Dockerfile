@@ -18,7 +18,10 @@ RUN groupadd -r itsm && useradd -r -g itsm -d /app -s /sbin/nologin itsm
 WORKDIR /app
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    GRADIO_ANALYTICS_ENABLED=False \
+    GRADIO_TEMP_DIR=/tmp/gradio \
+    HF_HOME=/tmp/hf
 
 COPY --from=builder /opt/venv /opt/venv
 COPY app ./app
@@ -31,7 +34,8 @@ COPY ui ./ui
 # non-root `itsm` user below actually work against docker-compose.yml's
 # `itsm_data:/app/data` volume (needed because the compose file also sets
 # `read_only: true` on the container - see persistence.py's DB_PATH).
-RUN mkdir -p /app/data && chown -R itsm:itsm /app
+# /app/logs is only used when LOG_FILE_ENABLED=true (mounted as its own volume).
+RUN mkdir -p /app/data /app/logs && chown -R itsm:itsm /app
 USER itsm
 
 EXPOSE 8000
