@@ -6,12 +6,13 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      # Container paths for the writable volumes (root FS is read-only).
+      ITSM_DB_PATH: /app/data/itsm_analysis.db
+      LOG_DIR: /app/logs
     volumes:
-      # SQLite (ticket/file cache) lives at /app/data by default - see
-      # ITSM_DB_PATH in app/services/persistence.py. Without this volume,
-      # `read_only: true` below would make that write fail at startup;
-      # this is the one path the container is allowed to write to.
-      - itsm_data:/app/data
+      - itsm_data:/app/data   # SQLite ticket/file cache
+      - itsm_logs:/app/logs   # only written if LOG_FILE_ENABLED=true
     read_only: true
     tmpfs:
       - /tmp
@@ -21,3 +22,4 @@ services:
 
 volumes:
   itsm_data:
+  itsm_logs:
