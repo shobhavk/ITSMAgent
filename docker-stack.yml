@@ -1,0 +1,53 @@
+# Docker Swarm: docker stack deploy ignores env_file/build/security_opt,
+# so values are substituted from the shell (see README steps).
+version: "3.8"
+services:
+  itsm-quality-agent:
+    image: ${IMAGE:-itsm-quality-agent:v1}
+    ports:
+      - "8000:8000"
+    environment:
+      ITSM_DB_PATH: /app/data/itsm_analysis.db
+      LOG_DIR: /app/logs
+      ENV: ${ENV:-prod}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      API_KEYS: ${API_KEYS:?API_KEYS must be set}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8000}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
+      RATE_LIMIT: ${RATE_LIMIT:-30/minute}
+      LLM_PROVIDER: ${LLM_PROVIDER:-rule_based}
+      CHAT_MODEL_NAME: ${CHAT_MODEL_NAME:-gpt-5.6-luna}
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-text-embedding-large}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      AICORE_AUTH_URL: ${AICORE_AUTH_URL:-}
+      AICORE_CLIENT_ID: ${AICORE_CLIENT_ID:-}
+      AICORE_CLIENT_SECRET: ${AICORE_CLIENT_SECRET:-}
+      AICORE_BASE_URL: ${AICORE_BASE_URL:-}
+      AICORE_RESOURCE_GROUP: ${AICORE_RESOURCE_GROUP:-}
+      SIMILARITY_THRESHOLD: ${SIMILARITY_THRESHOLD:-0.35}
+      LLM_RATE_LIMIT_MAX_RETRIES: ${LLM_RATE_LIMIT_MAX_RETRIES:-5}
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-200}
+      LLM_MAX_CONCURRENCY: ${LLM_MAX_CONCURRENCY:-10}
+      OBS_ENABLED: ${OBS_ENABLED:-true}
+      LOG_FILE_ENABLED: ${LOG_FILE_ENABLED:-false}
+      OBS_DETAILED_DIAGNOSTICS: ${OBS_DETAILED_DIAGNOSTICS:-false}
+      OBS_ADMIN_TOKEN: ${OBS_ADMIN_TOKEN:-}
+    volumes:
+      - itsm_data:/app/data
+      - itsm_logs:/app/logs
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      replicas: 1                 # in-memory sessions + SQLite: keep at 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: stop-first         # SQLite can't have two writers
+      placement:
+        constraints:
+          - node.role == manager  # volumes are node-local; pin to one node
+volumes:
+  itsm_data:
+  itsm_logs:
