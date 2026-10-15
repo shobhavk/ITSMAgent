@@ -3,11 +3,8 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
-
 from app.config import get_settings
+from app.security import BodySizeLimitMiddleware, RateLimitMiddleware, deployment_warnings, parse_ui_auth_users
 from app.routers import analyze, chat
 from app.routers import observability as observability_router
 from app.services import observability
@@ -19,16 +16,26 @@ logging.basicConfig(level=settings.LOG_LEVEL, format=observability.APP_LOG_FORMA
 observability.protect_root_handlers()   # redact secrets from log lines / stack traces
 logger = logging.getLogger(__name__)
 
-limiter = Limiter(key_func=get_remote_address, default_limits=[settings.RATE_LIMIT])
+# Step 16: configuration sanity checks. In ENV=prod an unsafe configuration
+# (placeholder/short API keys, wildcard CORS) stops the app from starting.
+_fatal, _warn = deployment_warnings()
+for _w in _warn:
+    logger.warning("Security configuration: %s", _w)
+if _fatal:
+    for _f in _fatal:
+        (logger.error if settings.ENV == "prod" else logger.warning)("Security configuration: %s", _f)
+    if settings.ENV == "prod":
+        raise RuntimeError("Refusing to start in prod with an unsafe security configuration: " + " ".join(_fatal))
 
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
     docs_url="/api/docs" if settings.ENV != "prod" else None,  # hide docs in prod
     redoc_url=None,
+    openapi_url="/openapi.json" if settings.ENV != "prod" else None,   # schema was still public in prod
 )
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# RATE_LIMIT used to be configured here through slowapi but was never enforced.
+# It is now applied to /api/ by RateLimitMiddleware (added at the bottom of this file).
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,6 +52,8 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"   # responses contain incident data
     return response
 
 
@@ -100,4 +109,11 @@ app.include_router(observability_router.router)
 from ui.gradio_app import CUSTOM_CSS, ITSM_THEME, build_ui  # noqa: E402  (import after app creation intentional)
 import gradio as gr  # noqa: E402
 
-gr.mount_gradio_app(app, build_ui(), path="/", theme=ITSM_THEME, css=CUSTOM_CSS)
+# Optional login for the dashboard (UI_AUTH_USERS="user:password,..."). Without it the UI
+# - including Knowledge Base upload/delete - is open to anyone who can reach the port.
+gr.mount_gradio_app(app, build_ui(), path="/", theme=ITSM_THEME, css=CUSTOM_CSS, auth=parse_ui_auth_users())
+
+# Outermost layers (last added = first to run), see security.py: rate limit, then cap
+# request bodies on /api/ before anything reads them.
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=(settings.MAX_UPLOAD_MB + 1) * 1024 * 1024)
+app.add_middleware(RateLimitMiddleware, rate=settings.RATE_LIMIT)
