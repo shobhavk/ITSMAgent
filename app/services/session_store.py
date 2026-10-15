@@ -1,8 +1,9 @@
 """
 In-memory store of "the last analysis result per session key" - shared by the
 analyze router (writes it) and the chat router (reads it). The key is the API
-key, or "<api key>:<X-Session-ID>" when the client sends a session ID (see
-security.get_session_key), so users are isolated per session.
+key, or the API key + X-Session-ID when the client sends a session ID, hashed
+into one opaque digest (see security.make_session_key / get_session_key), so
+users are isolated per session.
 
 Bounded so a long-running server cannot grow without limit: entries expire
 after SESSION_TTL_SECONDS of inactivity and at most MAX_SESSIONS are kept
