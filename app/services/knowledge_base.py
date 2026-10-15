@@ -53,7 +53,7 @@ import re
 import numpy as np
 
 from app.config import get_settings
-from app.security import validate_kb_upload
+from app.security import UploadValidationError, validate_kb_content, validate_kb_upload
 from app.services import persistence
 from app.services.llm_client import embeddings_retry, get_embeddings_model
 
@@ -90,6 +90,10 @@ def _extract_pdf(file_bytes: bytes) -> list[dict]:
     from pypdf import PdfReader
 
     reader = PdfReader(io.BytesIO(file_bytes))
+    if reader.is_encrypted:
+        raise ValueError("encrypted PDF")
+    if len(reader.pages) > settings.KB_MAX_PDF_PAGES:
+        raise ValueError(f"PDF has more than {settings.KB_MAX_PDF_PAGES} pages")
     units = []
     for page_number, page in enumerate(reader.pages, start=1):
         text = _clean_text(page.extract_text() or "")
@@ -170,7 +174,11 @@ def extract_units(filename: str, file_bytes: bytes) -> list[dict]:
             return _extract_md(file_bytes)
         return _extract_txt(file_bytes)
     except Exception as exc:
-        raise ValueError(f"Could not extract text from this {ext.upper()} file: {exc}") from exc
+        # Parser exceptions can contain internals/file content: log, don't show.
+        logger.warning("KB text extraction failed for a .%s file: %s: %s", ext, type(exc).__name__, exc)
+        raise ValueError(
+            f"Could not extract text from this {ext.upper()} file (it may be corrupted, encrypted, or not a valid {ext.upper()})."
+        ) from exc
 
 
 # --------------------------------------------------------------------------
@@ -254,6 +262,14 @@ async def _embed_texts(texts: list[str]) -> list[list[float]] | None:
 #    Gradio UI and the search_knowledge_base tool (rag.py) call.
 # --------------------------------------------------------------------------
 
+def _safe_kb_error(exc: BaseException) -> str:
+    """ValueErrors raised in this module carry deliberately user-safe text;
+    anything else (database, library, I/O errors) is replaced by a generic one."""
+    if isinstance(exc, ValueError):
+        return str(exc)
+    return "Indexing failed because of an internal error (see the application log)."
+
+
 async def ingest_document(filename: str, file_bytes: bytes) -> dict:
     """Runs the full pipeline for one uploaded document and persists the
     result. Never raises - a failure at any step marks this one document
@@ -262,6 +278,7 @@ async def ingest_document(filename: str, file_bytes: bytes) -> dict:
     calling UI action."""
     try:
         validate_kb_upload(filename, len(file_bytes))
+        filename = validate_kb_content(filename, file_bytes)   # also returns a sanitised display name
     except ValueError as exc:
         return {"success": False, "document_id": None, "status": "Failed", "error": str(exc), "chunk_count": 0}
 
@@ -270,6 +287,8 @@ async def ingest_document(filename: str, file_bytes: bytes) -> dict:
         units = extract_units(filename, file_bytes)
         if not units:
             raise ValueError("No extractable text was found in this document.")
+        if sum(len(u["text"]) for u in units) > settings.KB_MAX_EXTRACTED_CHARS:
+            raise ValueError(f"The document contains more than {settings.KB_MAX_EXTRACTED_CHARS:,} characters of text.")
 
         chunks = _chunk_units(units, settings.KB_CHUNK_SIZE, settings.KB_CHUNK_OVERLAP)
         if not chunks:
@@ -286,9 +305,10 @@ async def ingest_document(filename: str, file_bytes: bytes) -> dict:
         )
         return {"success": True, "document_id": document_id, "status": "Indexed", "error": None, "chunk_count": len(chunks)}
     except Exception as exc:
-        logger.warning("KB ingestion failed for %s: %s", filename, exc)
-        persistence.update_kb_document_status(document_id, status="Failed", error_message=str(exc))
-        return {"success": False, "document_id": document_id, "status": "Failed", "error": str(exc), "chunk_count": 0}
+        logger.warning("KB ingestion failed (%s): %s", type(exc).__name__, exc)
+        safe = _safe_kb_error(exc)
+        persistence.update_kb_document_status(document_id, status="Failed", error_message=safe)
+        return {"success": False, "document_id": document_id, "status": "Failed", "error": safe, "chunk_count": 0}
 
 
 async def reindex_document(document_id: int) -> dict:
@@ -317,11 +337,12 @@ async def reindex_document(document_id: int) -> dict:
         return {"success": True, "chunk_count": len(chunks)}
     except Exception as exc:
         logger.warning("KB reindex failed for document %s: %s", document_id, exc)
+        safe = _safe_kb_error(exc)
         try:
-            persistence.update_kb_document_status(document_id, status="Failed", error_message=str(exc))
+            persistence.update_kb_document_status(document_id, status="Failed", error_message=safe)
         except Exception:
             pass
-        return {"success": False, "error": str(exc)}
+        return {"success": False, "error": safe}
 
 
 def list_documents() -> list[dict]:
@@ -398,12 +419,29 @@ async def retrieve_relevant_chunks(query: str, top_k: int | None = None) -> list
     # Keyword fallback - no relevance score (not comparable to cosine
     # similarity), so callers/UI should treat relevance=None as "matched
     # by keyword" rather than omit the field.
-    terms = [t for t in query.lower().split() if len(t) > 2]
+    # Keyword fallback. A single shared common word ("procedure", "runbook") must
+    # not make an unrelated chunk look like an answer, so: stop-words are dropped
+    # and a chunk must match at least TWO of the query's meaningful terms (one if the
+    # query only has one), and be close to the best match found.
+    terms = _meaningful_terms(query)
     if not terms:
         return []
-    scored = [(sum(1 for t in terms if t in c["text"].lower()), c) for c in chunks]
-    scored = [(score, c) for score, c in scored if score > 0]
+    needed = 1 if len(terms) == 1 else 2
+    patterns = [re.compile(r"\b" + re.escape(_stem(t))) for t in terms]
+    scored = []
+    for c in chunks:
+        # Headings and the file name carry meaning ("P1 Incident Escalation Procedure")
+        # but are stored outside the chunk text, so search them too.
+        haystack = " ".join([
+            c["text"], c.get("section_title") or "", re.sub(r"[_.\-]+", " ", c.get("document_name") or ""),
+        ]).lower()
+        hits = sum(1 for rx in patterns if rx.search(haystack))
+        if hits >= needed:
+            scored.append((hits, c))
     scored.sort(key=lambda pair: pair[0], reverse=True)
+    if scored:
+        best = scored[0][0]
+        scored = [(h, c) for h, c in scored if h >= best - 1]
     return [
         {
             "text": c["text"], "document_name": c["document_name"], "document_type": c["document_type"],
@@ -411,3 +449,26 @@ async def retrieve_relevant_chunks(query: str, top_k: int | None = None) -> list
         }
         for _, c in scored[:top_k]
     ]
+
+
+_STOPWORDS = frozenset("""
+the and for are was were with what which who how when where why does did can could should would our your their
+about from into onto that this these those have has had not any all you its there then than them they
+procedure procedures documented documentation document runbook runbooks sop sops guide guides steps step
+say says tell give show please make official present
+""".split())
+
+
+def _stem(term: str) -> str:
+    """Crude prefix stem so 'incidents' matches 'incident' and 'escalation' matches 'escalate'."""
+    return term[:5] if len(term) > 5 else term
+
+
+def _meaningful_terms(query: str) -> list[str]:
+    seen, out = set(), []
+    for t in re.findall(r"[a-z0-9][a-z0-9_\-]*", (query or "").lower()):
+        long_enough = len(t) > 2 or (len(t) == 2 and any(ch.isdigit() for ch in t))   # keep "p1", "p2"
+        if long_enough and t not in _STOPWORDS and t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
