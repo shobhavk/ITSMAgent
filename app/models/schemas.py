@@ -3,6 +3,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.config import get_settings
+
 CATEGORIES: list[str] = [
     "Hardware issues",
     "Software issues",
@@ -133,11 +135,48 @@ class AnalysisResponse(BaseModel):
 class ChatRequest(BaseModel):
     """A management question about the most recently analyzed batch for
     this API key. `history` is the prior (question, answer) turns of this
-    conversation, oldest first, for multi-turn context."""
+    conversation, oldest first, for multi-turn context.
+
+    Bounded (Step 16): question length, number of turns and per-turn length are
+    capped so a request can't be used to push huge text into the model prompt.
+    History comes from the client, so it is also scrubbed again server-side
+    (guardrails.sanitize_history) before the model sees it."""
 
     question: str
     history: list[tuple[str, str]] = []
 
+    @field_validator("question")
+    @classmethod
+    def _question_ok(cls, v: str) -> str:
+        v = (v or "").strip()
+        limit = get_settings().MAX_QUESTION_CHARS
+        if not v:
+            raise ValueError("question must not be empty")
+        if len(v) > limit:
+            raise ValueError(f"question is too long (max {limit} characters)")
+        if "\x00" in v:
+            raise ValueError("question contains invalid characters")
+        return v
+
+    @field_validator("history")
+    @classmethod
+    def _history_ok(cls, v):
+        s = get_settings()
+        if len(v) > s.MAX_HISTORY_TURNS_ACCEPTED:
+            raise ValueError(f"history is too long (max {s.MAX_HISTORY_TURNS_ACCEPTED} turns)")
+        for q, a in v:
+            if len(q) > 2 * s.MAX_QUESTION_CHARS or len(a) > 10 * s.MAX_QUESTION_CHARS:
+                raise ValueError("a history entry is too long")
+        return v
+
 
 class ChatResponse(BaseModel):
     answer: str
+
+
+class TextAnalysisRequest(BaseModel):
+    """JSON body for POST /analyze/text. (The raw_text QUERY parameter still
+    works but is deprecated: URLs are written to access logs and proxies, so
+    incident text must not travel in them.)"""
+
+    raw_text: str
