@@ -99,9 +99,11 @@ class TicketState(TypedDict):
 
 
 def _log_node_error(node_name: str, ticket_id: str, exc: Exception) -> str:
-    msg = f"{node_name} failed for ticket {ticket_id}: {exc}"
-    logger.info(msg)
-    return msg
+    # Full detail goes to the (redacted) log only. The returned text ends up in
+    # the ticket's "Processing note" (UI + CSV export), so it must stay generic:
+    # exception strings can carry credentials, URLs or prompt/ticket content.
+    logger.info("%s failed for ticket %s: %s: %s", node_name, ticket_id, type(exc).__name__, exc)
+    return f"{node_name} step could not complete; a rule-based fallback was used."
 
 
 async def classify_node(state: TicketState, chat_model) -> TicketState:
