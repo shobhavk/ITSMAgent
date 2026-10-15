@@ -5,10 +5,16 @@ handles "get bytes into a table" concerns: encoding detection, delimiter
 sniffing, header discovery, and turning unstructured text into pseudo-rows.
 """
 import io
+import logging
 import re
 
 import chardet
 import pandas as pd
+
+from app.config import get_settings
+from app.security import UploadValidationError, check_dataframe_limits, validate_incident_bytes
+
+logger = logging.getLogger(__name__)
 
 # Common ITSM column name variants -> canonical name
 COLUMN_ALIASES: dict[str, str] = {
@@ -91,17 +97,24 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_excel(file_bytes: bytes) -> pd.DataFrame:
-    df = pd.read_excel(io.BytesIO(file_bytes), engine="openpyxl")
+    # nrows bounds memory: one row past the cap is enough to detect "too many".
+    max_rows = get_settings().MAX_INCIDENT_ROWS + 1
+    df = pd.read_excel(io.BytesIO(file_bytes), engine="openpyxl", nrows=max_rows)
     return _normalize_columns(df)
 
 
 def load_csv(file_bytes: bytes) -> pd.DataFrame:
+    max_rows = get_settings().MAX_INCIDENT_ROWS + 1
     encoding = chardet.detect(file_bytes[:20000]).get("encoding") or "utf-8"
     try:
-        df = pd.read_csv(io.BytesIO(file_bytes), encoding=encoding, sep=None, engine="python")
+        df = pd.read_csv(io.BytesIO(file_bytes), encoding=encoding, sep=None, engine="python",
+                         nrows=max_rows)
     except Exception:
-        # Fall back to strict utf-8 with comma delimiter
-        df = pd.read_csv(io.BytesIO(file_bytes), encoding="utf-8", errors="replace")
+        # Fall back to utf-8 with comma delimiter. (The previous fallback passed
+        # errors="replace", which is not a read_csv argument and always raised
+        # TypeError - the right keyword is encoding_errors.)
+        df = pd.read_csv(io.BytesIO(file_bytes), encoding="utf-8", encoding_errors="replace",
+                         nrows=max_rows)
     return _normalize_columns(df)
 
 
@@ -154,13 +167,33 @@ def load_unstructured_text(text: str) -> pd.DataFrame:
 
 
 def ingest(filename: str, file_bytes: bytes) -> pd.DataFrame:
-    """Dispatches to the right loader based on file extension."""
-    lower = filename.lower()
-    if lower.endswith((".xlsx", ".xls")):
-        return load_excel(file_bytes)
-    if lower.endswith(".csv"):
-        return load_csv(file_bytes)
-    if lower.endswith(".txt"):
-        text = file_bytes.decode(chardet.detect(file_bytes).get("encoding") or "utf-8", errors="replace")
-        return load_unstructured_text(text)
-    raise ValueError(f"Unsupported file extension for: {filename}")
+    """Dispatches to the right loader based on file extension.
+
+    Defence in depth: the content is re-validated here (routers and the UI
+    already do it) and every parser failure is converted to an
+    UploadValidationError with a generic message - parser exceptions can
+    contain paths or file content and must never reach users. The detailed
+    exception goes to the (redacted) log, without the file's content."""
+    validate_incident_bytes(filename, file_bytes)
+    lower = (filename or "").lower()
+    try:
+        if lower.endswith((".xlsx", ".xls")):
+            df = load_excel(file_bytes)
+        elif lower.endswith(".csv"):
+            df = load_csv(file_bytes)
+        elif lower.endswith(".txt"):
+            text = file_bytes.decode(chardet.detect(file_bytes).get("encoding") or "utf-8", errors="replace")
+            df = load_unstructured_text(text)
+        else:
+            raise UploadValidationError("Unsupported file type.", 415)
+    except UploadValidationError:
+        raise
+    except Exception as exc:
+        logger.warning("Could not parse upload (%s): %s", type(exc).__name__, exc)
+        raise UploadValidationError(
+            "The file could not be read. It may be malformed, password-protected, or not in the format its extension claims."
+        ) from exc
+    check_dataframe_limits(df)
+    if df.empty:
+        raise UploadValidationError("The file contains no data rows.")
+    return df
