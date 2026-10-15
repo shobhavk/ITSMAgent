@@ -261,7 +261,7 @@ def compute_recommendation_facts(full_df: pd.DataFrame, thresholds: dict | None 
         return chat_tools._to_native(facts)
     except Exception as exc:
         logger.warning("compute_recommendation_facts failed: %s", exc)
-        facts["note"] = f"Could not compute the recommendation facts: {exc}"
+        facts["note"] = "Could not compute the recommendation facts (internal error - see the application log)."
         return facts
 
 
@@ -646,7 +646,7 @@ def generate_recommendations(full_df: pd.DataFrame, facts: dict | None = None, t
         logger.warning("generate_recommendations failed: %s", exc)
         return {
             "available": False, "recommendations": [], "facts": facts or {},
-            "note": f"Could not generate recommendations: {exc}", "counts_by_area": {},
+            "note": "Could not generate recommendations (internal error - see the application log).", "counts_by_area": {},
         }
 
 
@@ -745,4 +745,4 @@ def get_recommendations(full_df: pd.DataFrame, thresholds: dict | None = None) -
         }
     except Exception as exc:
         logger.warning("get_recommendations failed: %s", exc)
-        return {"error": f"Could not compute recommendations: {exc}"}
+        return {"error": "Could not compute recommendations (internal error - see the application log)."}
