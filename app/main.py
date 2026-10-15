@@ -4,7 +4,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.config import get_settings
-from app.security import BodySizeLimitMiddleware, RateLimitMiddleware, deployment_warnings, parse_ui_auth_users
+from app.auth_routes import AuthGateMiddleware, gradio_auth_dependency, router as auth_router
+from app.security import BodySizeLimitMiddleware, RateLimitMiddleware, deployment_warnings
+from app.services import auth as auth_service
 from app.routers import analyze, chat
 from app.routers import observability as observability_router
 from app.services import observability
@@ -109,9 +111,21 @@ app.include_router(observability_router.router)
 from ui.gradio_app import CUSTOM_CSS, ITSM_THEME, build_ui  # noqa: E402  (import after app creation intentional)
 import gradio as gr  # noqa: E402
 
-# Optional login for the dashboard (UI_AUTH_USERS="user:password,..."). Without it the UI
-# - including Knowledge Base upload/delete - is open to anyone who can reach the port.
-gr.mount_gradio_app(app, build_ui(), path="/", theme=ITSM_THEME, css=CUSTOM_CSS, auth=parse_ui_auth_users())
+# Step 17: sign-in. The login page / auth endpoints are plain FastAPI routes registered BEFORE the
+# Gradio mount (so they win over it); AuthGateMiddleware then protects everything else, and the
+# dependency tells Gradio who is calling (request.username inside the UI handlers).
+app.include_router(auth_router)
+if settings.AUTH_ENABLED:
+    _boot = auth_service.bootstrap_admin()
+    if _boot:
+        logger.info("Accounts: %s (first start)", _boot)
+    if auth_service.count_users() == 0:
+        logger.warning("AUTH_ENABLED=true but no accounts exist: set ADMIN_PASSWORD (and optionally ADMIN_USERNAME) "
+                       "and restart to create the first Admin.")
+    app.add_middleware(AuthGateMiddleware)
+
+gr.mount_gradio_app(app, build_ui(), path="/", theme=ITSM_THEME, css=CUSTOM_CSS,
+                    auth_dependency=gradio_auth_dependency if settings.AUTH_ENABLED else None)
 
 # Outermost layers (last added = first to run), see security.py: rate limit, then cap
 # request bodies on /api/ before anything reads them.
