@@ -1,4 +1,3 @@
-"""Gradio layout (build_ui) and event wiring."""
 import os
 
 import gradio as gr
@@ -47,6 +46,20 @@ from ui.tab_chat import _build_chat_index, _chat_clear, _chat_respond
 from ui.tab_observability import build_observability_tab
 from ui.tab_kb import _kb_delete, _kb_refresh, _kb_reindex, _kb_upload
 from ui.analysis import _analyze, _analyze_sample, _reveal_after_analysis
+from ui.access import chat_scope, current_user, permissions_for
+from ui.tab_admin import build_admin_tab
+
+
+def _user_chip_html(user: dict | None) -> str:
+    """Signed-in person + Sign out (a real form POST, so it works without JS). Empty when sign-in is off."""
+    if not user:
+        return ""
+    import html as _h
+    name = _h.escape(user["display_name"])
+    initials = _h.escape("".join(w[0] for w in user["display_name"].replace(".", " ").split()[:2]).upper() or "?")
+    return (f'<div class="uc"><span class="uc-av">{initials}</span><span class="uc-t"><b>{name}</b>'
+            f'<small>{_h.escape(user["role"].capitalize())}</small></span>'
+            '<form method="post" action="/auth/logout"><button type="submit" class="uc-out">Sign out</button></form></div>')
 
 
 def build_ui() -> gr.Blocks:
@@ -56,13 +69,14 @@ def build_ui() -> gr.Blocks:
         # now the icon tab bar built into gr.Tabs below (native Gradio
         # tabs, previously hidden and driven by sidebar buttons instead).
         gr.HTML(SIDEBAR_BRAND_HTML, elem_id="topbar-wrap")
+        user_chip = gr.HTML("", elem_id="user-chip")      # who is signed in + Sign out (Step 17)
 
         with gr.Column(elem_id="main-col"):
             gr.HTML(TOPBAR_HTML, elem_id="topbar")
             gr.Markdown(f"_{SEVERITY_NOTE}_", elem_classes=["severity-note"])
 
             with gr.Tabs(elem_id="main-tabs") as main_tabs:
-                with gr.Tab("🏠 Overview", id=0):
+                with gr.Tab("🏠 Overview", id=0) as tab_overview:
                     agent_progress = gr.HTML(AGENT_PROGRESS_HTML, elem_id="agent-progress", visible=False)
                     cache_notice = gr.Markdown(visible=False, elem_id="cache-notice")
 
@@ -179,7 +193,7 @@ def build_ui() -> gr.Blocks:
                         gr.Markdown("### 🚩 Attention Required", elem_classes=["section-heading"])
                         attention_html = gr.HTML(_ATTENTION_PLACEHOLDER)
 
-                with gr.Tab("🗂️ Categorization", id=1, interactive=False) as tab_categorization:
+                with gr.Tab("🗂️ Categorization", id=1, interactive=False, visible=False) as tab_categorization:
                     # Categorization tab, laid out as: summary strip -> incident
                     # table (with filter bar) -> Category x Priority chart + top
                     # categories. Clicking a table row opens a detail drawer.
@@ -261,7 +275,7 @@ def build_ui() -> gr.Blocks:
                         detail_close_btn = gr.Button("✕ Close", size="sm", elem_id="detail-close-btn")
                         row_detail_html = gr.HTML("", elem_id="row-detail")
 
-                with gr.Tab("📊 Trends & Insights", id=2, interactive=False) as tab_trends:
+                with gr.Tab("📊 Trends & Insights", id=2, interactive=False, visible=False) as tab_trends:
                     # KPI trend - ticket volume + worklog quality over
                     # time, toggle between daily/weekly/monthly views.
                     with gr.Column(elem_classes=["dash-card"]):
@@ -343,7 +357,7 @@ def build_ui() -> gr.Blocks:
                                 '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                             )
 
-                with gr.Tab("💡 Recommendations", id=3, interactive=False) as tab_recommendations:
+                with gr.Tab("💡 Recommendations", id=3, interactive=False, visible=False) as tab_recommendations:
                     gr.Markdown(
                         "Data-backed recommendations for this batch. Every figure below is "
                         "calculated with pandas from the incidents you analyzed - recurrence, "
@@ -374,7 +388,7 @@ def build_ui() -> gr.Blocks:
                         gr.Markdown("### 💡 Recommended Actions", elem_classes=["section-heading"])
                         recommendations_html = gr.HTML(_RECOMMENDATIONS_PLACEHOLDER)
 
-                with gr.Tab("📚 Knowledge Base", id=4):
+                with gr.Tab("📚 Knowledge Base", id=4, visible=False) as tab_kb:
                     gr.Markdown(
                         "Upload organizational documents (runbooks, SOPs, troubleshooting "
                         "guides, known-error documents, escalation procedures) so the Agent "
@@ -410,7 +424,7 @@ def build_ui() -> gr.Blocks:
                             kb_delete_btn = gr.Button("🗑️ Delete", scale=1, variant="stop")
                         kb_manage_status = gr.Markdown("")
 
-                with gr.Tab("💬 Q&A (Agent)", id=5, interactive=False) as tab_qa:
+                with gr.Tab("💬 Q&A (Agent)", id=5, interactive=False, visible=False) as tab_qa:
                     # Single bounded chat panel (intro + transcript +
                     # composer) instead of loosely stacked components -
                     # keeps the tab a fixed height with the transcript
@@ -436,10 +450,10 @@ def build_ui() -> gr.Blocks:
                             chat_send = gr.Button("Send", variant="primary", scale=1)
                         chat_clear_btn = gr.Button("Clear conversation", size="sm", elem_id="chat-clear-btn")
 
-                with gr.Tab("🔭 Observability", id=7):
+                with gr.Tab("🔭 Observability", id=7, visible=False) as tab_observability:
                     build_observability_tab()
 
-                with gr.Tab("⚙️ Settings", id=6):
+                with gr.Tab("⚙️ Settings", id=6, visible=False) as tab_settings:
                     with gr.Column(elem_classes=["dash-card"]):
                         gr.Markdown("### ⚙️ Settings", elem_classes=["section-heading"])
                         gr.Markdown(
@@ -447,6 +461,10 @@ def build_ui() -> gr.Blocks:
                             "future options (e.g. default page size, scoring thresholds).",
                             elem_classes=["severity-note"],
                         )
+
+                # Step 17: visible only to people who may manage users (see _apply_access below).
+                with gr.Tab("🛡️ Admin", id=8, visible=False) as tab_admin:
+                    build_admin_tab(tab_admin)
 
         full_results_state = gr.State(pd.DataFrame())
         # Display label of the last analyzed input (file name / "pasted text"),
@@ -671,12 +689,42 @@ def build_ui() -> gr.Blocks:
         )
         chat_clear_btn.click(fn=_chat_clear, outputs=[chatbot, chat_history_state])
 
+        def _apply_access(request: gr.Request):
+            """Shows each person only the tabs their role/permissions allow. Cosmetic only - every
+            handler re-checks the permission on the server (ui/access.require)."""
+            p = permissions_for(request)
+            scope = chat_scope(request)
+            user = current_user(request)
+            qa = {"visible": scope is not None}
+            if scope == "documents":
+                qa["interactive"] = True          # Q&A over documents needs no uploaded incident data
+            return (
+                gr.update(visible=True),     # Overview stays visible; upload/analyze are checked in the handlers
+                gr.update(visible=p["run_categorization"]),
+                gr.update(visible=p["view_trends"]),
+                gr.update(visible=p["view_recommendations"]),
+                gr.update(visible=p["view_kb"] or p["manage_kb"]),
+                gr.update(**qa),
+                gr.update(visible=p["view_observability"]),
+                gr.update(visible=p["change_settings"]),
+                gr.update(visible=p["manage_users"]),
+                _user_chip_html(user),
+            )
+
+        demo.load(
+            fn=_apply_access, inputs=None,
+            outputs=[tab_overview, tab_categorization, tab_trends, tab_recommendations, tab_kb, tab_qa,
+                     tab_observability, tab_settings, tab_admin, user_chip],
+        )
+
         # Apply the theme the viewer last picked with the header toggle (if any).
         demo.load(
             fn=None, inputs=None, outputs=None,
             js="() => { try { var t = localStorage.getItem('itsm-theme');"
                " if (t === 'dark') document.body.classList.add('dark');"
-               " else if (t === 'light') document.body.classList.remove('dark'); } catch (e) {} }",
+               " else if (t === 'light') document.body.classList.remove('dark');"
+               " else if (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) document.body.classList.add('dark');"
+               " } catch (e) {} }",
         )
 
     return demo
