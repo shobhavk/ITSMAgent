@@ -95,6 +95,30 @@ class Settings(BaseSettings):
     # (PDFs especially) are often larger than incident export files.
     KB_MAX_UPLOAD_MB: int = 25
 
+    # --- Security & guardrails (Step 16) ---
+    # Input-size limits. Every one is a cap against resource exhaustion; the
+    # defaults are generous for normal ITSM exports.
+    MAX_TEXT_INPUT_CHARS: int = 200_000       # pasted / /analyze/text input
+    MAX_INCIDENT_ROWS: int = 20_000           # rows accepted from one CSV/XLSX/TXT
+    MAX_INCIDENT_COLUMNS: int = 200
+    MAX_CELL_CHARS: int = 20_000              # longer cells are truncated, not rejected
+    MAX_ARCHIVE_UNCOMPRESSED_MB: int = 200    # XLSX/DOCX zip-bomb guard
+    MAX_ARCHIVE_ENTRIES: int = 5_000
+    KB_MAX_PDF_PAGES: int = 500
+    KB_MAX_EXTRACTED_CHARS: int = 3_000_000   # text kept per knowledge document
+    MAX_QUESTION_CHARS: int = 2_000           # chat question (API + UI)
+    MAX_HISTORY_TURNS_ACCEPTED: int = 20
+
+    # Sessions: when True, REST endpoints that read/write session data reject
+    # requests without an X-Session-ID header (so people sharing one API key
+    # can never share a slot). Default False = old behaviour (backward
+    # compatible); set True for any multi-user deployment.
+    REQUIRE_SESSION_ID: bool = False
+
+    # Optional login for the Gradio dashboard, which is otherwise open to
+    # anyone who can reach the port. Format: "alice:pw1,bob:pw2". Empty =
+    # no login (acceptable only behind your own authenticating proxy / SSO).
+    UI_AUTH_USERS: str = ""
 
 @lru_cache
 def get_settings() -> Settings:
