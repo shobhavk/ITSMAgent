@@ -50,13 +50,15 @@ keep working exactly as before.
 """
 import json
 import logging
+import re
 
 import numpy as np
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 
+from app.config import get_settings
 from app.security import sanitize_for_llm
-from app.services import chat_tools, knowledge_base, recommendations
+from app.services import chat_tools, guardrails, knowledge_base, recommendations
 from app.services.llm_client import (
     SYSTEM_GUARDRAIL,
     embeddings_retry,
@@ -65,11 +67,13 @@ from app.services.llm_client import (
     with_chat_retry,
 )
 
+from app.services import observability
 from app.services.observability import (  # Step 15 tracing
     note_question, note_tool_selection, record_event, request_trace, set_mode, traced_llm_ainvoke,
 )
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 TOP_K = 8
 MAX_HISTORY_TURNS = 4
@@ -77,6 +81,7 @@ MAX_TOOL_ROUNDS = 4
 
 AGENT_SYSTEM_PROMPT = (
     SYSTEM_GUARDRAIL + "\n\n"
+    + guardrails.SECURITY_RULES_PROMPT + "\n"
     "You are an agent answering a manager's question using TWO separate sources of "
     "knowledge, and you must pick the right one (or both):\n\n"
     "SOURCE 1 - INCIDENT DATA: a batch of IT incident tickets that has already been "
@@ -277,56 +282,70 @@ def build_index_from_dataframe(full_df) -> "TicketIndex":
     return TicketIndex(rows)
 
 
-def _make_tools(full_df) -> list:
-    """Wraps the 6 chat_tools functions as LangChain tools bound to this
-    analysis batch via closure. Each tool returns a JSON string (LangChain
-    tool outputs must be strings) - the dict chat_tools builds is already
-    small and JSON-safe (see chat_tools._to_native), so this is a plain
-    json.dumps, no further processing needed.
+def _make_tools(full_df, log: "guardrails.ToolLog | None" = None) -> list:
+    """Wraps the 8 chat_tools functions as LangChain tools bound to this
+    analysis batch via closure. Every call goes through `_run` below, which:
+      * validates the arguments the MODEL chose (guardrails.clean_*_arg),
+      * runs the read-only function inside try/except (a failure becomes a
+        GENERIC error result - exception text is logged, never sent to the
+        model or the user),
+      * wraps the result in an "untrusted data" envelope after scrubbing
+        injection phrases/markers from every string (guardrails.wrap_untrusted),
+      * records what was returned in `log`, so the final answer can be checked
+        against it (numbers and knowledge-base sources) in plain Python.
+    The tool set is fixed (guardrails.ALLOWED_TOOLS): no code/shell/infra tools."""
+    log = log if log is not None else guardrails.ToolLog()
 
-    Every call is wrapped in try/except even though chat_tools functions
-    already catch their own errors - this is a second layer of defense so
-    a totally unexpected failure (e.g. a bad argument type from the LLM)
-    still comes back as a tool result the agent can react to, instead of
-    crashing the whole turn."""
+    def _emit(name: str, result) -> str:
+        envelope, stats = guardrails.wrap_untrusted(name, result)
+        log.names.append(name)
+        log.texts.append(json.dumps(result, default=str))
+        log.objects.append(result)
+        log.injection_flagged += stats.flagged_fields
+        if stats.flagged_fields:
+            # field NAMES and counts only - never the content itself
+            record_event("guardrail", "injection_in_tool_result", "degraded", 0.0,
+                         tool=name, flagged_fields=stats.flagged_fields, fields=",".join(stats.examples))
+        return json.dumps(envelope, default=str)
+
+    def _fail(name: str, exc: Exception) -> str:
+        if isinstance(exc, guardrails.ToolArgumentError):
+            return _emit(name, {"error": str(exc)})          # message is written to be safe
+        logger.warning("Tool %s failed: %s: %s", name, type(exc).__name__, exc)
+        return _emit(name, {"error": "This tool failed (internal error). Tell the user the data is unavailable."})
+
+    def _run(name: str, fn, *args, **kwargs) -> str:
+        try:
+            guardrails.assert_tool_allowed(name)
+            return _emit(name, fn(*args, **kwargs))
+        except Exception as exc:
+            return _fail(name, exc)
 
     @tool
     def get_incident_summary() -> str:
         """Returns overall incident health: total incidents, P1 count, P2 count, average
         resolution time (hours), average worklog score, and the percentage of tickets with a
         poor worklog. Use this for "give me an overall summary" or general-health questions."""
-        try:
-            return json.dumps(chat_tools.get_incident_summary(full_df), default=str)
-        except Exception as exc:
-            return json.dumps({"error": str(exc)})
+        return _run("get_incident_summary", chat_tools.get_incident_summary, full_df)
 
     @tool
     def get_category_analysis() -> str:
         """Returns incident count broken down by category, plus the top categories by volume.
         Use this for "what categories" or "most common issue types" questions."""
-        try:
-            return json.dumps(chat_tools.get_category_analysis(full_df), default=str)
-        except Exception as exc:
-            return json.dumps({"error": str(exc)})
+        return _run("get_category_analysis", chat_tools.get_category_analysis, full_df)
 
     @tool
     def get_priority_analysis() -> str:
         """Returns incident count broken down by priority (P1/P2/P3/P4/Unspecified) and the
         percentage distribution across priorities. Use this for "how many P1" or
         priority-breakdown questions."""
-        try:
-            return json.dumps(chat_tools.get_priority_analysis(full_df), default=str)
-        except Exception as exc:
-            return json.dumps({"error": str(exc)})
+        return _run("get_priority_analysis", chat_tools.get_priority_analysis, full_df)
 
     @tool
     def get_server_analysis() -> str:
         """Returns incident count broken down by server/host, plus the top affected servers.
         Use this for "which server has the most incidents" questions."""
-        try:
-            return json.dumps(chat_tools.get_server_analysis(full_df), default=str)
-        except Exception as exc:
-            return json.dumps({"error": str(exc)})
+        return _run("get_server_analysis", chat_tools.get_server_analysis, full_df)
 
     @tool
     def get_recurring_issues(threshold: int = 3) -> str:
@@ -335,9 +354,10 @@ def _make_tools(full_df) -> list:
         days apart they typically recur. Use this for "what's recurring" or "what keeps
         happening" questions."""
         try:
-            return json.dumps(chat_tools.get_recurring_issues(full_df, threshold=threshold), default=str)
+            n = guardrails.clean_int_arg("threshold", threshold, 2, 100)
         except Exception as exc:
-            return json.dumps({"error": str(exc)})
+            return _fail("get_recurring_issues", exc)
+        return _run("get_recurring_issues", chat_tools.get_recurring_issues, full_df, threshold=n)
 
     @tool
     def get_recommendations() -> str:
@@ -348,10 +368,7 @@ def _make_tools(full_df) -> list:
         the recommended action, an attention level, and the expected benefit. Use this for
         "what should we do", "what needs attention", or "how do we improve" questions - the
         numbers in it are already calculated, so quote them as-is rather than recomputing."""
-        try:
-            return json.dumps(recommendations.get_recommendations(full_df), default=str)
-        except Exception as exc:
-            return json.dumps({"error": str(exc)})
+        return _run("get_recommendations", recommendations.get_recommendations, full_df)
 
     @tool
     async def search_knowledge_base(query: str) -> str:
@@ -362,18 +379,21 @@ def _make_tools(full_df) -> list:
         passages with their source document name and page number or section title where
         available. If it returns an empty chunk list, say plainly that no relevant procedure
         was found in the current knowledge base - never invent or assume a procedure."""
+        name = "search_knowledge_base"
+        log.kb_searched = True
         try:
-            chunks = await knowledge_base.retrieve_relevant_chunks(query)
-            return json.dumps(
-                {
-                    "chunks": chunks,
-                    "count": len(chunks),
-                    "note": "" if chunks else "No relevant information was found in the knowledge base for this query.",
-                },
-                default=str,
-            )
+            guardrails.assert_tool_allowed(name)
+            q = guardrails.clean_text_arg("query", query, max_len=500, required=True)
+            chunks = await knowledge_base.retrieve_relevant_chunks(q)
+            for c in chunks:
+                log.kb_docs.append((c.get("document_name"), c.get("page_number"), c.get("section_title")))
+            return _emit(name, {
+                "chunks": chunks,
+                "count": len(chunks),
+                "note": "" if chunks else "No relevant information was found in the knowledge base for this query.",
+            })
         except Exception as exc:
-            return json.dumps({"error": str(exc)})
+            return _fail(name, exc)
 
     @tool
     def search_incidents(
@@ -386,15 +406,12 @@ def _make_tools(full_df) -> list:
         capped sample of matching tickets. Use this for specific lookups like "show me P1
         incidents on server ABC" or "find incidents mentioning VPN"."""
         try:
-            return json.dumps(
-                chat_tools.search_incidents(
-                    full_df, incident_id=incident_id, server=server, category=category,
-                    priority=priority, keyword=keyword,
-                ),
-                default=str,
-            )
+            args = {k: guardrails.clean_text_arg(k, v, max_len=200)
+                    for k, v in dict(incident_id=incident_id, server=server, category=category,
+                                     priority=priority, keyword=keyword).items()}
         except Exception as exc:
-            return json.dumps({"error": str(exc)})
+            return _fail("search_incidents", exc)
+        return _run("search_incidents", chat_tools.search_incidents, full_df, **args)
 
     return [
         get_incident_summary, get_category_analysis, get_priority_analysis,
@@ -408,14 +425,21 @@ def _make_tools(full_df) -> list:
 # available). Order matters: first match wins, so more specific intents
 # (recurring, server, priority, category) are checked before the generic
 # "summary" catch-all.
+_UNSUPPORTED_DATA_TERMS = (
+    "cpu", "memory", "ram", "temperature", "disk usage", "bandwidth", "latency", "uptime",
+    "cost", "costs", "revenue", "salary", "budget", "headcount", "customer satisfaction", "csat",
+)
+_HOST_TOKEN_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9]*[-_][A-Za-z0-9_-]*\d[A-Za-z0-9_-]*\b")
+
 _NO_LLM_INTENT_KEYWORDS = [
     # Checked first: a documentation/procedure question should hit the
     # knowledge base even if it also mentions a word like "recommend" or
     # "priority" in passing (e.g. "what does the runbook recommend for
     # priority incidents" is still a KB lookup, not a priority-analysis one).
     (("runbook", "documented procedure", "documentation", "sop", "knowledge base",
-      "troubleshooting guide", "troubleshooting steps", "known error", "escalation procedure",
-      "escalation steps", "what does the procedure", "how do we restart"), "kb"),
+      "troubleshooting guide", "troubleshooting steps", "troubleshoot", "known error", "escalation procedure",
+      "escalation steps", "what does the procedure", "how do we restart",
+      "on-call", "phone number", "contact number"), "kb"),
     (("recommend", "recommendation", "what should we do", "suggest", "improve", "action plan", "needs attention"), "recommend"),
     (("recurring", "repeat", "keeps happening", "again and again"), "recurring"),
     (("server", "host", "affected server", "which server"), "server"),
@@ -506,7 +530,13 @@ def _format_no_llm_result(intent: str, result: dict) -> str:
                 if c.get("section_title"):
                     source += f", section: {c['section_title']}"
                 lines.append(f"{c.get('text', '')}\n(Source: {source})")
-            return "\n\n".join(lines)
+            body = "\n\n".join(lines)
+            if all(c.get("relevance") is None for c in chunks):
+                # keyword match only (no embeddings): the passages were matched on words, not
+                # understood, so don't let them read as a confirmed answer.
+                body = ("Closest keyword matches in the knowledge base. They were matched on words only, so please "
+                        "check that they actually answer your question:\n\n" + body)
+            return body
 
         if intent == "search":
             total = result.get("total_matching", 0)
@@ -545,6 +575,23 @@ async def _no_llm_fallback(question: str, full_df) -> str:
     knowledge_base.retrieve_relevant_chunks (an embedding call) - every
     other intent below is a plain synchronous pandas call."""
     q = question.lower()
+
+    # Guardrail: say plainly when the question is about data this app does not hold.
+    # (Checked before anything else so e.g. "CPU temperature" never gets answered
+    # with an unrelated ticket summary that looks like an answer.)
+    unsupported = [t for t in _UNSUPPORTED_DATA_TERMS if re.search(rf"\b{re.escape(t)}\b", q)]
+    if unsupported and not any(kw in q for kw in _NO_LLM_INTENT_KEYWORDS[0][0]):
+        return (
+            f"No data is available on {', '.join(sorted(unsupported))}. The analyzed incident tickets only contain: ticket ID, "
+            "descriptions, worklog notes, priority, status, assignment group, host/CI, category, worklog score and "
+            "opened/resolved timestamps - so I can't answer this from them, and I won't guess."
+        )
+
+    # A hostname-looking token (e.g. DB-PRD-01) -> exact lookup, so an unknown host
+    # gets a true "0 matching incidents" instead of an unrelated server ranking.
+    host_token = _HOST_TOKEN_RE.search(question)
+    if host_token and not any(kw in q for kw in _NO_LLM_INTENT_KEYWORDS[0][0]):
+        return _format_no_llm_result("search", chat_tools.search_incidents(full_df, server=host_token.group(0)))
 
     for keywords, intent in _NO_LLM_INTENT_KEYWORDS:
         if any(kw in q for kw in keywords):
@@ -586,9 +633,11 @@ async def _no_llm_fallback(question: str, full_df) -> str:
 
 
 def _history_to_messages(history: list[tuple[str, str]]) -> list:
-    recent = (history or [])[-MAX_HISTORY_TURNS:]
+    """History is supplied by the CLIENT (REST body or browser state), so it is
+    untrusted: only well-formed text pairs are kept, length-capped and scrubbed
+    (guardrails.sanitize_history) before being replayed to the model."""
     messages = []
-    for question, answer in recent:
+    for question, answer in guardrails.sanitize_history(history, MAX_HISTORY_TURNS):
         messages.append(HumanMessage(content=question))
         messages.append(AIMessage(content=answer))
     return messages
@@ -632,7 +681,8 @@ async def _answer_question_impl(
             return "I couldn't compute an answer right now - please try again."
 
     try:
-        tools = _make_tools(full_df)
+        tool_log = guardrails.ToolLog()
+        tools = _make_tools(full_df, tool_log)
         tool_map = {t.name: t for t in tools}
         # bind_tools() must be called on the RAW model - with_chat_retry()
         # returns a RunnableRetry, which doesn't expose bind_tools() (see
@@ -648,18 +698,24 @@ async def _answer_question_impl(
             response = await traced_llm_ainvoke(model_with_tools, messages, "agent_turn")
             messages.append(response)
             if not getattr(response, "tool_calls", None):
-                return response.content.strip()
+                return await _finalize(_content_text(response), question, history, tool_log, full_df)
             note_tool_selection([c.get("name") for c in response.tool_calls], _round + 1)
 
             for call in response.tool_calls:
-                tool_fn = tool_map.get(call["name"])
+                name = call.get("name")
+                tool_fn = tool_map.get(name) if isinstance(name, str) and name in guardrails.ALLOWED_TOOLS else None
                 if tool_fn is None:
-                    record_event("tool", str(call.get("name"))[:60], "error", 0.0, error_type="UnknownTool")
-                try:
-                    result = await tool_fn.ainvoke(call["args"]) if tool_fn else json.dumps({"error": f"Unknown tool: {call['name']}"})
-                except Exception as exc:
-                    logger.warning("Tool %s failed: %s", call.get("name"), exc)
-                    result = json.dumps({"error": str(exc)})
+                    # Unknown / not-allow-listed tool name (the model hallucinated it or was
+                    # steered to it): never executed.
+                    record_event("tool", str(name)[:60], "error", 0.0, error_type="UnknownTool")
+                    result = json.dumps({"error": "That tool is not available."})
+                else:
+                    try:
+                        args = call.get("args") if isinstance(call.get("args"), dict) else {}
+                        result = await tool_fn.ainvoke(args)
+                    except Exception as exc:   # e.g. wrong argument types rejected by the tool schema
+                        logger.warning("Tool %s failed: %s: %s", name, type(exc).__name__, exc)
+                        result = json.dumps({"error": "Invalid or failed tool call."})
                 messages.append(ToolMessage(content=result, tool_call_id=call["id"]))
 
         # Exceeded MAX_TOOL_ROUNDS without a final answer - force one
@@ -669,13 +725,36 @@ async def _answer_question_impl(
             messages + [HumanMessage(content="Answer the original question now, using only the information already gathered above.")],
             "forced_final_answer",
         )
-        return final.content.strip()
+        return await _finalize(_content_text(final), question, history, tool_log, full_df)
     except Exception:
         logger.exception("Chat answer generation failed")
         try:
             return "I couldn't reach the assistant model just now. Here's what the data shows directly:\n\n" + await _no_llm_fallback(question, full_df)
         except Exception:
             return "I couldn't generate an answer right now - please try again."
+
+
+def _content_text(message) -> str:
+    """Chat models may return content as a string or a list of content blocks."""
+    content = getattr(message, "content", "")
+    if isinstance(content, list):
+        content = " ".join(b.get("text", "") if isinstance(b, dict) else str(b) for b in content)
+    return str(content or "").strip()
+
+
+async def _finalize(answer: str, question: str, history, tool_log, full_df) -> str:
+    """Deterministic checks on the model's final text before the user sees it
+    (guardrails.finalize_answer): withholds prompt leaks, flags/replaces figures
+    that no tool returned, appends knowledge-base sources from the retrieval
+    result itself - then masks any configured secret that slipped into the text."""
+    clean_history = guardrails.sanitize_history(history, MAX_HISTORY_TURNS)
+    answer, verdict = guardrails.finalize_answer(answer, question, clean_history, tool_log)
+    if verdict == "no_tool_figures":
+        record_event("guardrail", "ungrounded_answer_replaced", "degraded", 0.0)
+        answer = guardrails.NO_TOOL_FIGURES_MESSAGE + "Here is what the data shows directly:\n\n" + await _no_llm_fallback(question, full_df)
+    elif verdict != "ok":
+        record_event("guardrail", f"answer_{verdict}", "degraded", 0.0)
+    return observability.redact(answer)
 
 
 async def answer_question(
