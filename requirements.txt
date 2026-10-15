@@ -12,7 +12,7 @@ numpy>=1.26.4
 chardet==5.2.0
 plotly==7.0.0
 SQLAlchemy>=2.0,<3.0
-
+limits
 
 # --- Knowledge Base (Step 13 RAG) document text extraction ---
 # TXT/MD need no library (plain text). PDF/DOCX are the two binary
