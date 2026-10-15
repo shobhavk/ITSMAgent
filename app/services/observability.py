@@ -82,6 +82,10 @@ def _secret_values() -> list[str]:
         raw = _cfg(name, None)
         if raw:
             vals += [v.strip() for v in str(raw).split(",")]
+    # UI_AUTH_USERS="user:password,..." -> redact each password and the pair
+    for pair in str(_cfg("UI_AUTH_USERS", "") or "").split(","):
+        if ":" in pair:
+            vals += [pair.strip(), pair.strip().partition(":")[2]]
     return sorted({v for v in vals if len(v) >= 6}, key=len, reverse=True)
 
 
