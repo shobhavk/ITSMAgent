@@ -140,7 +140,7 @@ def get_incident_summary(full_df: pd.DataFrame) -> dict:
         })
     except Exception as exc:
         logger.warning("get_incident_summary failed: %s", exc)
-        return {"error": f"Could not compute the incident summary: {exc}"}
+        return {"error": "Could not compute the incident summary (internal error - see the application log)."}
 
 
 @traced_tool("get_category_analysis")
@@ -157,7 +157,7 @@ def get_category_analysis(full_df: pd.DataFrame, top_n: int = DEFAULT_TOP_N) -> 
         })
     except Exception as exc:
         logger.warning("get_category_analysis failed: %s", exc)
-        return {"error": f"Could not compute category analysis: {exc}"}
+        return {"error": "Could not compute category analysis (internal error - see the application log)."}
 
 
 @traced_tool("get_priority_analysis")
@@ -176,7 +176,7 @@ def get_priority_analysis(full_df: pd.DataFrame) -> dict:
         })
     except Exception as exc:
         logger.warning("get_priority_analysis failed: %s", exc)
-        return {"error": f"Could not compute priority analysis: {exc}"}
+        return {"error": "Could not compute priority analysis (internal error - see the application log)."}
 
 
 @traced_tool("get_server_analysis")
@@ -196,7 +196,7 @@ def get_server_analysis(full_df: pd.DataFrame, top_n: int = DEFAULT_TOP_N) -> di
         })
     except Exception as exc:
         logger.warning("get_server_analysis failed: %s", exc)
-        return {"error": f"Could not compute server analysis: {exc}"}
+        return {"error": "Could not compute server analysis (internal error - see the application log)."}
 
 
 @traced_tool("get_recurring_issues")
@@ -226,7 +226,7 @@ def get_recurring_issues(full_df: pd.DataFrame, threshold: int = recurring_issue
         })
     except Exception as exc:
         logger.warning("get_recurring_issues failed: %s", exc)
-        return {"error": f"Could not compute recurring issues: {exc}"}
+        return {"error": "Could not compute recurring issues (internal error - see the application log)."}
 
 
 @traced_tool("search_incidents")
@@ -272,4 +272,4 @@ def search_incidents(
         return _to_native({"total_matching": total_matching, "results": results})
     except Exception as exc:
         logger.warning("search_incidents failed: %s", exc)
-        return {"error": f"Could not search incidents: {exc}"}
+        return {"error": "Could not search incidents (internal error - see the application log)."}
