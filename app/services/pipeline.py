@@ -33,6 +33,7 @@ import logging
 
 from app.config import get_settings
 from app.models.schemas import AnalysisResponse, AnalyzedTicket
+from app.security import check_dataframe_limits, validate_text_input
 from app.services.categorizer import Categorizer
 from app.services.data_ingestion import ingest, load_unstructured_text
 from app.services.graph_pipeline import TicketState, build_graph
@@ -55,7 +56,9 @@ async def run_pipeline_from_bytes(filename: str, file_bytes: bytes) -> AnalysisR
 
 
 async def run_pipeline_from_text(raw_text: str) -> AnalysisResponse:
+    validate_text_input(raw_text)
     df = load_unstructured_text(raw_text)
+    check_dataframe_limits(df)
     return await _run_pipeline(df)
 
 
@@ -95,6 +98,11 @@ async def _run_pipeline(df) -> AnalysisResponse:
             cached
             and cached["content_hash"] == content_hashes[rec.ticket_id]
             and cached["llm_worklog_scoring_enabled"] == llm_worklog_scoring_enabled
+            # The cache is shared by every user and keyed on ticket_id. The
+            # content hash covers the text only, but `host` is derived from the
+            # configuration item too - without this check another upload's host
+            # could be served for a ticket with the same ID and text.
+            and (cached.get("configuration_item") or "") == (rec.configuration_item or "")
         ):
             cache_hits.append((rec, cached))
         else:
@@ -194,17 +202,16 @@ async def _run_pipeline(df) -> AnalysisResponse:
             worklog_score=cached["worklog_score"],
             worklog_flags=cached["worklog_flags"],
             validation_flags=validation_flags,
-            # Timestamps describe the ticket itself, not the cached LLM
-            # processing - use whichever is fresher: the current upload's
-            # values if it has them (e.g. a status/close-date update on an
-            # otherwise-unchanged ticket), falling back to what's in the
-            # cache from a prior upload.
-            opened_at=rec.opened_at or cached.get("opened_at"),
-            closed_at=rec.closed_at or cached.get("closed_at"),
-            created_at=rec.created_at or cached.get("created_at"),
-            resolved_at=rec.resolved_at or cached.get("resolved_at"),
-            responded_at=rec.responded_at or cached.get("responded_at"),
-            detected_at=rec.detected_at or cached.get("detected_at"),
+            # Timestamps come ONLY from the current upload. They used to fall
+            # back to the cached values of a previous upload (possibly another
+            # user's) when this one had none - a cross-session leak and a source
+            # of wrong resolution metrics. Only category/score are reused.
+            opened_at=rec.opened_at,
+            closed_at=rec.closed_at,
+            created_at=rec.created_at,
+            resolved_at=rec.resolved_at,
+            responded_at=rec.responded_at,
+            detected_at=rec.detected_at,
         )
 
     for state in final_states:
