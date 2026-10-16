@@ -1,5 +1,5 @@
-
 @import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Sora:wght@500;600;700&display=swap");
 
 /* Design tokens (light). Dark values are defined at the bottom of this file. */
 :root {
@@ -258,61 +258,6 @@ footer {display: none !important;}
     0% {opacity: 0;}
     20% {opacity: 1;}
     100% {opacity: 0;}
-}
-
-/* Q&A (Agent) - bounded, dribbble-style chat panel. Intro, transcript,
-   and composer all live inside one fixed-height card instead of loosely
-   stacked components, so the tab stays a fixed height and only the
-   transcript scrolls internally, like a real chat product. */
-#chat-panel {
-    display: flex !important; flex-direction: column !important;
-    height: 640px !important; max-height: 78vh !important;
-    padding: 0 !important; overflow: hidden !important;
-}
-.chat-intro {
-    margin: 0 !important; padding: 14px 20px 12px !important;
-    border-bottom: 1px solid var(--dash-border); flex-shrink: 0;
-}
-#chatbot {flex: 1 1 auto !important; min-height: 0 !important; border: none !important;}
-#chatbot .wrap {background: #f8fafc !important;}
-#chatbot .bubble-wrap, #chatbot .message-wrap {padding: 16px 20px !important; gap: 12px !important;}
-
-/* Message bubbles - best-effort selectors covering the class names used
-   across recent Gradio chatbot versions; harmless no-ops if a selector
-   doesn't match the installed version's DOM. */
-#chatbot .message, #chatbot [class*="user-row"] .bubble, #chatbot [class*="bot-row"] .bubble {
-    border-radius: 16px !important; font-size: 0.88rem !important; line-height: 1.45 !important;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important; border: none !important;
-}
-#chatbot .message.user, #chatbot [class*="user-row"] .bubble, #chatbot .role-user {
-    background: var(--dash-primary) !important; color: #ffffff !important;
-}
-#chatbot .message.bot, #chatbot [class*="bot-row"] .bubble, #chatbot .role-assistant {
-    background: #ffffff !important; color: var(--dash-text) !important;
-    border: 1px solid var(--dash-border) !important;
-}
-#chatbot .avatar-container {border-radius: 10px !important; box-shadow: var(--dash-shadow);}
-
-/* Composer - pinned to the bottom of the panel, pill-shaped input/button
-   so it reads as a real chat composer rather than a generic form row. */
-#chat-input-row {
-    flex-shrink: 0 !important; margin: 0 !important; gap: 10px !important;
-    align-items: center !important; padding: 14px 20px !important;
-    border-top: 1px solid var(--dash-border) !important; background: #ffffff !important;
-}
-#chat-input-row textarea {
-    border-radius: 22px !important; padding: 10px 18px !important; font-size: 0.88rem !important;
-    border: 1px solid var(--dash-border) !important; background: #f8fafc !important;
-}
-#chat-input-row textarea:focus {border-color: var(--dash-primary) !important; background: #ffffff !important;}
-#chat-input-row button.primary {
-    border-radius: 22px !important; font-weight: 600 !important; height: 42px !important; padding: 0 22px !important;
-}
-#chat-clear-btn {
-    flex-shrink: 0 !important; margin: 10px 20px 14px !important; align-self: flex-start !important;
-    border-radius: 8px !important; font-size: 0.78rem !important; font-weight: 500 !important;
-    color: var(--dash-text-muted) !important; background: transparent !important;
-    border: 1px solid var(--dash-border) !important; box-shadow: none !important;
 }
 
 /* Overview - Incident Health traffic-light grid. Reuses the same card
@@ -601,14 +546,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 /* Bars */
 .bar-track {background: var(--dash-soft) !important;}
 
-/* Chat */
-#chatbot .wrap {background: var(--dash-bg) !important;}
-#chatbot .message.user, #chatbot [class*="user-row"] .bubble, #chatbot .role-user {background: var(--dash-primary) !important; color: #ffffff !important;}
-#chatbot .message.bot, #chatbot [class*="bot-row"] .bubble, #chatbot .role-assistant {background: var(--dash-card) !important; color: var(--dash-text) !important;}
-#chat-panel {border-radius: var(--dash-radius) !important;}
-#chat-input-row {background: var(--dash-card) !important;}
-#chat-input-row textarea {background: var(--dash-bg) !important; color: var(--dash-text) !important;}
-#chat-input-row textarea:focus {border-color: var(--dash-primary) !important; background: var(--dash-card) !important;}
 
 /* Progress bar */
 .agent-progress-track {background: var(--dash-soft) !important;}
@@ -890,7 +827,7 @@ html::after {
     --dash-poor: #ef6b62;
 }
 .dark button.primary, .dark .gr-button.primary, .dark #exec-summary-btn, .dark #rec-writeup-btn, .dark #results-download-btn,
-.dark #chatbot .message.user, .dark #chatbot [class*="user-row"] .bubble, .dark #chatbot .role-user, .dark .hero-step-num, .dark .side-brand-icon {color: #0f1620 !important;}
+.dark .hero-step-num, .dark .side-brand-icon {color: #0f1620 !important;}
 
 /* =====================================================================
    Categorization tab: summary strip, filter bar, row detail drawer
@@ -951,22 +888,6 @@ body.dark .theme-toggle .to-dark, body:not(.dark) .theme-toggle .to-light {displ
 /* Plotly charts sit directly on the card (no lighter Gradio block behind them), in both themes */
 .block:has(.js-plotly-plot), .block:has(.js-plotly-plot) .plot-container {background: transparent !important; border-color: transparent !important; box-shadow: none !important;}
 
-/* Chat bubbles: style the outer bubble only (the inner .message used to be styled too, which
-   double-wrapped the text and clipped it), give answers room, and keep lists tidy. */
-#chatbot .message-row.user-row .message.user {
-    background: var(--dash-primary) !important; color: #ffffff !important; border: 0 !important; box-shadow: none !important;
-    border-radius: 14px 14px 4px 14px !important; padding: 10px 14px !important; overflow: visible !important;
-}
-#chatbot .message-row.bot-row .message.bot {
-    background: var(--dash-card) !important; color: var(--dash-text) !important; border: 1px solid var(--dash-border) !important; box-shadow: none !important;
-    border-radius: 14px 14px 14px 4px !important; padding: 10px 14px !important; overflow: visible !important;
-}
-#chatbot .message .message {background: transparent !important; border: 0 !important; padding: 0 !important; box-shadow: none !important; color: inherit !important; border-radius: 0 !important;}
-#chatbot .message-row.bot-row {max-width: 88% !important;}
-#chatbot .message-content {white-space: normal; overflow-wrap: anywhere;}
-#chatbot .message-content p {margin: 0 0 0.5em;} #chatbot .message-content p:last-child {margin-bottom: 0;}
-#chatbot .message-content ul, #chatbot .message-content ol {margin: 0.25em 0 0.25em 1.1em; padding: 0;}
-#chatbot .message-content em {color: var(--dash-text-muted); font-size: 0.85em;}
 
 
 /* =====================================================================
@@ -1077,3 +998,133 @@ body.dark .theme-toggle .to-dark, body:not(.dark) .theme-toggle .to-light {displ
 .dark #user-chip .uc-t small {color: #93a3b3;}
 .dark #user-chip .uc-out {border-color: rgba(255,255,255,.28); color: #e6edf3;}
 .dark #user-chip .uc-out:hover {border-color: #4fb3c0; color: #4fb3c0;}
+
+/* =====================================================================
+   Q&A (Agent) page (Step 17 design). Everything is scoped under .qa, same pattern as .adm:
+   dark values are the design's palette, light values are the matching light variant.
+   ===================================================================== */
+.qa {
+    --q-bg: transparent; --q-card: #ffffff; --q-bd: #e2e7ef; --q-tx: #0f172a; --q-mu: #5b6577; --q-lb: #334155;
+    --q-ac: #0f766e; --q-acfg: #ffffff; --q-in: #ffffff; --q-inbd: #cbd3e1; --q-hov: #f1f5f9; --q-sel: #f0fdfa;
+    --q-user: #e6f6f4; --q-userbd: #b6e4de; --q-bot: #f8fafc; --q-botbd: #e2e7ef; --q-pill: #0f766e; --q-pillbd: #99d5cd;
+    --q-off: #94a3b8; --q-kbd: #f1f5f9;
+    font-family: "DM Sans", "Public Sans", system-ui, sans-serif; color: var(--q-tx);
+    --block-background-fill: var(--q-card); --background-fill-primary: var(--q-card); --background-fill-secondary: var(--q-in);
+    --input-background-fill: var(--q-in); --input-background-fill-focus: var(--q-in); --input-border-color: var(--q-inbd);
+    --input-border-color-focus: var(--q-ac); --border-color-primary: var(--q-bd); --border-color-accent: var(--q-ac);
+    --body-text-color: var(--q-tx); --body-text-color-subdued: var(--q-mu); --block-border-color: var(--q-bd);
+    --button-primary-background-fill: var(--q-ac); --button-primary-background-fill-hover: var(--q-ac);
+    --button-primary-text-color: var(--q-acfg); --button-primary-border-color: var(--q-ac);
+    --button-secondary-background-fill: transparent; --button-secondary-background-fill-hover: var(--q-hov);
+    --button-secondary-text-color: var(--q-tx); --button-secondary-border-color: var(--q-inbd);
+    --color-accent: var(--q-ac); --color-accent-soft: var(--q-sel);
+}
+.dark .qa {
+    --q-bg: #0a0d14; --q-card: #10141c; --q-bd: #1f2633; --q-tx: #e6e9f0; --q-mu: #8b93a5; --q-lb: #b6bdcc;
+    --q-ac: #2dd4bf; --q-acfg: #04201c; --q-in: #0a0d14; --q-inbd: #2a3344; --q-hov: #161c28; --q-sel: #121a24;
+    --q-user: #16303a; --q-userbd: #1e4a55; --q-bot: #141a24; --q-botbd: #1f2633; --q-pill: #5eead4; --q-pillbd: #164e4a;
+    --q-off: #566074; --q-kbd: #1b2230;
+    background: var(--q-bg); padding: 20px; border-radius: 14px;
+}
+.qa .block, .qa .form, .qa .gr-group {box-shadow: none !important;}
+
+/* ---- page heading ---- */
+.qa .qa-head {padding: 0 0 14px;}
+.qa .qa-crumb {font-size: 12px; color: var(--q-mu); margin-bottom: 8px;}
+.qa .qa-head h2 {font: 600 24px Sora, "DM Sans", sans-serif; margin: 0 0 6px; letter-spacing: -.02em; color: var(--q-tx);}
+.qa .qa-head p {margin: 0; color: var(--q-mu); font-size: 14px;}
+.qa #qa-head, .qa #qa-status, .qa #qa-foot {background: transparent !important; border: 0 !important; padding: 0 !important;}
+.qa #qa-body {gap: 16px !important; align-items: flex-start !important;}
+.qa #qa-main {gap: 12px !important; min-width: 0;}
+.qa .qa-mono {font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 500; font-size: 12.5px;}
+.qa .qa-kbd {display: inline-block; font: 500 11px "JetBrains Mono", ui-monospace, monospace; padding: 1px 6px; border-radius: 4px;
+    background: var(--q-kbd); border: 1px solid var(--q-bd); color: var(--q-mu);}
+
+/* ---- chat card: status line, transcript ---- */
+.qa #qa-panel {background: var(--q-card) !important; border: 1px solid var(--q-bd) !important; border-radius: 12px !important;
+    padding: 0 !important; overflow: hidden !important; gap: 0 !important;}
+.qa #qa-status-row {align-items: center !important; gap: 10px !important; padding: 12px 16px !important; margin: 0 !important;
+    border-bottom: 1px solid var(--q-bd) !important; background: transparent !important; flex-wrap: nowrap !important;}
+.qa #qa-status {flex: 1 1 auto !important; min-width: 0;}
+.qa #qa-status .prose, .qa #qa-status > div {display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--q-mu);}
+.qa #qa-status b {color: var(--q-tx); font-weight: 500;}
+.qa .qa-dot {width: 8px; height: 8px; border-radius: 50%; background: var(--q-ac); flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--q-ac) 22%, transparent);}
+.qa .qa-dot.off {background: var(--q-off); box-shadow: none;}
+.qa #qa-clear-btn {flex: 0 0 auto !important; min-width: 0 !important; width: auto !important; border-radius: 8px !important; font-size: 12.5px !important;
+    padding: 4px 12px !important; color: var(--q-mu) !important; background: transparent !important; border: 1px solid var(--q-inbd) !important;}
+.qa #qa-clear-btn:hover {background: var(--q-hov) !important; color: var(--q-tx) !important;}
+.qa #qa-chatbot {border: 0 !important; background: transparent !important; box-shadow: none !important;}
+.qa #qa-chatbot .wrap, .qa #qa-chatbot .bubble-wrap {background: transparent !important;}
+.qa #qa-chatbot .bubble-wrap, .qa #qa-chatbot .message-wrap {padding: 18px 20px !important; gap: 14px !important;}
+.qa #qa-chatbot .placeholder, .qa #qa-chatbot .placeholder-content {color: var(--q-mu) !important; font-size: 14px;}
+.qa #qa-chatbot .message-row.user-row .message.user {
+    background: var(--q-user) !important; color: var(--q-tx) !important; border: 1px solid var(--q-userbd) !important; box-shadow: none !important;
+    border-radius: 12px 12px 3px 12px !important; padding: 11px 14px !important; overflow: visible !important; font-size: 14px; line-height: 1.55;}
+.qa #qa-chatbot .message-row.bot-row .message.bot {
+    background: var(--q-bot) !important; color: var(--q-tx) !important; border: 1px solid var(--q-botbd) !important; box-shadow: none !important;
+    border-radius: 3px 12px 12px 12px !important; padding: 12px 15px !important; overflow: visible !important; font-size: 14px; line-height: 1.6;}
+.qa #qa-chatbot .message .message {background: transparent !important; border: 0 !important; padding: 0 !important; box-shadow: none !important; color: inherit !important;}
+.qa #qa-chatbot .message-row.bot-row {max-width: 90% !important;}
+.qa #qa-chatbot .message-row.user-row {max-width: 78% !important;}
+.qa #qa-chatbot .message-content {white-space: normal; overflow-wrap: anywhere; color: var(--q-tx);}
+.qa #qa-chatbot .message-content p {margin: 0 0 .55em;} .qa #qa-chatbot .message-content p:last-child {margin-bottom: 0;}
+.qa #qa-chatbot .message-content ul, .qa #qa-chatbot .message-content ol {margin: .3em 0 .3em 1.15em; padding: 0;}
+.qa #qa-chatbot .message-content code {font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; background: var(--q-kbd); border-radius: 4px; padding: 1px 5px;}
+/* the "📎 Sources: ..." footnote the answer ends with, drawn as a source chip */
+.qa #qa-chatbot .message-content p:last-child > em:only-child {
+    display: inline-block; font-style: normal; font-size: 12px; color: var(--q-pill); background: transparent;
+    border: 1px solid var(--q-pillbd); border-radius: 999px; padding: 3px 11px; margin-top: 4px; line-height: 1.4;}
+.qa #qa-chatbot .message.bot::before {content: "Agent"; display: block; font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--q-ac); margin-bottom: 6px;}
+
+/* ---- composer ---- */
+.qa #qa-composer-wrap {gap: 8px !important; background: transparent !important; border: 0 !important; padding: 0 !important;}
+.qa #qa-composer {align-items: flex-end !important; gap: 10px !important; flex-wrap: nowrap !important; margin: 0 !important; padding: 10px !important;
+    background: var(--q-card) !important; border: 1px solid var(--q-bd) !important; border-radius: 12px !important;}
+.qa #qa-composer:focus-within {border-color: var(--q-ac) !important;}
+.qa #qa-input textarea {min-height: 46px !important; font-size: 14px !important; line-height: 1.5 !important; background: transparent !important;
+    border: 0 !important; box-shadow: none !important; color: var(--q-tx) !important; padding: 11px 8px !important;}
+.qa #qa-input, .qa #qa-input .block {background: transparent !important; border: 0 !important; box-shadow: none !important;}
+.qa #qa-send {flex: 0 0 auto !important; min-width: 92px !important; height: 42px !important; border-radius: 8px !important; font-weight: 600 !important;
+    background: var(--q-ac) !important; color: var(--q-acfg) !important; border: 0 !important;}
+.qa .qa-foot {display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--q-mu); padding: 0 4px;}
+.qa .qa-foot-center {justify-content: center; text-align: center;}
+
+/* ---- prompt library ---- */
+.qa #qa-library {background: var(--q-card) !important; border: 1px solid var(--q-bd) !important; border-radius: 12px !important;
+    padding: 16px !important; gap: 10px !important; flex: 0 0 330px !important; width: 330px !important; max-width: 330px;}
+.qa .qa-lib-title {display: flex; justify-content: space-between; align-items: center; font-size: 15px; color: var(--q-tx);}
+.qa .qa-lib-title b {font: 600 15px Sora, "DM Sans", sans-serif;}
+.qa #qa-library .block {background: transparent !important; border: 0 !important; padding: 0 !important;}
+.qa #qa-search textarea, .qa #qa-search input {background: var(--q-in) !important; border: 1px solid var(--q-inbd) !important; border-radius: 8px !important;
+    padding: 9px 12px !important; font-size: 13.5px !important; color: var(--q-tx) !important;}
+.qa #qa-search textarea:focus, .qa #qa-search input:focus {border-color: var(--q-ac) !important;}
+.qa .qa-group {gap: 2px !important; margin-top: 6px;}
+.qa .qa-cat {display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--q-mu); padding: 6px 4px 4px;}
+.qa .qa-cat svg {color: var(--q-ac);}
+.qa .qa-prompt {justify-content: flex-start !important; text-align: left !important; white-space: normal !important; height: auto !important;
+    min-height: 0 !important; padding: 8px 10px !important; font-size: 13.5px !important; font-weight: 400 !important; line-height: 1.4 !important;
+    color: var(--q-tx) !important; background: transparent !important; border: 0 !important; border-radius: 8px !important; box-shadow: none !important;}
+.qa .qa-prompt::after {content: "\2192"; margin-left: auto; padding-left: 8px; color: var(--q-ac); opacity: 0; transition: opacity .12s;}
+.qa .qa-prompt:hover {background: var(--q-hov) !important;} .qa .qa-prompt:hover::after {opacity: 1;}
+
+/* ---- viewer layout: centred knowledge-base page ---- */
+.qa:has(.qa-mode-viewer) #qa-main {max-width: 860px; margin: 0 auto; width: 100%;}
+.qa:has(.qa-mode-viewer) #qa-panel {border: 0 !important; background: transparent !important;}
+.qa:has(.qa-mode-viewer) #qa-status-row {justify-content: flex-end !important; border-bottom: 0 !important; padding: 0 0 8px !important;}
+.qa #qa-empty {align-items: center !important; gap: 18px !important; background: transparent !important; border: 0 !important; padding: 28px 0 8px !important;}
+.qa .qa-hero {text-align: center; max-width: 520px; margin: 0 auto;}
+.qa .qa-hero-ic {width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 14px; display: grid; place-items: center;
+    background: color-mix(in srgb, var(--q-ac) 14%, transparent); color: var(--q-ac); border: 1px solid var(--q-pillbd);}
+.qa .qa-hero h3 {font: 600 22px Sora, "DM Sans", sans-serif; margin: 0 0 8px; color: var(--q-tx);}
+.qa .qa-hero p {margin: 0; color: var(--q-mu); font-size: 14px;}
+.qa #qa-cards {display: grid !important; grid-template-columns: 1fr 1fr; gap: 12px !important; width: 100%; background: transparent !important; border: 0 !important;}
+.qa .qa-card {height: auto !important; white-space: pre-line !important; text-align: left !important; justify-content: flex-start !important; align-items: flex-start !important;
+    padding: 14px 16px !important; font-size: 14px !important; font-weight: 400 !important; line-height: 1.45 !important; color: var(--q-tx) !important;
+    background: var(--q-card) !important; border: 1px solid var(--q-bd) !important; border-radius: 12px !important; box-shadow: none !important;}
+.qa .qa-card:hover {border-color: var(--q-ac) !important; background: var(--q-hov) !important;}
+.qa .qa-card {display: block !important;}
+.qa .qa-card::first-line {font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--q-ac);}
+@media (max-width: 900px) {.qa #qa-body {flex-wrap: wrap !important;} .qa #qa-library {flex: 1 1 100% !important; width: 100% !important; max-width: none;} .qa #qa-cards {grid-template-columns: 1fr;}}
+/* the page has its own Clear button (wired to _chat_clear); Gradio's built-in trash icon would only wipe the screen, not the saved history */
+.qa #qa-chatbot button[aria-label="Clear"] {display: none !important;}
