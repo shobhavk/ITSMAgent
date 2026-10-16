@@ -793,6 +793,8 @@ html::after {
 #main-tabs .tab-container:not(.visually-hidden) button:nth-child(6) {top: 336px;}
 #main-tabs .tab-container:not(.visually-hidden) button:nth-child(7) {top: 380px;}
 #main-tabs .tab-container:not(.visually-hidden) button:nth-child(8) {top: 424px;}
+/* 9th nav slot = Admin (Step 17) */
+#main-tabs .tab-container:not(.visually-hidden) button:nth-child(9) {top: 468px;}
 #main-tabs .tab-container:not(.visually-hidden) button:hover {background: rgba(255,255,255,.06) !important; color: #ffffff !important;}
 #main-tabs .tab-container:not(.visually-hidden) button.selected {
     background: rgba(79,179,192,.16) !important; color: #ffffff !important; font-weight: 600 !important; box-shadow: inset 3px 0 0 var(--nav-accent) !important;
@@ -965,3 +967,113 @@ body.dark .theme-toggle .to-dark, body:not(.dark) .theme-toggle .to-light {displ
 #chatbot .message-content p {margin: 0 0 0.5em;} #chatbot .message-content p:last-child {margin-bottom: 0;}
 #chatbot .message-content ul, #chatbot .message-content ol {margin: 0.25em 0 0.25em 1.1em; padding: 0;}
 #chatbot .message-content em {color: var(--dash-text-muted); font-size: 0.85em;}
+
+
+/* =====================================================================
+   Step 17 - Admin page + signed-in user chip.
+   Tokens: dark = the "Admin" design (#0A0D14 / #10141C / teal #2DD4BF);
+   light = a counterpart derived to sit on the existing light dashboard.
+   Gradio's own CSS variables are re-pointed on .adm so its inputs, radios,
+   checkboxes, tabs and buttons follow the same palette in both themes.
+   ===================================================================== */
+.adm {
+    --a-bg: transparent; --a-card: #ffffff; --a-bd: #e2e7ef; --a-tx: #0f172a; --a-mu: #5b6577; --a-lb: #334155;
+    --a-ac: #0f766e; --a-acfg: #ffffff; --a-in: #ffffff; --a-inbd: #cbd3e1; --a-row: #eef1f6; --a-sel: #f0fdfa;
+    --a-seg: #f1f5f9; --a-segon: #ccfbf1; --a-segfg: #0f766e; --a-ok: #16a34a; --a-off: #94a3b8;
+    --a-dng-bg: #fee2e2; --a-dng-fg: #b91c1c; --a-ok-bg: #ecfdf5; --a-ok-fg: #047857; --a-warn-bg: #fef2f2;
+    font-family: "DM Sans", "Public Sans", system-ui, sans-serif; color: var(--a-tx);
+    --block-background-fill: var(--a-card); --background-fill-primary: var(--a-card); --background-fill-secondary: var(--a-in);
+    --input-background-fill: var(--a-in); --input-background-fill-focus: var(--a-in); --input-border-color: var(--a-inbd);
+    --input-border-color-focus: var(--a-ac); --border-color-primary: var(--a-bd); --border-color-accent: var(--a-ac);
+    --body-text-color: var(--a-tx); --body-text-color-subdued: var(--a-mu); --block-label-text-color: var(--a-lb);
+    --block-title-text-color: var(--a-lb); --block-info-text-color: var(--a-mu); --block-border-color: var(--a-bd);
+    --button-primary-background-fill: var(--a-ac); --button-primary-background-fill-hover: var(--a-ac);
+    --button-primary-text-color: var(--a-acfg); --button-primary-border-color: var(--a-ac);
+    --button-secondary-background-fill: transparent; --button-secondary-background-fill-hover: var(--a-sel);
+    --button-secondary-text-color: var(--a-tx); --button-secondary-border-color: var(--a-inbd);
+    --color-accent: var(--a-ac); --color-accent-soft: var(--a-segon);
+    --checkbox-background-color: var(--a-in); --checkbox-background-color-selected: var(--a-ac);
+    --checkbox-border-color: var(--a-inbd); --checkbox-border-color-selected: var(--a-ac);
+    --checkbox-label-background-fill: transparent; --checkbox-label-background-fill-hover: transparent;
+    --checkbox-label-background-fill-selected: transparent; --checkbox-label-border-color: transparent;
+    --checkbox-label-border-color-selected: transparent; --checkbox-label-text-color: var(--a-tx);
+    --checkbox-label-text-color-selected: var(--a-tx);
+}
+/* `.dark` ancestor selector (like the rest of this file): Gradio prefixes every rule and a plain
+   `body.dark .adm` loses to the prefixed light-token copy above. */
+.dark .adm {
+    --a-bg: #0a0d14; --a-card: #10141c; --a-bd: #1f2633; --a-tx: #e6e9f0; --a-mu: #8b93a5; --a-lb: #b6bdcc;
+    --a-ac: #2dd4bf; --a-acfg: #04201c; --a-in: #0a0d14; --a-inbd: #2a3344; --a-row: #1b2230; --a-sel: #121a24;
+    --a-seg: #0a0d14; --a-segon: #1b2a33; --a-segfg: #5eead4; --a-ok: #34d399; --a-off: #566074;
+    --a-dng-bg: #3b1414; --a-dng-fg: #fca5a5; --a-ok-bg: #0f3b38; --a-ok-fg: #5eead4; --a-warn-bg: #2a1214;
+    background: var(--a-bg); padding: 20px; border-radius: 14px;
+}
+.adm .adm-card, .adm .adm-legend .adm-card {background: var(--a-card) !important; border: 1px solid var(--a-bd) !important; border-radius: 12px !important; padding: 16px !important;}
+.adm .adm-top {align-items: flex-start !important; margin-bottom: 4px;}
+.adm .adm-head h2 {font: 600 24px Sora, "DM Sans", sans-serif; margin: 0 0 6px; letter-spacing: -.02em; color: var(--a-tx);}
+.adm .adm-head p {margin: 0; color: var(--a-mu); font-size: 14px;}
+.adm .adm-muted {color: var(--a-mu); font-size: 13px; margin: 0;}
+.adm .adm-primary {background: var(--a-ac) !important; color: var(--a-acfg) !important; border: 0 !important; font-weight: 600 !important; border-radius: 8px !important;}
+.adm .adm-ghost {background: transparent !important; color: var(--a-tx) !important; border: 1px solid var(--a-inbd) !important; border-radius: 8px !important;}
+.adm .adm-danger {background: transparent !important; color: var(--a-dng-fg) !important; border: 1px solid var(--a-dng-fg) !important; border-radius: 8px !important;}
+.adm .adm-manage {background: transparent !important; color: var(--a-tx) !important; border: 1px solid var(--a-inbd) !important; border-radius: 8px !important; font-weight: 600 !important;}
+.adm .adm-legend {display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 10px 0 14px;}
+.adm .adm-role b {display: block; font: 600 14px Sora, "DM Sans", sans-serif; margin-bottom: 4px;}
+.adm .adm-role span {font-size: 13px; color: var(--a-mu);}
+.adm .adm-bar {align-items: center !important; gap: 12px !important; margin-bottom: 10px;}
+.adm .adm-pills label {border-radius: 999px !important; border: 1px solid var(--a-inbd) !important; padding: 4px 12px !important; font-size: 12px !important; font-weight: 500 !important; background: transparent !important; color: var(--a-lb) !important;}
+.adm .adm-pills label.selected {background: var(--a-segon) !important; color: var(--a-segfg) !important; border-color: var(--a-ac) !important;}
+.adm .adm-table {padding: 0 !important; overflow: hidden;}
+.adm .adm-grid {display: grid; grid-template-columns: minmax(0, 1.5fr) auto minmax(78px, .8fr); gap: 12px; align-items: center; font-size: 14px; width: 100%;}
+.adm .adm-thead {padding: 12px 20px; font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--a-mu);}
+.adm .adm-tr {border-top: 1px solid var(--a-row) !important; padding: 10px 14px 10px 20px !important; align-items: center !important; gap: 8px !important; background: transparent !important; margin: 0 !important;}
+.adm .adm-tr.sel {background: var(--a-sel) !important; box-shadow: inset 3px 0 0 var(--a-ac);}
+.adm .adm-tr .block, .adm .adm-tr .prose {background: transparent !important; border: 0 !important; padding: 0 !important; box-shadow: none !important;}
+.adm .adm-who {display: flex; gap: 12px; align-items: center; min-width: 0;}
+.adm .adm-who b {display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.adm .adm-who > div {min-width: 0;}
+.adm .adm-last {display: block; color: var(--a-mu); font-size: 11px; margin-top: 2px;}
+.adm .adm-who small {display: block; color: var(--a-mu); font-size: 12px;}
+.adm .adm-av {display: grid; place-items: center; border-radius: 50%; font: 600 11px Sora, "DM Sans", sans-serif; flex: none;}
+.adm .adm-seg {display: inline-flex; background: var(--a-seg); border: 1px solid var(--a-bd); border-radius: 8px; padding: 2px;}
+.adm .adm-seg span {padding: 4px 8px; font-size: 12px; font-weight: 600; color: var(--a-mu); border-radius: 6px;}
+.adm .adm-seg span.a {background: var(--a-segon); color: var(--a-segfg);}
+.adm .adm-st {font-size: 12px; font-weight: 500; display: inline-flex; gap: 6px; align-items: center;}
+.adm .adm-st i {width: 7px; height: 7px; border-radius: 50%; background: var(--a-ok); display: inline-block;}
+.adm .adm-st.off i {background: var(--a-off);}
+.adm .adm-muted, .adm .adm-grid .adm-muted {color: var(--a-mu);}
+.adm .adm-empty {padding: 28px 20px; color: var(--a-mu); font-size: 14px; text-align: center;}
+.adm .adm-phead {display: flex; gap: 12px; align-items: center; margin-bottom: 8px;}
+.adm .adm-phead b {display: block; font: 600 16px Sora, "DM Sans", sans-serif;}
+.adm .adm-phead small {color: var(--a-mu); font-size: 12px;}
+.adm .adm-phead .adm-pill {margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 2px 8px; border-radius: 999px; background: var(--a-segon); color: var(--a-segfg); text-transform: uppercase;}
+.adm .adm-group {font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--a-mu); padding: 14px 0 4px;}
+.adm .adm-perm {padding: 6px 0 !important; border-bottom: 1px solid var(--a-row) !important;}
+.adm .adm-hr {border: 0; border-top: 1px solid var(--a-bd); margin: 12px 0;}
+.adm .adm-msg {font-size: 13px; line-height: 1.55; border-radius: 8px; padding: 10px 12px; margin-top: 8px; background: var(--a-ok-bg); color: var(--a-ok-fg);}
+.adm .adm-msg.err {background: var(--a-warn-bg); color: var(--a-dng-fg);}
+.adm .adm-secret {font: 600 15px "JetBrains Mono", monospace; user-select: all; padding: 2px 6px; border-radius: 6px; background: rgba(127,127,127,.18);}
+.adm .adm-stats {display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px;}
+.adm .adm-stats div {border: 1px solid var(--a-bd); border-radius: 10px; padding: 10px;}
+.adm .adm-stats b {display: block; font: 600 20px Sora, "DM Sans", sans-serif;}
+.adm .adm-stats span {font-size: 11px; color: var(--a-mu);}
+.adm .adm-act h4 {font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--a-mu); margin: 6px 0;}
+.adm .adm-act ul {list-style: none; margin: 0; padding: 0;}
+.adm .adm-act li {display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--a-row); font-size: 13px;}
+.adm .adm-act li small {color: var(--a-mu); white-space: nowrap;}
+@media (max-width: 900px) {.adm .adm-legend {grid-template-columns: 1fr;}}
+
+/* signed-in person in the page header (light by default, dark under .dark) */
+#user-chip {position: fixed; top: 14px; right: 150px; z-index: 60; background: transparent !important; border: 0 !important; padding: 0 !important; width: auto !important; min-width: 0 !important;}
+#user-chip .uc {display: flex; align-items: center; gap: 10px; color: #0f172a; font-size: 13px;}
+#user-chip .uc-av {width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #0f766e; color: #ffffff; font-weight: 700; font-size: 11px;}
+#user-chip .uc-t b {display: block; font-weight: 600; line-height: 1.1;}
+#user-chip .uc-t small {display: block; color: #5b6577; font-size: 11px;}
+#user-chip form {margin: 0;}
+#user-chip .uc-out {background: transparent; border: 1px solid #cbd3e1; color: #0f172a; border-radius: 8px; padding: 5px 12px; font: 600 12px "Public Sans", system-ui, sans-serif; cursor: pointer;}
+#user-chip .uc-out:hover {border-color: #0f766e; color: #0f766e;}
+.dark #user-chip .uc {color: #e6edf3;}
+.dark #user-chip .uc-av {background: #1b2a33; color: #5eead4;}
+.dark #user-chip .uc-t small {color: #93a3b3;}
+.dark #user-chip .uc-out {border-color: rgba(255,255,255,.28); color: #e6edf3;}
+.dark #user-chip .uc-out:hover {border-color: #4fb3c0; color: #4fb3c0;}
