@@ -1,3 +1,4 @@
+"""Gradio layout (build_ui) and event wiring."""
 import os
 
 import gradio as gr
@@ -42,7 +43,7 @@ from ui.tab_results import (
     _refresh_view,
     _show_row_detail,
 )
-from ui.tab_chat import _build_chat_index, _chat_clear, _chat_respond
+from ui.tab_chat import _build_chat_index, build_qa_tab, wire_qa_tab
 from ui.tab_observability import build_observability_tab
 from ui.tab_kb import _kb_delete, _kb_refresh, _kb_reindex, _kb_upload
 from ui.analysis import _analyze, _analyze_sample, _reveal_after_analysis
@@ -425,30 +426,8 @@ def build_ui() -> gr.Blocks:
                         kb_manage_status = gr.Markdown("")
 
                 with gr.Tab("💬 Q&A (Agent)", id=5, interactive=False, visible=False) as tab_qa:
-                    # Single bounded chat panel (intro + transcript +
-                    # composer) instead of loosely stacked components -
-                    # keeps the tab a fixed height with the transcript
-                    # scrolling internally like a normal chat app.
-                    with gr.Column(elem_id="chat-panel", elem_classes=["dash-card"]):
-                        gr.Markdown(
-                            "Ask a question about the tickets you just analyzed - e.g. "
-                            "*\"what's driving high-priority incidents?\"*, "
-                            "*\"which assignment group has the worst worklog quality?\"*, or "
-                            "*\"summarize the recurring issues on our database servers.\"* "
-                            "Answers are grounded only in the analyzed batch (Overview tab) - "
-                            "run an analysis first if you haven't yet. You can also ask "
-                            "documentation questions, e.g. *\"what does the runbook recommend "
-                            "for connection errors?\"*, answered from the Knowledge Base tab.",
-                            elem_classes=["severity-note", "chat-intro"],
-                        )
-                        chatbot = gr.Chatbot(height=440, show_label=False, elem_id="chatbot")
-                        with gr.Row(elem_id="chat-input-row"):
-                            chat_input = gr.Textbox(
-                                placeholder="Ask a question about the analyzed tickets...",
-                                show_label=False, scale=5, container=False,
-                            )
-                            chat_send = gr.Button("Send", variant="primary", scale=1)
-                        chat_clear_btn = gr.Button("Clear conversation", size="sm", elem_id="chat-clear-btn")
+                    # Q&A page (Step 17 design) - see ui/tab_chat.py build_qa_tab().
+                    qa_page = build_qa_tab()
 
                 with gr.Tab("🔭 Observability", id=7, visible=False) as tab_observability:
                     build_observability_tab()
@@ -677,17 +656,9 @@ def build_ui() -> gr.Blocks:
         )
         demo.load(fn=_kb_refresh, outputs=[kb_documents_table, kb_document_dropdown])
 
-        chat_send.click(
-            fn=_chat_respond,
-            inputs=[chat_input, chat_history_state, full_results_state, chat_stats_state],
-            outputs=[chatbot, chat_history_state, chat_input],
-        )
-        chat_input.submit(
-            fn=_chat_respond,
-            inputs=[chat_input, chat_history_state, full_results_state, chat_stats_state],
-            outputs=[chatbot, chat_history_state, chat_input],
-        )
-        chat_clear_btn.click(fn=_chat_clear, outputs=[chatbot, chat_history_state])
+        # Same handlers as before (_chat_respond / _chat_clear); the page also has starter cards,
+        # a prompt library and a data-source line that call the very same handler.
+        wire_qa_tab(qa_page, tab_qa, demo, chat_history_state, full_results_state, chat_stats_state, source_label_state)
 
         def _apply_access(request: gr.Request):
             """Shows each person only the tabs their role/permissions allow. Cosmetic only - every
