@@ -282,7 +282,7 @@ def build_index_from_dataframe(full_df) -> "TicketIndex":
     return TicketIndex(rows)
 
 
-def _make_tools(full_df, log: "guardrails.ToolLog | None" = None) -> list:
+def _make_tools(full_df, log: "guardrails.ToolLog | None" = None, scope: str = "all") -> list:
     """Wraps the 8 chat_tools functions as LangChain tools bound to this
     analysis batch via closure. Every call goes through `_run` below, which:
       * validates the arguments the MODEL chose (guardrails.clean_*_arg),
@@ -413,11 +413,16 @@ def _make_tools(full_df, log: "guardrails.ToolLog | None" = None) -> list:
             return _fail("search_incidents", exc)
         return _run("search_incidents", chat_tools.search_incidents, full_df, **args)
 
-    return [
+    incident_tools = [
         get_incident_summary, get_category_analysis, get_priority_analysis,
         get_server_analysis, get_recurring_issues, get_recommendations,
-        search_knowledge_base, search_incidents,
+        search_incidents,
     ]
+    if scope == "documents":
+        return [search_knowledge_base]
+    if scope == "incident":
+        return incident_tools
+    return incident_tools[:6] + [search_knowledge_base, incident_tools[6]]
 
 
 # Maps a keyword found in the question to the tool that answers it, used
@@ -566,7 +571,7 @@ def _format_no_llm_result(intent: str, result: dict) -> str:
         return "\n".join(f"{k}: {v}" for k, v in result.items())
 
 
-async def _no_llm_fallback(question: str, full_df) -> str:
+async def _no_llm_fallback(question: str, full_df, scope: str = "all") -> str:
     """rule_based mode: no chat model, so no tool-calling loop is
     possible. Dispatches to the same tool functions directly via a
     simple keyword match on the question, so the app stays useful without
@@ -575,6 +580,12 @@ async def _no_llm_fallback(question: str, full_df) -> str:
     knowledge_base.retrieve_relevant_chunks (an embedding call) - every
     other intent below is a plain synchronous pandas call."""
     q = question.lower()
+
+    is_kb_question = any(kw in q for kw in _NO_LLM_INTENT_KEYWORDS[0][0])
+    if scope == "documents" and not is_kb_question:
+        return "Your account can only ask about the knowledge base documents - try a question about a runbook, SOP or procedure."
+    if scope == "incident" and is_kb_question:
+        return "Knowledge-base questions aren't enabled for your account - I can answer questions about the incident data."
 
     # Guardrail: say plainly when the question is about data this app does not hold.
     # (Checked before anything else so e.g. "CPU temperature" never gets answered
@@ -648,6 +659,7 @@ async def _answer_question_impl(
     full_df,
     stats: dict | None = None,
     history: list[tuple[str, str]] | None = None,
+    scope: str = "all",
 ) -> str:
     """Answers a management question by letting the chat model choose
     from 6 domain-specific tools (see _make_tools), each backed by a
@@ -668,21 +680,21 @@ async def _answer_question_impl(
     if not question:
         return 'Ask a question about the analyzed tickets - e.g. "how many P1 tickets are there?"'
 
-    if full_df is None or len(full_df) == 0:
+    if scope != "documents" and (full_df is None or len(full_df) == 0):
         return "No analyzed tickets are available yet - run an analysis first, then come back and ask away."
 
     raw_chat_model = get_raw_chat_model()
     set_mode("rule_based" if raw_chat_model is None else "llm")
     if raw_chat_model is None:
         try:
-            return await _no_llm_fallback(question, full_df)
+            return await _no_llm_fallback(question, full_df, scope)
         except Exception:
             logger.exception("No-LLM fallback failed")
             return "I couldn't compute an answer right now - please try again."
 
     try:
         tool_log = guardrails.ToolLog()
-        tools = _make_tools(full_df, tool_log)
+        tools = _make_tools(full_df, tool_log, scope)
         tool_map = {t.name: t for t in tools}
         # bind_tools() must be called on the RAW model - with_chat_retry()
         # returns a RunnableRetry, which doesn't expose bind_tools() (see
@@ -690,7 +702,12 @@ async def _answer_question_impl(
         # then wrap the bound runnable in retry so 429s are still handled.
         model_with_tools = with_chat_retry(raw_chat_model.bind_tools(tools))
 
-        messages = [SystemMessage(content=AGENT_SYSTEM_PROMPT)]
+        system_prompt = AGENT_SYSTEM_PROMPT
+        if scope == "documents":
+            system_prompt += "\n\nSCOPE: this user may ask ONLY about the knowledge base documents. Use search_knowledge_base only; politely decline any question about incident data."
+        elif scope == "incident":
+            system_prompt += "\n\nSCOPE: this user may ask ONLY about the incident data. The knowledge base is not available; politely decline questions about documents."
+        messages = [SystemMessage(content=system_prompt)]
         messages += _history_to_messages(history)
         messages.append(HumanMessage(content=question))
 
@@ -698,7 +715,7 @@ async def _answer_question_impl(
             response = await traced_llm_ainvoke(model_with_tools, messages, "agent_turn")
             messages.append(response)
             if not getattr(response, "tool_calls", None):
-                return await _finalize(_content_text(response), question, history, tool_log, full_df)
+                return await _finalize(_content_text(response), question, history, tool_log, full_df, scope)
             note_tool_selection([c.get("name") for c in response.tool_calls], _round + 1)
 
             for call in response.tool_calls:
@@ -725,11 +742,11 @@ async def _answer_question_impl(
             messages + [HumanMessage(content="Answer the original question now, using only the information already gathered above.")],
             "forced_final_answer",
         )
-        return await _finalize(_content_text(final), question, history, tool_log, full_df)
+        return await _finalize(_content_text(final), question, history, tool_log, full_df, scope)
     except Exception:
         logger.exception("Chat answer generation failed")
         try:
-            return "I couldn't reach the assistant model just now. Here's what the data shows directly:\n\n" + await _no_llm_fallback(question, full_df)
+            return "I couldn't reach the assistant model just now. Here's what the data shows directly:\n\n" + await _no_llm_fallback(question, full_df, scope)
         except Exception:
             return "I couldn't generate an answer right now - please try again."
 
@@ -742,7 +759,7 @@ def _content_text(message) -> str:
     return str(content or "").strip()
 
 
-async def _finalize(answer: str, question: str, history, tool_log, full_df) -> str:
+async def _finalize(answer: str, question: str, history, tool_log, full_df, scope: str = "all") -> str:
     """Deterministic checks on the model's final text before the user sees it
     (guardrails.finalize_answer): withholds prompt leaks, flags/replaces figures
     that no tool returned, appends knowledge-base sources from the retrieval
@@ -751,7 +768,7 @@ async def _finalize(answer: str, question: str, history, tool_log, full_df) -> s
     answer, verdict = guardrails.finalize_answer(answer, question, clean_history, tool_log)
     if verdict == "no_tool_figures":
         record_event("guardrail", "ungrounded_answer_replaced", "degraded", 0.0)
-        answer = guardrails.NO_TOOL_FIGURES_MESSAGE + "Here is what the data shows directly:\n\n" + await _no_llm_fallback(question, full_df)
+        answer = guardrails.NO_TOOL_FIGURES_MESSAGE + "Here is what the data shows directly:\n\n" + await _no_llm_fallback(question, full_df, scope)
     elif verdict != "ok":
         record_event("guardrail", f"answer_{verdict}", "degraded", 0.0)
     return observability.redact(answer)
@@ -762,9 +779,10 @@ async def answer_question(
     full_df,
     stats: dict | None = None,
     history: list[tuple[str, str]] | None = None,
+    scope: str = "all",
 ) -> str:
-    """Public entry point - unchanged signature and behaviour. Wraps the agent
+    """Public entry point - unchanged behaviour; optional `scope` ("all" | "documents" | "incident"). Wraps the agent
     in a traced request (Step 15): reuses the REST request context if one is
     active, otherwise starts its own (Gradio path). See observability.py."""
     with request_trace("chat", source="agent"):
-        return await _answer_question_impl(question, full_df, stats, history)
+        return await _answer_question_impl(question, full_df, stats, history, scope)
