@@ -54,7 +54,7 @@ from app.models.schemas import CATEGORIES
 from app.security import sanitize_for_llm
 from app.services.json_utils import extract_json
 from app.services.llm_client import SYSTEM_GUARDRAIL
-from app.services.scorer import heuristic_score
+from app.services.scorer import heuristic_score, prepare_sources
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -76,10 +76,21 @@ _SCORE_PROMPT = ChatPromptTemplate.from_messages(
         ("system", SYSTEM_GUARDRAIL),
         (
             "user",
-            "Score this ITSM worklog's quality from 0-100 based on: clarity, "
+            "Score this ITSM incident's worklog quality from 0-100 based on: clarity, "
             "root-cause documented, resolution steps documented, timestamps/"
             "actions present, professionalism.\n"
-            "<<<DATA>>>\nContext: {context}\nWorklog: {worklog}\n<<<END_DATA>>>\n"
+            "Evidence comes from up to three separately labeled sections: Work Notes, External "
+            "Info (external-facing updates) and Internal Info (internal technical investigation "
+            "notes). Judge the evidence across all of them together. A section that is "
+            "empty or '(none provided)' is NOT a defect - do not lower the score for it. Do not "
+            "assume External Info is less reliable than Internal Info or the reverse. Use only "
+            "what the sections actually say: never invent troubleshooting steps, root causes, "
+            "validation or resolution details. If two sections contradict each other, do not pick "
+            "a side - add a flag starting with 'Conflict:' that names the sections involved.\n"
+            "<<<DATA>>>\nContext: {context}\n"
+            "Work Notes: {worklog}\n"
+            "External Info: {external_info}\n"
+            "Internal Info: {internal_info}\n<<<END_DATA>>>\n"
             'Respond as JSON only: {{"score": 0, "breakdown": {{}}, "flags": ["..."]}}',
         ),
     ]
@@ -90,6 +101,10 @@ class TicketState(TypedDict):
     ticket_id: str
     text: str  # combined short_description + description, used for classification/scoring context
     worklog: str
+    # Separate evidence sources for worklog scoring (see scorer.prepare_sources).
+    # Optional: states built without them (older callers) score on `worklog` alone.
+    external_info: str
+    internal_info: str
     category: str | None  # pre-filled by the keyword/embedding pre-pass; None means "needs LLM"
     category_confidence: float
     category_method: str
@@ -134,20 +149,34 @@ async def classify_node(state: TicketState, chat_model) -> TicketState:
 
 
 async def score_node(state: TicketState, chat_model) -> TicketState:
-    base = heuristic_score(state["worklog"])
+    external_info = state.get("external_info", "") or ""
+    internal_info = state.get("internal_info", "") or ""
+    base = heuristic_score(state["worklog"], external_info, internal_info)
     score, flags = base.score, list(base.flags)
 
-    if settings.ENABLE_LLM_WORKLOG_SCORING and chat_model is not None and state["worklog"].strip():
+    # Cleaned + de-duplicated per source (placeholder-only sources become empty); the
+    # sources stay separate so the prompt can label them.
+    sources = prepare_sources(state["worklog"], external_info, internal_info)
+
+    if settings.ENABLE_LLM_WORKLOG_SCORING and chat_model is not None and any(sources.values()):
         try:
             chain = _SCORE_PROMPT | chat_model
+            none_provided = "(none provided)"
             response = await chain.ainvoke(
-                {"context": sanitize_for_llm(state["text"]), "worklog": sanitize_for_llm(state["worklog"])}
+                {
+                    "context": sanitize_for_llm(state["text"]),
+                    "worklog": sanitize_for_llm(sources["worklog"]) or none_provided,
+                    "external_info": sanitize_for_llm(sources["external_info"]) or none_provided,
+                    "internal_info": sanitize_for_llm(sources["internal_info"]) or none_provided,
+                }
             )
             parsed = json.loads(extract_json(response.content))
             llm_score = parsed.get("score")
-            if isinstance(llm_score, (int, float)):
+            if isinstance(llm_score, (int, float)) and not isinstance(llm_score, bool):
                 score = max(0, min(100, round((score + llm_score) / 2)))
-                flags = list(dict.fromkeys(flags + parsed.get("flags", [])))
+                raw_flags = parsed.get("flags")
+                llm_flags = [f for f in raw_flags if isinstance(f, str)] if isinstance(raw_flags, list) else []
+                flags = list(dict.fromkeys(flags + llm_flags))
         except Exception as exc:
             # Heuristic score already computed - an LLM scoring failure
             # degrades gracefully rather than losing the ticket's score.
