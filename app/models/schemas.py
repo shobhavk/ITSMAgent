@@ -72,6 +72,8 @@ class TicketRecord(BaseModel):
     # guessing when these are absent - see that module's docstring.
     responded_at: Optional[datetime] = None
     detected_at: Optional[datetime] = None
+    # When acknowledgment began ("Start Time"); responded_at is when it stopped.
+    ack_start_at: Optional[datetime] = None
     source_row: int = Field(description="Original row index for traceability")
 
     @field_validator("ticket_id", mode="before")
@@ -125,6 +127,7 @@ class AnalyzedTicket(BaseModel):
     resolved_at: Optional[datetime] = None
     responded_at: Optional[datetime] = None
     detected_at: Optional[datetime] = None
+    ack_start_at: Optional[datetime] = None
 
 
 class AnalysisResponse(BaseModel):
