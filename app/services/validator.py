@@ -15,9 +15,15 @@ REQUIRED_ANY = ["short_description", "description", "worklog"]
 def _coerce_datetime(value) -> pd.Timestamp | None:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return None  # a whole number (e.g. resolve time in hours) is not a timestamp
     try:
         ts = pd.to_datetime(value, errors="coerce")
-        return None if pd.isna(ts) else ts.to_pydatetime()
+        if pd.isna(ts):
+            return None
+        if ts.tzinfo is not None:
+            ts = ts.tz_localize(None)  # keep wall-clock; avoids tz-aware/naive mixes downstream
+        return ts.to_pydatetime()
     except Exception:
         return None
 
@@ -43,7 +49,7 @@ def normalize_and_validate(df: pd.DataFrame) -> tuple[list[TicketRecord], list[d
     for col in ["ticket_id", "short_description", "subject", "description", "worklog", "external_info", "internal_info",
                 "priority", "status", "assignment_group", "configuration_item",
                 "opened_at", "closed_at", "created_at", "resolved_at",
-                "responded_at", "detected_at"]:
+                "responded_at", "detected_at", "ack_start_at"]:
         if col not in df.columns:
             df[col] = None
 
@@ -88,6 +94,7 @@ def normalize_and_validate(df: pd.DataFrame) -> tuple[list[TicketRecord], list[d
             resolved_at=_coerce_datetime(row.get("resolved_at")),
             responded_at=_coerce_datetime(row.get("responded_at")),
             detected_at=_coerce_datetime(row.get("detected_at")),
+            ack_start_at=_coerce_datetime(row.get("ack_start_at")),
             source_row=idx,
         )
         valid.append(record)

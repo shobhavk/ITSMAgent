@@ -205,7 +205,7 @@ def compute_file_hash(file_bytes: bytes) -> str:
 # name for MTTR/SLA/volume-trend, so a cache-hit load has to restore the
 # exact same dtype or those calculations silently go wrong.
 _CACHED_DATETIME_COLUMNS = [
-    "Opened At", "Closed At", "Created At", "Resolved At", "Responded At", "Detected At",
+    "Opened At", "Closed At", "Created At", "Resolved At", "Responded At", "Detected At", "Ack Start At",
 ]
 
 

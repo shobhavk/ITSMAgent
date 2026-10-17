@@ -214,6 +214,7 @@ async def _run_pipeline(df) -> AnalysisResponse:
             resolved_at=rec.resolved_at,
             responded_at=rec.responded_at,
             detected_at=rec.detected_at,
+            ack_start_at=rec.ack_start_at,
         )
 
     for state in final_states:
@@ -267,6 +268,7 @@ async def _run_pipeline(df) -> AnalysisResponse:
             resolved_at=rec.resolved_at,
             responded_at=rec.responded_at,
             detected_at=rec.detected_at,
+            ack_start_at=rec.ack_start_at,
         )
 
         new_cache_entries.append(

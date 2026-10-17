@@ -42,6 +42,8 @@ MTTR already uses. Adjust SLA_TARGET_HOURS to match your organization's
 actual SLA policy - the defaults here are common ITSM conventions, not
 universal.
 """
+import datetime as dt
+
 import pandas as pd
 
 # Target resolution time per priority, in hours. Tune to your org's real
@@ -66,14 +68,52 @@ def _priority_bucket(priority: str) -> str:
     return ""
 
 
+def _to_naive_datetime(series: pd.Series) -> pd.Series:
+    """Always returns a tz-naive datetime64[ns] series (NaT where a value is
+    blank, numeric or unparseable), so the .dt accessor is always valid.
+    Handles object columns of mixed tz-aware/naive datetimes, differing UTC
+    offsets, and whole numbers sitting in a date column."""
+    if isinstance(series, pd.DataFrame):  # duplicate column labels
+        series = series.iloc[:, 0]
+
+    def _one(v):
+        if v is None or isinstance(v, bool) or isinstance(v, (int, float)):
+            return pd.NaT
+        ts = pd.to_datetime(v, errors="coerce")
+        if pd.isna(ts):
+            return pd.NaT
+        return ts.tz_localize(None) if ts.tzinfo is not None else ts
+
+    if pd.api.types.is_datetime64_any_dtype(series):
+        out = series
+    else:
+        numeric_mask = pd.Series(False, index=series.index)
+        try:
+            numeric_mask = series.map(lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and pd.notna(v))
+            out = pd.to_datetime(series.mask(numeric_mask), errors="coerce")
+        except Exception:
+            out = None
+        # Mixed tz-aware/naive columns can come back as object dtype, or with
+        # valid values silently turned into NaT - re-parse element by element.
+        lost = out is None or not pd.api.types.is_datetime64_any_dtype(out) or (
+            series.map(lambda v: isinstance(v, (pd.Timestamp, dt.datetime)) and getattr(v, "tzinfo", None) is not None).any()
+            and out.isna().sum() > (series.isna() | numeric_mask).sum()
+        )
+        if lost:
+            out = pd.Series(pd.to_datetime(series.map(_one), errors="coerce"), index=series.index)
+    if getattr(out.dt, "tz", None) is not None:
+        out = out.dt.tz_localize(None)
+    return out.astype("datetime64[ns]")
+
+
 def _column_datetime(full_df: pd.DataFrame, column: str) -> pd.Series:
-    """pd.to_datetime on a display column that may not exist in this
+    """Datetime series for a display column that may not exist in this
     batch's dataframe - returns an all-NaT series of the right length/
     index instead of raising, so callers can .fillna() across columns
     freely regardless of which ones a given upload actually had."""
     if column in full_df.columns:
-        return pd.to_datetime(full_df[column], errors="coerce")
-    return pd.Series([pd.NaT] * len(full_df), index=full_df.index)
+        return _to_naive_datetime(full_df[column])
+    return pd.Series(pd.NaT, index=full_df.index, dtype="datetime64[ns]")
 
 
 def effective_open_resolve_times(full_df: pd.DataFrame) -> pd.DataFrame:
@@ -117,7 +157,7 @@ def _opened_closed_series(full_df: pd.DataFrame) -> pd.DataFrame:
     effective_open_resolve_times) plus responded_at/detected_at/priority,
     for compute_resolution_metrics below."""
     if full_df is None or len(full_df) == 0:
-        return pd.DataFrame(columns=["opened_at", "closed_at", "responded_at", "detected_at", "priority"])
+        return pd.DataFrame(columns=["opened_at", "closed_at", "responded_at", "detected_at", "ack_start_at", "priority"])
     effective = effective_open_resolve_times(full_df)
     out = pd.DataFrame(
         {
@@ -125,6 +165,7 @@ def _opened_closed_series(full_df: pd.DataFrame) -> pd.DataFrame:
             "closed_at": effective["end"],
             "responded_at": _column_datetime(full_df, "Responded At"),
             "detected_at": _column_datetime(full_df, "Detected At"),
+            "ack_start_at": _column_datetime(full_df, "Ack Start At"),
             "priority": full_df.get("Priority", ""),
         }
     )
@@ -150,6 +191,7 @@ def compute_time_series(full_df: pd.DataFrame, granularity: str = "Daily") -> li
     label_fmt = _GRANULARITY_LABEL_FMT.get(granularity, "%Y-%m-%d")
 
     frame = pd.DataFrame({"opened_at": opened[valid], "worklog_score": scores[valid]})
+    frame["opened_at"] = _to_naive_datetime(frame["opened_at"])
     period = frame["opened_at"].dt.to_period(freq)
     grouped = frame.groupby(period).agg(ticket_count=("opened_at", "count"), avg_worklog_score=("worklog_score", "mean"))
     grouped = grouped.sort_index()
@@ -165,6 +207,7 @@ def compute_time_series(full_df: pd.DataFrame, granularity: str = "Daily") -> li
 
 
 def _duration_hours(start: pd.Series, end: pd.Series) -> pd.Series:
+    start, end = _to_naive_datetime(start), _to_naive_datetime(end)
     both_present = start.notna() & end.notna()
     delta = (end - start).dt.total_seconds() / 3600.0
     return delta[both_present]
@@ -188,7 +231,11 @@ def compute_resolution_metrics(full_df: pd.DataFrame) -> dict:
     ts = _opened_closed_series(full_df)
 
     mttd_durations = _duration_hours(ts["detected_at"], ts["opened_at"])
-    mtta_durations = _duration_hours(ts["opened_at"], ts["responded_at"])
+    # Acknowledgment start/stop columns ("Start Time"/"Stop Time") give the
+    # exact acknowledge window; where a ticket has no start time, fall back
+    # to opened_at as before.
+    mtta_start = ts["ack_start_at"].fillna(ts["opened_at"])
+    mtta_durations = _duration_hours(mtta_start, ts["responded_at"])
     mttr_durations = _duration_hours(ts["opened_at"], ts["closed_at"])
 
     mttd = _metric_from_durations(
@@ -208,7 +255,9 @@ def compute_resolution_metrics(full_df: pd.DataFrame) -> dict:
         sla = {"available": False, "compliance_pct": None, "sample_size": 0, "by_priority": {}, "note": mttr["note"]}
     else:
         resolved = ts[resolved_mask].copy()
-        resolved["duration_hours"] = (resolved["closed_at"] - resolved["opened_at"]).dt.total_seconds() / 3600.0
+        resolved["duration_hours"] = (
+            _to_naive_datetime(resolved["closed_at"]) - _to_naive_datetime(resolved["opened_at"])
+        ).dt.total_seconds() / 3600.0
         resolved["priority_bucket"] = resolved["priority"].apply(_priority_bucket)
         resolved["target_hours"] = resolved["priority_bucket"].map(SLA_TARGET_HOURS).fillna(DEFAULT_SLA_TARGET_HOURS)
         resolved["met_sla"] = resolved["duration_hours"] <= resolved["target_hours"]

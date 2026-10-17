@@ -88,7 +88,40 @@ COLUMN_ALIASES: dict[str, str] = {
     "detected at": "detected_at",
     "alert time": "detected_at",
     "incident start": "detected_at",
+    # Acknowledgment window: "start time" = when acknowledgment began,
+    # "stop time" = when the incident was acknowledged. The difference is the
+    # time taken to acknowledge (MTTA, see trend_metrics.py). "stop time" maps
+    # to responded_at (the existing acknowledged-at field); "start time" has
+    # its own field so it never collides with Opened/Created.
+    "start time": "ack_start_at",
+    "ack start": "ack_start_at",
+    "ack start time": "ack_start_at",
+    "incident ack start": "ack_start_at",
+    "incident ack start time": "ack_start_at",
+    "incident ack starting time": "ack_start_at",
+    "stop time": "responded_at",
+    "ack stop": "responded_at",
+    "ack stop time": "responded_at",
+    "incident ack stop": "responded_at",
+    "incident ack stop time": "responded_at",
+    "incident ack time": "responded_at",
 }
+
+
+def _datetime_likeness(series: pd.Series) -> float:
+    """Share of non-blank values that look like real dates (not whole numbers).
+    Used only to choose between two source columns that map to the same
+    canonical datetime field (e.g. a numeric 'Resolution Time' in hours and a
+    real 'Resolved' timestamp both aliasing to resolved_at)."""
+    values = series.dropna()
+    if values.empty:
+        return 0.0
+    if pd.api.types.is_datetime64_any_dtype(values):
+        return 1.0
+    if pd.api.types.is_numeric_dtype(values):
+        return 0.0
+    parsed = pd.to_datetime(values.astype(str), errors="coerce")
+    return float(parsed.notna().mean())
 
 
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -97,6 +130,25 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
         key = str(col).strip().lower()
         if key in COLUMN_ALIASES:
             rename_map[col] = COLUMN_ALIASES[key]
+
+    # Two source columns mapping to the same canonical name would produce
+    # duplicate column labels, so df["resolved_at"] returns a DataFrame and
+    # later datetime handling fails ("Can only use .dt accessor ..."). Keep
+    # one per canonical name (the most date-like for *_at fields, otherwise the
+    # first) and leave the other under its original header.
+    by_target: dict[str, list] = {}
+    for col, target in rename_map.items():
+        by_target.setdefault(target, []).append(col)
+    for target, cols in by_target.items():
+        if len(cols) < 2:
+            continue
+        if target.endswith("_at"):
+            winner = max(cols, key=lambda c: _datetime_likeness(df[c]))
+        else:
+            winner = cols[0]
+        for c in cols:
+            if c != winner:
+                del rename_map[c]
     return df.rename(columns=rename_map)
 
 
