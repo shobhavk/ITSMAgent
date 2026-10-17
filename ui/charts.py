@@ -58,7 +58,7 @@ def _donut_figure(
     else:
         legend_labels = raw_labels
     colors = [color_fn(c) for c in raw_labels] if color_fn else [_category_color(i) for i in range(len(raw_labels))]
-    marker = dict(colors=colors, line=dict(color="#ffffff", width=3))
+    marker = dict(colors=colors, line=dict(color="rgba(0,0,0,0)", width=3))
     total = int(chart_df["Count"].sum())
     fig = go.Figure(
         data=[
@@ -70,7 +70,7 @@ def _donut_figure(
                 sort=False,
                 textinfo="percent",
                 textposition="inside",
-                textfont=dict(color="#ffffff", size=12, family="Inter, Segoe UI, sans-serif"),
+                textfont=dict(color="#0a0d14", size=12, family="DM Sans, Public Sans, sans-serif"),
                 insidetextorientation="horizontal",
                 marker=marker,
                 hovertemplate="%{customdata}: %{value} tickets (%{percent})<extra></extra>",
@@ -218,15 +218,15 @@ def _priority_color(label: str) -> str:
     "high" substring match, since "high" also occurs inside it."""
     l = (label or "").lower()
     if "critical" in l or "p1" in l:
-        return "#b3261e"
+        return "#ef6b62"
     if "very high" in l:
-        return "#c05621"
+        return "#fb923c"
     if "high" in l or "p2" in l:
-        return "#b7791f"
+        return "#f2b01e"
     if "medium" in l or "p3" in l:
-        return "#2b7a9b"
+        return "#2dd4bf"
     if "low" in l or "p4" in l:
-        return "#2e7d5b"
+        return "#64748b"
     return "#94a3b8"
 
 
