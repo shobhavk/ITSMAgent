@@ -1,28 +1,46 @@
+.dark {
+    --dash-bg: #0a0d14;
+    --dash-card: #10141c;
+    --dash-soft: #121a24;
+    --dash-border: #1f2633;
+    --dash-border-strong: #2a3344;
+    --dash-text-muted: #8b93a5;
+    --dash-text: #e6e9f0;
+    --dash-primary: #2dd4bf;
+    --dash-primary-hover: #5eead4;
+    --dash-on-primary: #04201c;
+    --dash-good: #34d399;
+    --dash-fair: #fbbf24;
+    --dash-poor: #f87171;
+}
+
 @import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Sora:wght@500;600;700&display=swap");
 
 /* Design tokens (light). Dark values are defined at the bottom of this file. */
 :root {
-    --dash-bg: #f4f6f8;
+    --dash-bg: #f4f6fa;
     --dash-card: #ffffff;
-    --dash-soft: #e8f1f3;
-    --dash-border: #dde3e9;
-    --dash-text-muted: #5d6b78;
-    --dash-text: #14202b;
-    --dash-primary: #0f6e7a;
-    --dash-primary-hover: #0b5862;
-    --dash-good: #2e7d5b;
-    --dash-fair: #b7791f;
-    --dash-poor: #b3261e;
-    --dash-shadow: 0 1px 2px rgba(20, 32, 43, 0.04);
-    --dash-radius: 10px;
+    --dash-soft: #eaf6f4;
+    --dash-border: #e2e7ef;
+    --dash-border-strong: #cbd3e1;
+    --dash-text-muted: #5b6577;
+    --dash-text: #0f172a;
+    --dash-primary: #0f766e;
+    --dash-primary-hover: #0b5f58;
+    --dash-on-primary: #ffffff;
+    --dash-good: #15803d;
+    --dash-fair: #b45309;
+    --dash-poor: #b91c1c;
+    --dash-shadow: none;
+    --dash-radius: 12px;
 }
 
 html, body {margin: 0 !important; padding: 0 !important; background: var(--dash-bg) !important;}
 
 .gradio-container {
     max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important;
-    background: var(--dash-bg) !important; font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    background: var(--dash-bg) !important; font-family: "DM Sans", "Public Sans", system-ui, sans-serif;
 }
 footer {display: none !important;}
 
@@ -238,7 +256,7 @@ footer {display: none !important;}
 }
 .agent-progress-fill {
     position: absolute; top: 0; left: -40%; width: 40%; height: 100%; border-radius: 999px;
-    background: linear-gradient(90deg, #16345c, #3b82f6, #16345c);
+    background: linear-gradient(90deg, transparent, var(--dash-primary), transparent);
     animation: agent-slide 1.15s ease-in-out infinite;
 }
 @keyframes agent-slide {
@@ -814,20 +832,22 @@ html::after {
    system (or ?__theme=dark) asks for it; only the tokens change.
    ===================================================================== */
 .dark {
-    --dash-bg: #0f1620;
-    --dash-card: #18222e;
-    --dash-soft: #1d2e38;
-    --dash-border: #2a3846;
-    --dash-text-muted: #93a3b3;
-    --dash-text: #e6edf3;
-    --dash-primary: #4fb3c0;
-    --dash-primary-hover: #7cc7d1;
-    --dash-good: #4cc38a;
-    --dash-fair: #e0a93b;
-    --dash-poor: #ef6b62;
+    --dash-bg: #0a0d14;
+    --dash-card: #10141c;
+    --dash-soft: #121a24;
+    --dash-border: #1f2633;
+    --dash-border-strong: #2a3344;
+    --dash-text-muted: #8b93a5;
+    --dash-text: #e6e9f0;
+    --dash-primary: #2dd4bf;
+    --dash-primary-hover: #5eead4;
+    --dash-on-primary: #04201c;
+    --dash-good: #34d399;
+    --dash-fair: #fbbf24;
+    --dash-poor: #f87171;
 }
 .dark button.primary, .dark .gr-button.primary, .dark #exec-summary-btn, .dark #rec-writeup-btn, .dark #results-download-btn,
-.dark .hero-step-num, .dark .side-brand-icon {color: #0f1620 !important;}
+.dark .hero-step-num, .dark .side-brand-icon {color: #04201c !important;}
 
 /* =====================================================================
    Categorization tab: summary strip, filter bar, row detail drawer
@@ -1128,3 +1148,169 @@ body.dark .theme-toggle .to-dark, body:not(.dark) .theme-toggle .to-light {displ
 @media (max-width: 900px) {.qa #qa-body {flex-wrap: wrap !important;} .qa #qa-library {flex: 1 1 100% !important; width: 100% !important; max-width: none;} .qa #qa-cards {grid-template-columns: 1fr;}}
 /* the page has its own Clear button (wired to _chat_clear); Gradio's built-in trash icon would only wipe the screen, not the saved history */
 .qa #qa-chatbot button[aria-label="Clear"] {display: none !important;}
+
+/* =====================================================================
+   DESIGN LAYER (Step 17 shell + Overview, from the Login/Admin design file)
+   Palette/font tokens are defined above; this block rebuilds the app shell: sidebar (brand, search,
+   grouped nav with icons, user chip footer) and the per-page header. Pure presentation.
+   ===================================================================== */
+:root {
+    --nav-w: 248px; --nav-bg: #ffffff; --nav-bd: #e2e7ef; --nav-text: #475569; --nav-muted: #8590a3; --nav-accent: #0f766e;
+    --nav-hover: #f1f5f9; --nav-active-bg: #e6f6f4; --nav-active-fg: #0f172a;
+    --font-ui: "DM Sans", "Public Sans", system-ui, sans-serif; --font-head: "Sora", "DM Sans", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+.dark {
+    --nav-bg: #0a0d14; --nav-bd: #1f2633; --nav-text: #a7afc0; --nav-muted: #6b7488; --nav-accent: #2dd4bf;
+    --nav-hover: #121823; --nav-active-bg: #10161f; --nav-active-fg: #ffffff;
+}
+.gradio-container {
+    --body-background-fill: var(--dash-bg); --background-fill-primary: var(--dash-card); --background-fill-secondary: var(--dash-soft);
+    --block-background-fill: var(--dash-card); --block-border-color: var(--dash-border); --border-color-primary: var(--dash-border);
+    --input-background-fill: var(--dash-bg); --input-border-color: var(--dash-border-strong); --body-text-color: var(--dash-text);
+    --body-text-color-subdued: var(--dash-text-muted); --color-accent: var(--dash-primary); --link-text-color: var(--dash-primary);
+    --button-primary-background-fill: var(--dash-primary); --button-primary-background-fill-hover: var(--dash-primary-hover);
+    --button-primary-text-color: var(--dash-on-primary); --button-primary-border-color: var(--dash-primary);
+    --table-even-background-fill: var(--dash-card); --table-odd-background-fill: var(--dash-soft);
+    font-family: var(--font-ui);
+}
+button.primary, .gr-button.primary, #exec-summary-btn, #rec-writeup-btn, #results-download-btn {
+    background: var(--dash-primary) !important; color: var(--dash-on-primary) !important; border: 0 !important;
+    border-radius: 8px !important; font-weight: 600 !important; box-shadow: none !important;
+}
+button.primary:hover {background: var(--dash-primary-hover) !important;}
+button.secondary, button.stop {border-radius: 8px !important; box-shadow: none !important;}
+
+/* ---- sidebar surface ---- */
+body::before {background: var(--nav-bg) !important; border-right: 1px solid var(--nav-bd);}
+body::after, html::after {display: none !important;}   /* old "WORKSPACE" label + footer note (the note is already shown in the page) */
+#topbar-wrap {
+    position: fixed !important; left: 0; top: 0; width: var(--nav-w); height: auto !important; z-index: 60;
+    display: flex !important; flex-direction: column; align-items: stretch !important; gap: 14px;
+    padding: 20px 16px 6px !important; background: transparent !important; border: 0 !important; box-sizing: border-box;
+}
+#topbar-wrap > .block, #topbar-wrap .prose {background: transparent !important; border: 0 !important; padding: 0 !important;}
+.side-brand {display: flex; align-items: center; gap: 10px; padding: 0 4px;}
+.side-brand-icon {width: 30px !important; height: 30px !important; border-radius: 8px !important; display: grid; place-items: center;
+    background: var(--dash-primary) !important; color: var(--dash-on-primary) !important; flex: none; font-size: 0 !important;}
+.side-brand-title {font: 700 15px var(--font-head) !important; letter-spacing: -.01em; color: var(--dash-text) !important;}
+.side-brand-sub {display: none !important;}
+.nav-search {display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid var(--nav-bd); border-radius: 8px;
+    color: var(--nav-muted); margin: 0; cursor: text;}
+.nav-search:focus-within {border-color: var(--dash-primary);}
+.nav-search input {flex: 1; min-width: 0; border: 0 !important; outline: 0 !important; background: transparent !important; box-shadow: none !important;
+    color: var(--dash-text); font: 400 13px var(--font-ui); padding: 0 !important; height: auto !important;}
+.nav-search kbd {font: 500 10px var(--font-mono); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--nav-bd); color: var(--nav-muted); white-space: nowrap;}
+
+/* ---- sidebar navigation: a real flex column (replaces the pixel-pinned buttons) ---- */
+#main-tabs .tab-container:not(.visually-hidden) {
+    /* Gradio measures THIS element to decide which tabs fit before moving the rest into a "More tabs" menu, so it must
+       stay very wide; only its content box is narrowed (via padding) to the sidebar width. */
+    position: fixed !important; left: 0 !important; top: 126px !important; width: 4000px !important; height: auto !important;
+    padding: 0 calc(4000px - var(--nav-w) + 12px) 12px 12px !important; box-sizing: border-box; overflow: visible !important;
+    display: flex !important; flex-direction: column; gap: 2px; z-index: 56; pointer-events: none !important; border: 0 !important; background: transparent !important;
+}
+#main-tabs .overflow-menu {display: none !important;}
+#main-tabs .tab-container:not(.visually-hidden) button[role="tab"] {
+    position: relative !important; top: auto !important; left: auto !important; width: 100% !important; height: 36px !important; flex: none;
+    display: flex !important; align-items: center; gap: 10px; padding: 0 10px !important; margin: 0 !important; justify-content: flex-start !important;
+    border: 0 !important; border-radius: 8px !important; background: transparent !important; box-shadow: none !important;
+    color: var(--nav-text) !important; font: 500 13.5px var(--font-ui) !important; text-align: left; cursor: pointer; pointer-events: auto !important;
+}
+#main-tabs .tab-container:not(.visually-hidden) button[role="tab"]::before {
+    content: ""; display: block !important; width: 16px; height: 16px; flex: none; background: currentColor;
+    -webkit-mask: var(--ic) center / contain no-repeat; mask: var(--ic) center / contain no-repeat;
+    position: static !important; border: 0 !important; transform: none !important; opacity: .9;
+}
+#main-tabs .tab-container:not(.visually-hidden) button[role="tab"]:hover:not([disabled]) {background: var(--nav-hover) !important; color: var(--dash-text) !important;}
+#main-tabs .tab-container:not(.visually-hidden) button[role="tab"].selected {background: var(--nav-active-bg) !important; color: var(--nav-active-fg) !important; font-weight: 600 !important;}
+#main-tabs .tab-container:not(.visually-hidden) button[role="tab"].selected::before {background: var(--dash-primary); opacity: 1;}
+#main-tabs .tab-container:not(.visually-hidden) button[role="tab"][disabled] {opacity: .45; cursor: not-allowed;}
+/* group headings, attached to the first visible tab of each group */
+#main-tabs .tab-container button[role="tab"]::after {display: none; position: absolute; top: -22px; left: 10px; height: auto; width: auto; background: none !important;
+    font: 600 11px var(--font-ui); letter-spacing: .08em; color: var(--nav-muted); text-transform: uppercase; pointer-events: none;}
+#main-tabs .tab-container:not(.visually-hidden):has(button[data-tab-id="1"]) button[data-tab-id="0"] {margin-top: 24px !important;}
+#main-tabs .tab-container:has(button[data-tab-id="1"]) button[data-tab-id="0"]::after {content: "Analyze"; display: block !important;}
+#main-tabs .tab-container:not(.visually-hidden) button[data-tab-id="4"] {margin-top: 24px !important;}
+#main-tabs .tab-container button[data-tab-id="4"]::after {content: "Knowledge"; display: block !important;}
+#main-tabs .tab-container:not(.visually-hidden) button[data-tab-id="7"] {margin-top: 24px !important;}
+#main-tabs .tab-container button[data-tab-id="7"]::after {content: "System"; display: block !important;}
+#main-tabs .tab-container:not(.visually-hidden):not(:has(button[data-tab-id="7"])) button[data-tab-id="6"] {margin-top: 24px !important;}
+#main-tabs .tab-container:not(:has(button[data-tab-id="7"])) button[data-tab-id="6"]::after {content: "System"; display: block !important;}
+#main-tabs .tab-container:not(.visually-hidden):not(:has(button[data-tab-id="7"])):not(:has(button[data-tab-id="6"])) button[data-tab-id="8"] {margin-top: 24px !important;}
+#main-tabs .tab-container:not(:has(button[data-tab-id="7"])):not(:has(button[data-tab-id="6"])) button[data-tab-id="8"]::after {content: "System"; display: block !important;}
+#main-tabs .tab-container button[data-tab-id="0"] {--ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%224%22 y=%224%22 width=%227%22 height=%227%22 rx=%221.5%22/%3E%3Crect x=%2213%22 y=%224%22 width=%227%22 height=%227%22 rx=%221.5%22/%3E%3Crect x=%224%22 y=%2213%22 width=%227%22 height=%227%22 rx=%221.5%22/%3E%3Crect x=%2213%22 y=%2213%22 width=%227%22 height=%227%22 rx=%221.5%22/%3E%3C/svg%3E");}
+#main-tabs .tab-container button[data-tab-id="1"] {--ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M3 12V4h8l9 9-8 8z%22/%3E%3Ccircle cx=%227.5%22 cy=%228.5%22 r=%221.2%22/%3E%3C/svg%3E");}
+#main-tabs .tab-container button[data-tab-id="2"] {--ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M4 20V10m6 10V4m6 16v-7%22/%3E%3C/svg%3E");}
+#main-tabs .tab-container button[data-tab-id="3"] {--ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M9 18h6M12 3a6 6 0 00-4 10c1 1 1 2 1 3h6c0-1 0-2 1-3a6 6 0 00-4-10z%22/%3E%3C/svg%3E");}
+#main-tabs .tab-container button[data-tab-id="4"] {--ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3z%22/%3E%3Cpath d=%22M8 17h11%22/%3E%3C/svg%3E");}
+#main-tabs .tab-container button[data-tab-id="5"] {--ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M4 5h16v11H9l-5 4z%22/%3E%3C/svg%3E");}
+#main-tabs .tab-container button[data-tab-id="7"] {--ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M3 12h4l2.5-6 4 12 2.5-6H21%22/%3E%3C/svg%3E");}
+#main-tabs .tab-container button[data-tab-id="6"] {--ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%223%22/%3E%3Cpath d=%22M12 3v3m0 12v3M3 12h3m12 0h3%22/%3E%3C/svg%3E");}
+#main-tabs .tab-container button[data-tab-id="8"] {--ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z%22/%3E%3C/svg%3E");}
+
+/* ---- sidebar footer: user chip ---- */
+#user-chip {position: fixed !important; left: 0 !important; bottom: 0 !important; top: auto !important; right: auto !important; width: var(--nav-w) !important;
+    z-index: 61; padding: 14px 16px !important; background: var(--nav-bg) !important; border: 0 !important; border-top: 1px solid var(--nav-bd) !important;
+    border-radius: 0 !important; box-sizing: border-box; min-height: 0;}
+#user-chip .block, #user-chip .prose {background: transparent !important; border: 0 !important; padding: 0 !important;}
+#user-chip .uc {display: flex !important; align-items: center; gap: 10px; color: var(--dash-text) !important;}
+#user-chip .uc-av {width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none; font: 600 11px var(--font-ui);
+    background: color-mix(in srgb, var(--dash-primary) 16%, transparent) !important; color: var(--dash-primary) !important;}
+#user-chip .uc-av-admin {background: color-mix(in srgb, #fbbf24 18%, transparent) !important; color: #d97706 !important;}
+.dark #user-chip .uc-av-admin {color: #fbbf24 !important;}
+#user-chip .uc-t {display: flex; flex-direction: column; gap: 3px; min-width: 0; line-height: 1.1;}
+#user-chip .uc-t b {font: 600 13px var(--font-ui); color: var(--dash-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+#user-chip .uc-role {align-self: flex-start; font: 600 9.5px var(--font-ui); letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 5px;
+    background: color-mix(in srgb, var(--dash-primary) 14%, transparent) !important; color: var(--dash-primary) !important; border: 0 !important;}
+#user-chip .uc-role-admin {background: color-mix(in srgb, #fbbf24 16%, transparent) !important; color: #d97706 !important;}
+.dark #user-chip .uc-role-admin {color: #fbbf24 !important;}
+#user-chip form {margin: 0 0 0 auto;}
+#user-chip .uc-out {width: 32px; height: 32px; padding: 0 !important; display: grid; place-items: center; background: transparent !important; border: 0 !important;
+    border-radius: 8px !important; color: var(--nav-muted) !important; cursor: pointer; font-size: 0 !important;}
+#user-chip .uc-out:hover {background: var(--nav-hover) !important; color: var(--dash-text) !important;}
+
+/* ---- page header (follows the open tab; see SHELL_JS) ---- */
+#topbar {position: relative !important; display: block !important; height: auto !important; background: transparent !important; border: 0 !important;
+    box-shadow: none !important; padding: 28px 32px 6px !important; margin: 0 !important;}
+#topbar .block, #topbar .prose {background: transparent !important; border: 0 !important; padding: 0 !important;}
+#topbar .pg-crumb {font: 400 12.5px var(--font-ui); color: var(--dash-text-muted); margin: 0 0 8px;}
+#topbar h1 {font: 600 26px/1.15 var(--font-head) !important; letter-spacing: -.02em; margin: 0 0 6px !important; color: var(--dash-text) !important;}
+#topbar p {margin: 0 !important; font-size: 14px; color: var(--dash-text-muted) !important;}
+#topbar .theme-toggle {position: absolute !important; right: 32px !important; top: 30px !important; transform: none !important; width: 38px; height: 38px; padding: 0 !important;
+    display: grid; place-items: center; border-radius: 10px !important; background: var(--dash-card) !important; border: 1px solid var(--dash-border) !important;
+    color: var(--dash-text-muted) !important; box-shadow: none !important; cursor: pointer;}
+#topbar .theme-toggle:hover {color: var(--dash-primary) !important; border-color: var(--dash-primary) !important;}
+body[data-pg="8"] #topbar .pg-text {display: none;}            /* Admin / Q&A draw their own heading inside the tab */
+.qa .qa-head {display: none;}
+#topbar #topbar-user, #topbar .user-chip {display: none !important;}
+
+/* ---- content column ---- */
+#main-col > .severity-note {background: transparent !important; border: 0 !important; color: var(--dash-text-muted) !important; font-size: 12px !important; padding: 0 0 2px !important; box-shadow: none !important;}
+
+/* ---- design-layer fixes: brand row, search, top note ---- */
+.side-brand-title {font-size: 14px !important; white-space: nowrap; line-height: 1.2;}
+.side-brand {flex-wrap: nowrap;}
+.nav-search input {text-overflow: ellipsis;}
+.nav-search kbd {flex: none;}
+#top-note {background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important;}
+#top-note, #top-note p, #top-note em {color: var(--dash-text-muted) !important; font-size: 12px !important; font-style: normal !important;}
+#top-note .prose, #top-note .md {padding: 0 32px 4px !important;}
+
+/* ---- Overview, in the design's language: flat cards, 12px radius, hairline borders ---- */
+.hero-card {background: var(--dash-card) !important; border: 1px dashed var(--dash-border-strong) !important; border-radius: 12px !important; box-shadow: none !important;}
+.hero-title {color: var(--dash-text) !important; font: 600 17px var(--font-head) !important;}
+.hero-sub {color: var(--dash-text-muted) !important;}
+.hero-step {background: transparent !important; border: 1px solid var(--dash-border) !important; color: var(--dash-text-muted) !important; font-weight: 500 !important;}
+.hero-step-num {background: var(--dash-primary) !important; color: var(--dash-on-primary) !important;}
+.kpi-card {background: var(--dash-card) !important; border: 1px solid var(--dash-border) !important; border-left: 1px solid var(--dash-border) !important;
+    border-radius: 12px !important; box-shadow: none !important;}
+.kpi-card:hover {box-shadow: none !important; border-color: var(--dash-border-strong) !important;}
+.kpi-card .kpi-icon {display: none !important;}
+.kpi-label {text-transform: none !important; letter-spacing: 0 !important; font-size: 12.5px !important; font-weight: 500 !important;}
+.kpi-value {font-family: var(--font-ui) !important; font-weight: 700 !important; letter-spacing: -.02em;}
+.section-heading h3, .section-heading p {font: 600 15px var(--font-head) !important; letter-spacing: -.01em; color: var(--dash-text) !important;}
+.dash-card, .chart-card {background: var(--dash-card) !important; border: 1px solid var(--dash-border) !important; border-radius: 12px !important; box-shadow: none !important;}
+.side-brand {margin-bottom: 14px;}
+#main-tabs .tab-container button[role="tab"]::after {background: none !important; border: 0 !important; transform: none !important;}
+.qa, .dark .qa {background: transparent !important; padding: 0 !important; border-radius: 0 !important;}
