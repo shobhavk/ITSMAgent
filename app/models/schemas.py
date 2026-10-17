@@ -43,6 +43,11 @@ class TicketRecord(BaseModel):
     # (pipeline.py) as additional evidence of diagnosis/resolution work,
     # not displayed as its own column.
     external_info: str = ""
+    # Optional - only populated if the source has an "Internal Info" column
+    # (internal technical investigation notes). Scored together with worklog and
+    # external_info (scorer.heuristic_score / graph_pipeline.score_node) but kept
+    # separate so the two sources remain distinguishable.
+    internal_info: str = ""
     priority: Optional[str] = None
     status: Optional[str] = None
     assignment_group: Optional[str] = None
