@@ -40,7 +40,7 @@ def normalize_and_validate(df: pd.DataFrame) -> tuple[list[TicketRecord], list[d
         return valid, rejected
 
     # Ensure expected columns exist even if the source lacked them
-    for col in ["ticket_id", "short_description", "subject", "description", "worklog", "external_info",
+    for col in ["ticket_id", "short_description", "subject", "description", "worklog", "external_info", "internal_info",
                 "priority", "status", "assignment_group", "configuration_item",
                 "opened_at", "closed_at", "created_at", "resolved_at",
                 "responded_at", "detected_at"]:
@@ -58,6 +58,7 @@ def normalize_and_validate(df: pd.DataFrame) -> tuple[list[TicketRecord], list[d
         desc = _clean_str(row.get("description"))
         worklog = _clean_str(row.get("worklog"))
         external_info = _clean_str(row.get("external_info"))
+        internal_info = _clean_str(row.get("internal_info"))
 
         if not any([short_desc, subject, desc, worklog]):
             rejected.append({"source_row": idx, "reason": "No description or worklog content found."})
@@ -76,6 +77,7 @@ def normalize_and_validate(df: pd.DataFrame) -> tuple[list[TicketRecord], list[d
             description=desc,
             worklog=worklog,
             external_info=external_info,
+            internal_info=internal_info,
             priority=_clean_str(row.get("priority")) or None,
             status=_clean_str(row.get("status")) or None,
             assignment_group=_clean_str(row.get("assignment_group")) or None,
