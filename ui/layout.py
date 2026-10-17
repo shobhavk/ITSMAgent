@@ -8,6 +8,7 @@ from ui.constants import (
     DEFAULT_PAGE_SIZE,
     HERO_HTML,
     SEVERITY_NOTE,
+    SHELL_JS,
     SIDEBAR_BRAND_HTML,
     TOPBAR_HTML,
     _ATTENTION_PLACEHOLDER,
@@ -56,11 +57,15 @@ def _user_chip_html(user: dict | None) -> str:
     if not user:
         return ""
     import html as _h
-    name = _h.escape(user["display_name"])
+    name = _h.escape(user.get("username") or user["display_name"])
+    full = _h.escape(user["display_name"])
+    role = _h.escape(user["role"])
     initials = _h.escape("".join(w[0] for w in user["display_name"].replace(".", " ").split()[:2]).upper() or "?")
-    return (f'<div class="uc"><span class="uc-av">{initials}</span><span class="uc-t"><b>{name}</b>'
-            f'<small>{_h.escape(user["role"].capitalize())}</small></span>'
-            '<form method="post" action="/auth/logout"><button type="submit" class="uc-out">Sign out</button></form></div>')
+    return (f'<div class="uc"><span class="uc-av uc-av-{role}">{initials}</span><span class="uc-t"><b title="{full}">{name}</b>'
+            f'<small class="uc-role uc-role-{role}">{role}</small></span>'
+            '<form method="post" action="/auth/logout"><button type="submit" class="uc-out" title="Sign out" aria-label="Sign out">'
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+            'stroke-linejoin="round"><path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9"/></svg></button></form></div>')
 
 
 def build_ui() -> gr.Blocks:
@@ -74,10 +79,10 @@ def build_ui() -> gr.Blocks:
 
         with gr.Column(elem_id="main-col"):
             gr.HTML(TOPBAR_HTML, elem_id="topbar")
-            gr.Markdown(f"_{SEVERITY_NOTE}_", elem_classes=["severity-note"])
+            gr.Markdown(f"_{SEVERITY_NOTE}_", elem_classes=["severity-note"], elem_id="top-note")
 
             with gr.Tabs(elem_id="main-tabs") as main_tabs:
-                with gr.Tab("🏠 Overview", id=0) as tab_overview:
+                with gr.Tab("Overview", id=0) as tab_overview:
                     agent_progress = gr.HTML(AGENT_PROGRESS_HTML, elem_id="agent-progress", visible=False)
                     cache_notice = gr.Markdown(visible=False, elem_id="cache-notice")
 
@@ -107,7 +112,7 @@ def build_ui() -> gr.Blocks:
                             with gr.Column(scale=2, min_width=180, elem_id="action-col"):
                                 analyze_btn = gr.Button("Analyze", variant="primary")
                                 sample_btn = gr.Button(
-                                    "✨ Try sample data", size="sm", elem_id="sample-btn",
+                                    "Try sample data", size="sm", elem_id="sample-btn",
                                     visible=os.path.exists(_SAMPLE_DATA_PATH),
                                 )
 
@@ -143,9 +148,9 @@ def build_ui() -> gr.Blocks:
                         # card with CSS position:absolute, so it can never
                         # escape the card's visible edges.
                         with gr.Column(elem_classes=["dash-card"], elem_id="exec-summary-card"):
-                            gr.Markdown("### 🧾 Executive Summary", elem_classes=["section-heading"])
+                            gr.Markdown("### Executive Summary", elem_classes=["section-heading"])
                             exec_summary_btn = gr.Button(
-                                "✨ Generate summary", size="sm", elem_id="exec-summary-btn",
+                                "Generate summary", size="sm", elem_id="exec-summary-btn",
                             )
                             exec_summary_output = gr.Markdown(
                                 _EXEC_SUMMARY_PLACEHOLDER,
@@ -163,18 +168,18 @@ def build_ui() -> gr.Blocks:
                         # category_chart in the outputs list below.
                         with gr.Row(elem_id="overview-panel-row-1"):
                             with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🗂️ Incidents by Category", elem_classes=["section-heading"])
+                                gr.Markdown("### Incidents by Category", elem_classes=["section-heading"])
                                 overview_category_bar_html = gr.HTML(
                                     '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                                 )
                             with gr.Column(scale=1, elem_classes=["dash-card"]):
-                                gr.Markdown("### 🎯 Incidents by Priority", elem_classes=["section-heading"])
+                                gr.Markdown("### Incidents by Priority", elem_classes=["section-heading"])
                                 overview_priority_chart = gr.Plot(show_label=False)
 
                         # Incident Health - four traffic-light indicators so
                         # management can scan overall status in a second.
                         with gr.Column(elem_classes=["dash-card"]):
-                            gr.Markdown("### 🩺 Incident Health", elem_classes=["section-heading"])
+                            gr.Markdown("### Incident Health", elem_classes=["section-heading"])
                             health_html = gr.HTML(_HEALTH_PLACEHOLDER)
 
                     # Incident Volume Trend - hidden per request, but the
@@ -183,7 +188,7 @@ def build_ui() -> gr.Blocks:
                     # refresh) so nothing downstream has to change - only
                     # its visibility here.
                     with gr.Column(elem_classes=["dash-card"], visible=False):
-                        gr.Markdown("### 📈 Incident Volume Trend", elem_classes=["section-heading"])
+                        gr.Markdown("### Incident Volume Trend", elem_classes=["section-heading"])
                         overview_trend_chart = gr.Plot(show_label=False)
 
                     # Attention Required - hidden per request, same
@@ -191,10 +196,10 @@ def build_ui() -> gr.Blocks:
                     # component still exists and still updates, it's just
                     # not shown.
                     with gr.Column(elem_classes=["dash-card"], visible=False):
-                        gr.Markdown("### 🚩 Attention Required", elem_classes=["section-heading"])
+                        gr.Markdown("### Attention Required", elem_classes=["section-heading"])
                         attention_html = gr.HTML(_ATTENTION_PLACEHOLDER)
 
-                with gr.Tab("🗂️ Categorization", id=1, interactive=False, visible=False) as tab_categorization:
+                with gr.Tab("Categorization", id=1, interactive=False, visible=False) as tab_categorization:
                     # Categorization tab, laid out as: summary strip -> incident
                     # table (with filter bar) -> Category x Priority chart + top
                     # categories. Clicking a table row opens a detail drawer.
@@ -211,7 +216,7 @@ def build_ui() -> gr.Blocks:
                     # CUSTOM_CSS); it still receives the same full CSV path
                     # from _analyze.
                     with gr.Column(elem_id="results-section", elem_classes=["dash-card"]):
-                        gr.Markdown("### 📋 Recent Incidents (Analyzed &amp; Categorized)", elem_classes=["section-heading"])
+                        gr.Markdown("### Recent Incidents (Analyzed &amp; Categorized)", elem_classes=["section-heading"])
                         gr.Markdown(
                             "Includes each incident's timeline: when it came in, time to acknowledge, any "
                             "reassignment found in External Info, and whether External Info carries a "
@@ -261,10 +266,10 @@ def build_ui() -> gr.Blocks:
 
                     with gr.Row(elem_id="cat-analytics-row", equal_height=False):
                         with gr.Column(scale=2, elem_classes=["dash-card"]):
-                            gr.Markdown("### 📊 Category × Priority", elem_classes=["section-heading"])
+                            gr.Markdown("### Category × Priority", elem_classes=["section-heading"])
                             category_heatmap = gr.Plot(show_label=False)
                         with gr.Column(scale=1, elem_classes=["dash-card"]):
-                            gr.Markdown("### 🗂️ Top Categories", elem_classes=["section-heading"])
+                            gr.Markdown("### Top Categories", elem_classes=["section-heading"])
                             category_bar_html = gr.HTML(
                                 '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                             )
@@ -273,14 +278,14 @@ def build_ui() -> gr.Blocks:
 
                     # Row detail drawer (opened by clicking a table row).
                     with gr.Column(elem_id="detail-drawer", visible=False) as detail_drawer:
-                        detail_close_btn = gr.Button("✕ Close", size="sm", elem_id="detail-close-btn")
+                        detail_close_btn = gr.Button("Close", size="sm", elem_id="detail-close-btn")
                         row_detail_html = gr.HTML("", elem_id="row-detail")
 
-                with gr.Tab("📊 Trends & Insights", id=2, interactive=False, visible=False) as tab_trends:
+                with gr.Tab("Trends & Insights", id=2, interactive=False, visible=False) as tab_trends:
                     # KPI trend - ticket volume + worklog quality over
                     # time, toggle between daily/weekly/monthly views.
                     with gr.Column(elem_classes=["dash-card"]):
-                        gr.Markdown("### 📈 Ticket Trend", elem_classes=["section-heading"])
+                        gr.Markdown("### Ticket Trend", elem_classes=["section-heading"])
                         trend_granularity = gr.Radio(
                             ["Daily", "Weekly", "Monthly"], value="Daily",
                             show_label=False, elem_id="trend-granularity",
@@ -307,7 +312,7 @@ def build_ui() -> gr.Blocks:
                             label=None, show_label=False, interactive=False,
                             wrap=False, max_height=360, elem_id="timeline-table",
                         )
-                        timeline_summary_btn = gr.Button("✨ Generate summary", size="sm")
+                        timeline_summary_btn = gr.Button("Generate summary", size="sm")
                         timeline_summary_output = gr.Markdown(_TIMELINE_PLACEHOLDER_MD)
 
                     # Recurring issues, exact-match: (host, category)
@@ -315,7 +320,7 @@ def build_ui() -> gr.Blocks:
                     # real time dimension (first/last seen, average
                     # days between occurrences) - not just a raw count.
                     with gr.Column(elem_classes=["dash-card"]):
-                        gr.Markdown("### 🔁 Recurring Issues", elem_classes=["section-heading"])
+                        gr.Markdown("### Recurring Issues", elem_classes=["section-heading"])
                         recurring_issues_html = gr.HTML(
                             '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                         )
@@ -331,7 +336,7 @@ def build_ui() -> gr.Blocks:
                     # makes the other free.
                     with gr.Column(elem_classes=["dash-card"]):
                         gr.Markdown(
-                            "### 🔬 Semantic Recurrence Detection",
+                            "### Semantic Recurrence Detection",
                             elem_classes=["section-heading"],
                         )
                         gr.Markdown(
@@ -348,17 +353,17 @@ def build_ui() -> gr.Blocks:
                     # Top hosts, assignment group performance.
                     with gr.Row(elem_id="panel-row-2"):
                         with gr.Column(scale=1, elem_classes=["dash-card"]):
-                            gr.Markdown("### 🖥️ Top Affected Servers / Hosts", elem_classes=["section-heading"])
+                            gr.Markdown("### Top Affected Servers / Hosts", elem_classes=["section-heading"])
                             host_bar_html = gr.HTML(
                                 '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                             )
                         with gr.Column(scale=1, elem_classes=["dash-card"]):
-                            gr.Markdown("### 👥 Assignment Group Performance", elem_classes=["section-heading"])
+                            gr.Markdown("### Assignment Group Performance", elem_classes=["section-heading"])
                             assignment_group_html = gr.HTML(
                                 '<p style="color:var(--dash-text-muted); font-size:0.85rem; margin:0;">Run an analysis to see this.</p>'
                             )
 
-                with gr.Tab("💡 Recommendations", id=3, interactive=False, visible=False) as tab_recommendations:
+                with gr.Tab("Recommendations", id=3, interactive=False, visible=False) as tab_recommendations:
                     gr.Markdown(
                         "Data-backed recommendations for this batch. Every figure below is "
                         "calculated with pandas from the incidents you analyzed - recurrence, "
@@ -374,9 +379,9 @@ def build_ui() -> gr.Blocks:
                     # the cards themselves never depend on it. Placed
                     # above Recommended Actions per request.
                     with gr.Column(elem_classes=["dash-card"], elem_id="rec-writeup-card"):
-                        gr.Markdown("### 🧾 Management Write-Up", elem_classes=["section-heading"])
+                        gr.Markdown("### Management Write-Up", elem_classes=["section-heading"])
                         rec_writeup_btn = gr.Button(
-                            "✨ Generate write-up", size="sm", elem_id="rec-writeup-btn",
+                            "Generate write-up", size="sm", elem_id="rec-writeup-btn",
                         )
                         rec_writeup_output = gr.Markdown(
                             "Run an analysis, then click **Generate write-up** to turn the "
@@ -386,10 +391,10 @@ def build_ui() -> gr.Blocks:
                         )
 
                     with gr.Column(elem_classes=["dash-card"]):
-                        gr.Markdown("### 💡 Recommended Actions", elem_classes=["section-heading"])
+                        gr.Markdown("### Recommended Actions", elem_classes=["section-heading"])
                         recommendations_html = gr.HTML(_RECOMMENDATIONS_PLACEHOLDER)
 
-                with gr.Tab("📚 Knowledge Base", id=4, visible=False) as tab_kb:
+                with gr.Tab("Knowledge Base", id=4, visible=False) as tab_kb:
                     gr.Markdown(
                         "Upload organizational documents (runbooks, SOPs, troubleshooting "
                         "guides, known-error documents, escalation procedures) so the Agent "
@@ -401,7 +406,7 @@ def build_ui() -> gr.Blocks:
                     )
 
                     with gr.Column(elem_classes=["dash-card"]):
-                        gr.Markdown("### 📤 Upload Document", elem_classes=["section-heading"])
+                        gr.Markdown("### Upload Document", elem_classes=["section-heading"])
                         with gr.Row():
                             kb_file_input = gr.File(
                                 label="Supported: PDF, DOCX, TXT, MD",
@@ -412,7 +417,7 @@ def build_ui() -> gr.Blocks:
                         kb_upload_status = gr.Markdown("")
 
                     with gr.Column(elem_classes=["dash-card"]):
-                        gr.Markdown("### 📚 Indexed Documents", elem_classes=["section-heading"])
+                        gr.Markdown("### Indexed Documents", elem_classes=["section-heading"])
                         kb_documents_table = gr.Dataframe(
                             headers=["Document Name", "Type", "Status", "Chunks", "Uploaded At", "Error"],
                             interactive=False, wrap=True, elem_id="kb-documents-table",
@@ -421,20 +426,20 @@ def build_ui() -> gr.Blocks:
                             kb_document_dropdown = gr.Dropdown(
                                 label="Select a document to manage", choices=[], scale=3,
                             )
-                            kb_reindex_btn = gr.Button("🔁 Reindex", scale=1)
-                            kb_delete_btn = gr.Button("🗑️ Delete", scale=1, variant="stop")
+                            kb_reindex_btn = gr.Button("Reindex", scale=1)
+                            kb_delete_btn = gr.Button("Delete", scale=1, variant="stop")
                         kb_manage_status = gr.Markdown("")
 
-                with gr.Tab("💬 Q&A (Agent)", id=5, interactive=False, visible=False) as tab_qa:
+                with gr.Tab("Q&A (Agent)", id=5, interactive=False, visible=False) as tab_qa:
                     # Q&A page (Step 17 design) - see ui/tab_chat.py build_qa_tab().
                     qa_page = build_qa_tab()
 
-                with gr.Tab("🔭 Observability", id=7, visible=False) as tab_observability:
+                with gr.Tab("Observability", id=7, visible=False) as tab_observability:
                     build_observability_tab()
 
-                with gr.Tab("⚙️ Settings", id=6, visible=False) as tab_settings:
+                with gr.Tab("Settings", id=6, visible=False) as tab_settings:
                     with gr.Column(elem_classes=["dash-card"]):
-                        gr.Markdown("### ⚙️ Settings", elem_classes=["section-heading"])
+                        gr.Markdown("### Settings", elem_classes=["section-heading"])
                         gr.Markdown(
                             "Nothing configurable here yet - this tab is a placeholder for "
                             "future options (e.g. default page size, scoring thresholds).",
@@ -442,7 +447,7 @@ def build_ui() -> gr.Blocks:
                         )
 
                 # Step 17: visible only to people who may manage users (see _apply_access below).
-                with gr.Tab("🛡️ Admin", id=8, visible=False) as tab_admin:
+                with gr.Tab("Admin", id=8, visible=False) as tab_admin:
                     build_admin_tab(tab_admin)
 
         full_results_state = gr.State(pd.DataFrame())
@@ -659,6 +664,9 @@ def build_ui() -> gr.Blocks:
         # Same handlers as before (_chat_respond / _chat_clear); the page also has starter cards,
         # a prompt library and a data-source line that call the very same handler.
         wire_qa_tab(qa_page, tab_qa, demo, chat_history_state, full_results_state, chat_stats_state, source_label_state)
+
+        # Shell behaviour that is purely presentational: page heading follows the open tab, nav search, Ctrl/Cmd+K.
+        demo.load(fn=None, inputs=None, outputs=None, js=SHELL_JS)
 
         def _apply_access(request: gr.Request):
             """Shows each person only the tabs their role/permissions allow. Cosmetic only - every
