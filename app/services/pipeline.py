@@ -84,7 +84,8 @@ async def _run_pipeline(df) -> AnalysisResponse:
     # if the rest of this upload is brand new.
     content_hashes = {
         rec.ticket_id: compute_ticket_content_hash(
-            rec.short_description, rec.description, rec.worklog, rec.subject, rec.external_info
+            rec.short_description, rec.description, rec.worklog, rec.subject, rec.external_info,
+            rec.internal_info,
         )
         for rec in valid_records
     }
@@ -136,13 +137,14 @@ async def _run_pipeline(df) -> AnalysisResponse:
             TicketState(
                 ticket_id=rec.ticket_id,
                 text=combined_texts[rec.ticket_id],
-                # External Info is additional evidence of diagnosis/
-                # resolution work - folded in here so both the heuristic
-                # rubric and the optional LLM scoring pass see it, without
-                # touching rec.worklog itself (still used unmodified for
-                # the displayed Worklog Notes column and the "No worklog
-                # present" flag below).
-                worklog=" ".join(filter(None, [rec.worklog, rec.external_info])).strip(),
+                # Work Notes, External Info and Internal Info are passed as three
+                # separate fields so scoring (heuristic + optional LLM pass) can
+                # use all of them while keeping the sources distinguishable.
+                # rec.worklog itself is untouched (still used for the displayed
+                # Worklog Notes column and the "No worklog present" flag below).
+                worklog=rec.worklog,
+                external_info=rec.external_info,
+                internal_info=rec.internal_info,
                 category=pre.category if pre else None,
                 category_confidence=pre.confidence if pre else 0.0,
                 category_method=pre.method if pre else "",
