@@ -21,16 +21,43 @@ from ui.helpers import _strip_html
 from ui.charts import _category_color, _high_priority_count
 
 
-def _agent_progress_html(stage: str = "Agent analyzing tickets", step: int | None = None, total: int | None = None) -> str:
-    """Animated progress card. `stage` is the current stage label; `step`/`total`
-    (optional) add a "Step N of M" tag so the bar says what is actually happening."""
-    step_html = f'<span class="agent-progress-step">Step {step} of {total}</span>' if step and total else ""
-    return f"""
-<div class="agent-progress">
-  <span class="agent-progress-icon">🤖</span>
+_PROGRESS_STEP_LABELS = ("Read input", "Analyze tickets", "Build dashboards")
+
+
+def _agent_progress_html(stage: str = "Analyzing tickets", step: int | None = None, total: int | None = None) -> str:
+    """Progress card shown while an analysis runs. `stage` is the current stage label;
+    `step`/`total` (optional) turn it into a segmented, step-by-step bar - finished steps
+    are solid, the current one animates, upcoming ones are empty. Without a step it shows
+    an indeterminate bar. No percentage is shown: the pipeline reports steps, not a
+    measurable fraction, so the bar never claims more precision than it has."""
+    stage_html = _html_escape(str(stage or ""))
+    if not (step and total and total > 0):
+        return f"""
+<div class="agent-progress" role="progressbar" aria-label="Analysis in progress" aria-busy="true">
+  <div class="agent-progress-head"><span class="agent-progress-stage">{stage_html}</span></div>
   <div class="agent-progress-track"><div class="agent-progress-fill"></div></div>
-  <span class="agent-progress-text">{stage}<span class="dots"><span>.</span><span>.</span><span>.</span></span></span>
-  {step_html}
+</div>
+"""
+    step = max(1, min(int(step), int(total)))
+    total = int(total)
+    labels = _PROGRESS_STEP_LABELS if total == len(_PROGRESS_STEP_LABELS) else ()
+    items = []
+    for i in range(1, total + 1):
+        state = "done" if i < step else "active" if i == step else "todo"
+        label = f'<span class="agent-progress-step-label">{_html_escape(labels[i - 1])}</span>' if labels else ""
+        current = ' aria-current="step"' if state == "active" else ""
+        items.append(
+            f'<div class="agent-progress-step-item {state}"{current}>'
+            f'<div class="agent-progress-seg"></div>{label}</div>'
+        )
+    return f"""
+<div class="agent-progress" role="progressbar" aria-label="Analysis progress" aria-busy="true"
+     aria-valuemin="1" aria-valuemax="{total}" aria-valuenow="{step}" aria-valuetext="Step {step} of {total}: {stage_html}">
+  <div class="agent-progress-head">
+    <span class="agent-progress-stage">{stage_html}</span>
+    <span class="agent-progress-step">Step {step} of {total}</span>
+  </div>
+  <div class="agent-progress-steps">{"".join(items)}</div>
 </div>
 """
 
