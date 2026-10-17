@@ -232,199 +232,69 @@ footer {display: none !important;}
 
 .plotly {border-radius: 10px;}
 
-/* Animated "agent working" progress bar - shown in one fixed, centered
-   spot (a compact card, not a full-width strip) while an analysis is
-   running, instead of Gradio's default per-component loading overlays
-   scattered across the summary/donut chart section. */
+/* Analysis progress - shown in one fixed, centered spot (a compact card) while an
+   analysis is running, instead of Gradio's default per-component loading overlays
+   scattered across the summary/donut chart section. Segmented by step: finished steps
+   are solid, the current step animates, upcoming steps are empty. */
 #agent-progress {margin: 0 auto 16px; max-width: 600px;}
 .agent-progress {
-    display: flex; align-items: center; gap: 14px;
-    background: #ffffff; border: 1px solid var(--dash-border); border-radius: 14px;
-    padding: 12px 20px; box-shadow: var(--dash-shadow);
+    display: block;
+    background: #ffffff; border: 1px solid var(--dash-border); border-radius: 12px;
+    padding: 14px 20px 16px; box-shadow: var(--dash-shadow);
 }
-.agent-progress-icon {
-    font-size: 1.3rem; flex-shrink: 0;
-    animation: agent-bounce 1s ease-in-out infinite;
+.agent-progress-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px;
 }
-@keyframes agent-bounce {
-    0%, 100% {transform: translateY(0) rotate(0deg);}
-    50% {transform: translateY(-4px) rotate(-6deg);}
+.agent-progress-stage {
+    font-size: 0.88rem; font-weight: 600; color: var(--dash-text); line-height: 1.3;
 }
+.agent-progress-step {
+    font-size: 0.74rem; font-weight: 600; color: var(--dash-text-muted); white-space: nowrap; flex-shrink: 0;
+    letter-spacing: 0.02em;
+}
+.agent-progress-steps {display: flex; gap: 6px;}
+.agent-progress-step-item {flex: 1; min-width: 0;}
+.agent-progress-seg {
+    position: relative; height: 6px; border-radius: 999px; overflow: hidden;
+    background: var(--dash-border);
+}
+.agent-progress-step-item.done .agent-progress-seg {background: var(--dash-primary);}
+.agent-progress-step-item.active .agent-progress-seg {background: var(--dash-soft);}
+.agent-progress-step-item.active .agent-progress-seg::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: -45%; width: 45%; border-radius: 999px;
+    background: var(--dash-primary);
+    animation: progress-sweep 1.3s ease-in-out infinite;
+}
+.agent-progress-step-label {
+    display: block; margin-top: 7px; font-size: 0.72rem; font-weight: 500; color: var(--dash-text-muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.agent-progress-step-item.done .agent-progress-step-label {color: var(--dash-text-muted);}
+.agent-progress-step-item.active .agent-progress-step-label {color: var(--dash-text); font-weight: 600;}
+/* Indeterminate variant (no step information) */
 .agent-progress-track {
-    position: relative; flex: 1; height: 8px; border-radius: 999px;
-    background: #eef1f5; overflow: hidden;
+    position: relative; height: 6px; border-radius: 999px; overflow: hidden; background: var(--dash-border);
 }
 .agent-progress-fill {
-    position: absolute; top: 0; left: -40%; width: 40%; height: 100%; border-radius: 999px;
-    background: linear-gradient(90deg, transparent, var(--dash-primary), transparent);
-    animation: agent-slide 1.15s ease-in-out infinite;
+    position: absolute; top: 0; bottom: 0; left: -45%; width: 45%; border-radius: 999px;
+    background: var(--dash-primary);
+    animation: progress-sweep 1.3s ease-in-out infinite;
 }
-@keyframes agent-slide {
-    0% {left: -40%;}
+@keyframes progress-sweep {
+    0% {left: -45%;}
     100% {left: 100%;}
 }
-.agent-progress-text {
-    font-size: 0.85rem; font-weight: 600; color: var(--dash-text);
-    white-space: nowrap; flex-shrink: 0;
-}
-.agent-progress-text .dots span {
-    animation: agent-dot 1.4s infinite; opacity: 0;
-}
-.agent-progress-text .dots span:nth-child(2) {animation-delay: 0.2s;}
-.agent-progress-text .dots span:nth-child(3) {animation-delay: 0.4s;}
-@keyframes agent-dot {
-    0% {opacity: 0;}
-    20% {opacity: 1;}
-    100% {opacity: 0;}
+@media (prefers-reduced-motion: reduce) {
+    .agent-progress-step-item.active .agent-progress-seg::after, .agent-progress-fill {
+        animation: none; left: 0; width: 100%; opacity: 0.45;
+    }
 }
 
-/* Overview - Incident Health traffic-light grid. Reuses the same card
-   look as .kpi-card (white panel, left accent bar) so it reads as part
-   of the same dashboard rather than a new visual language. */
-.health-grid {display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;}
-.health-card {
-    background: #ffffff; border: 1px solid var(--dash-border); border-radius: 14px;
-    padding: 14px 16px; box-shadow: var(--dash-shadow); border-left: 4px solid var(--accent, #94a3b8);
-}
-.health-card-top {display: flex; align-items: center; gap: 8px; margin-bottom: 6px;}
-.health-dot {width: 9px; height: 9px; border-radius: 999px; background: var(--accent, #94a3b8); flex-shrink: 0;}
-.health-label {font-size: 0.78rem; font-weight: 600; color: var(--dash-text);}
-.health-status {font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; color: var(--accent, #94a3b8);}
-.health-detail {font-size: 0.76rem; color: var(--dash-text-muted); line-height: 1.35;}
-
-/* Overview - Attention Required list. Same card language as the mini
-   bar-list rows elsewhere, colored by severity via a left accent bar. */
-.attention-list {display: flex; flex-direction: column; gap: 10px;}
-.attention-item {
-    display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px;
-    border-radius: 10px; border-left: 4px solid var(--accent, #94a3b8);
-    background: #f8fafc; font-size: 0.82rem;
-}
-.attention-icon {flex-shrink: 0; font-size: 0.95rem; line-height: 1.4;}
-.attention-title {font-weight: 600; color: var(--dash-text);}
-.attention-detail {color: var(--dash-text-muted); font-size: 0.78rem; margin-top: 2px;}
-.attention-ok {
-    padding: 10px 14px; border-radius: 10px; background: #f0fdf4; border: 1px solid #bbf7d0;
-    color: #166534; font-size: 0.85rem;
-}
-
-/* Overview - Executive Summary card/button. The button is pinned with
-   position:absolute onto the card's own padding box (via
-   #exec-summary-card {position:relative}) instead of living inside a
-   gr.Row next to the heading - Gradio applies its own negative side
-   margins to Row internals to get edge-to-edge children, which was
-   pulling the button outside the card's visible border. Taking it out
-   of the normal flow entirely avoids that regardless of Gradio version. */
-#exec-summary-card {margin-top: 14px; position: relative !important; overflow: visible;}
-#exec-summary-card .section-heading {padding-right: 150px !important;}
-#exec-summary-btn {
-    position: absolute !important; top: 18px !important; right: 20px !important;
-    z-index: 5 !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
-    background: #ffffff !important; color: var(--dash-primary) !important;
-    border: 1px solid #bfdbfe !important; border-radius: 999px !important;
-    font-size: 0.78rem !important; font-weight: 600 !important; line-height: 1 !important;
-    padding: 7px 16px !important; height: auto !important; min-width: 0 !important;
-    width: auto !important; box-shadow: 0 1px 2px rgba(15,23,42,0.06) !important; white-space: nowrap !important;
-}
-#exec-summary-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
-#exec-summary-output {
-    margin-top: 4px; font-size: 0.88rem; color: var(--dash-text); line-height: 1.55;
-}
-#exec-summary-output p {margin: 0 0 8px 0;}
-
-/* Recommendations tab. Deliberately reuses .dash-card / the same left
-   accent bar as .attention-item and .health-card so this reads as another
-   panel of the same dashboard, not a new visual language. The card is a
-   fixed five-part structure (observation / evidence / recommendation /
-   attention / expected benefit) because every recommendation has exactly
-   those parts - see app/services/recommendations.py. */
-.rec-summary-bar {
-    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
-}
-.rec-chip {
-    display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
-    border-radius: 999px; background: #f1f5f9; border: 1px solid var(--dash-border);
-    font-size: 0.76rem; font-weight: 600; color: var(--dash-text);
-}
-.rec-chip-count {
-    background: #ffffff; border-radius: 999px; padding: 0 7px;
-    font-size: 0.72rem; color: var(--dash-text-muted);
-}
-.rec-list {display: flex; flex-direction: column; gap: 12px;}
-.rec-card {
-    border: 1px solid var(--dash-border); border-left: 4px solid var(--accent, #94a3b8);
-    border-radius: 10px; background: #ffffff; padding: 14px 16px;
-    box-shadow: var(--dash-shadow);
-}
-.rec-card-top {
-    display: flex; align-items: flex-start; justify-content: space-between;
-    gap: 12px; margin-bottom: 8px;
-}
-.rec-observation {font-weight: 600; font-size: 0.88rem; color: var(--dash-text); line-height: 1.4;}
-.rec-badges {display: flex; gap: 6px; flex-shrink: 0;}
-.rec-badge {
-    border-radius: 999px; padding: 3px 10px; font-size: 0.7rem;
-    font-weight: 700; white-space: nowrap; line-height: 1.4;
-}
-.rec-badge-area {background: #f1f5f9; color: var(--dash-text-muted); font-weight: 600;}
-.rec-row {display: flex; gap: 8px; font-size: 0.81rem; line-height: 1.5; margin-top: 6px;}
-.rec-row-label {
-    flex-shrink: 0; width: 132px; color: var(--dash-text-muted);
-    font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.02em;
-    padding-top: 1px;
-}
-.rec-row-value {color: var(--dash-text);}
-.rec-empty {
-    padding: 14px 16px; border-radius: 10px; background: #f0fdf4;
-    border: 1px solid #bbf7d0; color: #166534; font-size: 0.85rem; line-height: 1.5;
-}
-/* Same pinned-button treatment as #exec-summary-btn above, for the same
-   Gradio negative-margin reason - see that comment. */
-#rec-writeup-card {margin-top: 14px; position: relative !important; overflow: visible;}
-#rec-writeup-card .section-heading {padding-right: 210px !important;}
-#rec-writeup-btn {
-    position: absolute !important; top: 18px !important; right: 20px !important;
-    z-index: 5 !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
-    background: #ffffff !important; color: var(--dash-primary) !important;
-    border: 1px solid #bfdbfe !important; border-radius: 999px !important;
-    font-size: 0.78rem !important; font-weight: 600 !important; line-height: 1 !important;
-    padding: 7px 16px !important; height: auto !important; min-width: 0 !important;
-    width: auto !important; box-shadow: 0 1px 2px rgba(15,23,42,0.06) !important; white-space: nowrap !important;
-}
-#rec-writeup-btn:hover {background: #eff6ff !important; border-color: #93c5fd !important;}
-#rec-writeup-output {margin-top: 4px; font-size: 0.88rem; color: var(--dash-text); line-height: 1.55;}
-#rec-writeup-output p {margin: 0 0 8px 0;}
-
-/* First-run experience (Overview). Hero card shown before any analysis,
-   slim "Loaded" strip shown after, and dimmed result tabs until data exists. */
-#hero {margin-bottom: 14px;}
-.hero-card {
-    background: linear-gradient(135deg, #0f1f33 0%, #16345c 100%); border-radius: 16px;
-    padding: 26px 28px; box-shadow: var(--dash-shadow);
-}
-.hero-title {color: #ffffff; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px;}
-.hero-sub {color: #b6c2d4; font-size: 0.9rem; line-height: 1.5; max-width: 760px;}
-.hero-steps {display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px;}
-.hero-step {
-    display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px;
-    background: rgba(255,255,255,0.10); color: #e2e8f0; font-size: 0.8rem; font-weight: 600;
-}
-.hero-step-num {
-    width: 20px; height: 20px; border-radius: 999px; background: var(--dash-primary); color: #fff;
-    display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem;
-}
-.hero-note {color: #8291a8; font-size: 0.78rem; margin-top: 14px;}
-
-#loaded-strip {gap: 14px !important; margin-bottom: 14px; align-items: center !important; padding: 10px 20px !important;}
-.loaded-strip-text {font-size: 0.88rem; color: var(--dash-text); line-height: 1.4;}
 .loaded-strip-text .loaded-meta {color: var(--dash-text-muted); font-size: 0.8rem;}
 #sample-btn {border-radius: 10px !important; font-weight: 600 !important;}
 
 #main-tabs > .tab-nav button:disabled,
 #main-tabs > .tab-nav button[disabled] {opacity: 0.4 !important; cursor: not-allowed !important;}
-.agent-progress-step {
-    font-size: 0.72rem; font-weight: 600; color: var(--dash-text-muted); white-space: nowrap; flex-shrink: 0;
-}
 
 /* Overview polish: KPI deltas / sparkline / clickable cards, bolder
    Executive Summary button now that the card sits right under the KPIs. */
@@ -566,8 +436,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 
 /* Progress bar */
-.agent-progress-track {background: var(--dash-soft) !important;}
-.agent-progress-fill {background: linear-gradient(90deg, var(--dash-primary), var(--dash-primary-hover), var(--dash-primary)) !important;}
+.agent-progress-seg, .agent-progress-track {background: var(--dash-border) !important;}
+.agent-progress-step-item.done .agent-progress-seg {background: var(--dash-primary) !important;}
+.agent-progress-step-item.active .agent-progress-seg {background: var(--dash-soft) !important;}
+.agent-progress-step-item.active .agent-progress-seg::after, .agent-progress-fill {background: var(--dash-primary) !important;}
 
 /* Charts: let the page tokens drive text, separators and the donut gaps */
 .js-plotly-plot .legendtext, .js-plotly-plot .xtick text, .js-plotly-plot .ytick text,
