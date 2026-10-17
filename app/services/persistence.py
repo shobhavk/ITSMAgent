@@ -238,16 +238,21 @@ def _restore_cached_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+# Bump when the worklog-scoring logic changes so cached scores from the old logic are not reused.
+_SCORING_VERSION = "wl2-external+internal"
+
+
 def compute_ticket_content_hash(
-    short_description: str, description: str, worklog: str, subject: str = "", external_info: str = ""
+    short_description: str, description: str, worklog: str, subject: str = "", external_info: str = "",
+    internal_info: str = "",
 ) -> str:
     """Hash of a ticket's actual content (not its ID) - used to detect
     when an Incident ID has been re-exported with edited text, so the
-    cache isn't served stale in that case. subject/external_info default
+    cache isn't served stale in that case. subject/external_info/internal_info default
     to "" so this stays backward-compatible with any other caller."""
     raw = (
         f"{short_description or ''}|{subject or ''}|{description or ''}|"
-        f"{worklog or ''}|{external_info or ''}"
+        f"{worklog or ''}|{external_info or ''}|{internal_info or ''}|{_SCORING_VERSION}"
     ).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
 
