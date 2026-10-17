@@ -45,6 +45,10 @@ COLUMN_ALIASES: dict[str, str] = {
     # column, just extra evidence of what was actually done/found.
     "external info": "external_info",
     "external information": "external_info",
+    # Internal technical notes - scored alongside Work Notes and External Info
+    # (scorer.heuristic_score), kept as its own field so the sources stay distinct.
+    "internal info": "internal_info",
+    "internal information": "internal_info",
     "priority": "priority",
     "state": "status",
     "status": "status",
