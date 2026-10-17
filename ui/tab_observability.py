@@ -63,12 +63,12 @@ def _obs_refresh(admin_token: str = ""):
 def build_observability_tab():
     """Builds the tab contents (call inside a gr.Tab). Returns nothing - wiring is local."""
     with gr.Column(elem_classes=["dash-card"]):
-        gr.Markdown("### 🔭 Observability", elem_classes=["section-heading"])
+        gr.Markdown("### Observability", elem_classes=["section-heading"])
         gr.Markdown("Live operational metrics since the app started. For answer-quality scores run `python evaluate_agent.py` - "
                     "those are a separate thing.", elem_classes=["severity-note"])
         with gr.Row():
             token = gr.Textbox(label="Admin token (for recent events)", type="password", scale=3)
-            refresh = gr.Button("🔄 Refresh", scale=1)
+            refresh = gr.Button("Refresh", scale=1)
         summary = gr.Markdown("")
         gr.Markdown("**Tool usage**")
         tools_df = gr.Dataframe(interactive=False)
