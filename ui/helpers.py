@@ -59,6 +59,7 @@ def _results_to_full_dataframe(analysis) -> pd.DataFrame:
                 "Resolved At": r.resolved_at,
                 "Responded At": r.responded_at,
                 "Detected At": r.detected_at,
+                "Ack Start At": r.ack_start_at,
             }
         )
     return pd.DataFrame(rows)

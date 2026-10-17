@@ -47,7 +47,7 @@ ALL_COLUMNS = [
     "Short Description", "Description", "Worklog Notes", "Worklog Score",
     "Worklog Rating", "Worklog Flags", "Priority", "Status",
     "Assignment Group", "Host / CI", "Validation Notes",
-    "Opened At", "Closed At", "Created At", "Resolved At", "Responded At", "Detected At",
+    "Opened At", "Closed At", "Created At", "Resolved At", "Responded At", "Detected At", "Ack Start At",
 ]
 
 
